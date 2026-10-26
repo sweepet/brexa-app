@@ -288,12 +288,12 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
         }
     }
 
-    // --- RESPALDO MANUAL LOCAL (.JSON / .BREXA) ---
+    // --- RESPALDO MANUAL LOCAL Y EN LA NUBE (.JSON / .BREXA) ---
     suspend fun exportBackupJson(): String {
         val currencies = allCurrencies.value
         val accounts = activeAccounts.value
         val categories = expenseCategories.value + incomeCategories.value
-        val transactions = recentTransactions.value // o todas
+        val transactions = repository.getAllTransactionsSync()
 
         val payload = BackupPayload(
             exportTimestamp = System.currentTimeMillis(),
@@ -303,6 +303,22 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
             transactions = transactions
         )
         return Gson().toJson(payload)
+    }
+
+    suspend fun restoreBackupFromJson(jsonString: String): Result<Unit> {
+        return try {
+            val payload = Gson().fromJson(jsonString, BackupPayload::class.java)
+                ?: return Result.failure(IllegalArgumentException("El archivo de respaldo está corrupto o vacío."))
+
+            repository.restoreBackup(
+                currencies = payload.currencies ?: emptyList(),
+                accounts = payload.accounts ?: emptyList(),
+                categories = payload.categories ?: emptyList(),
+                transactions = payload.transactions ?: emptyList()
+            )
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 }
 

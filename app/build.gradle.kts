@@ -91,6 +91,7 @@ dependencies {
     // Credentials / Google Sign-in
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services)
+    implementation(libs.google.play.services.auth)
 
     // Testing
     testImplementation(libs.junit)

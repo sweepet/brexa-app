@@ -47,8 +47,14 @@ interface TransactionDao {
     """)
     fun getCategoryTotals(type: String, startDate: Long, endDate: Long): Flow<List<CategoryTotal>>
 
+    @Query("SELECT * FROM transactions ORDER BY date_timestamp DESC")
+    suspend fun getAllTransactionsSync(): List<TransactionEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: TransactionEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(transactions: List<TransactionEntity>)
 
     @Update
     suspend fun updateTransaction(transaction: TransactionEntity)

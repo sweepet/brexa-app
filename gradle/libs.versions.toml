@@ -50,6 +50,7 @@ gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 # Credentials / Auth
 androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
 androidx-credentials-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
+google-play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version = "21.3.0" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

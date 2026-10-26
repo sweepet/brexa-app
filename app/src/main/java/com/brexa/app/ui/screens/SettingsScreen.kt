@@ -2,12 +2,15 @@ package com.brexa.app.ui.screens
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -18,11 +21,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.brexa.app.data.sync.GoogleDriveSyncManager
 import com.brexa.app.presentation.BrexaViewModel
 import com.brexa.app.ui.components.BrutalistBadge
 import com.brexa.app.ui.components.BrutalistButton
 import com.brexa.app.ui.components.BrutalistCard
 import com.brexa.app.ui.theme.*
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -38,10 +44,34 @@ fun SettingsScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
+    val syncManager = remember { GoogleDriveSyncManager(context) }
+    var signedInAccount by remember { mutableStateOf(syncManager.getLastSignedInAccount()) }
     var isCheckingUpdates by remember { mutableStateOf(false) }
     var updateResultText by remember { mutableStateOf<String?>(null) }
     var isDriveSyncing by remember { mutableStateOf(false) }
-    var driveSyncStatus by remember { mutableStateOf("Configurado con Google Drive AppData (Gratuito)") }
+    var isDriveRestoring by remember { mutableStateOf(false) }
+    var showRestoreConfirmDialog by remember { mutableStateOf(false) }
+    var driveSyncStatus by remember {
+        mutableStateOf(
+            if (signedInAccount != null) "Listo para sincronizar o restaurar."
+            else "Inicia sesión con tu cuenta de Google para respaldar en tu nube privada de Drive."
+        )
+    }
+
+    val signInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            signedInAccount = account
+            driveSyncStatus = "Conectado. Pulsa 'SUBIR A DRIVE' para crear tu primer respaldo en la nube."
+            Toast.makeText(context, "Sesión iniciada con Google", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            driveSyncStatus = "Error al iniciar sesión: ${e.localizedMessage ?: "Cancelado"}"
+            Toast.makeText(context, driveSyncStatus, Toast.LENGTH_LONG).show()
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -117,11 +147,11 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // SECCIÓN 2: GOOGLE DRIVE APPDATA
+        // SECCIÓN 2: GOOGLE DRIVE APPDATA (100% NATIVO Y PRIVADO)
         BrutalistCard(
             modifier = Modifier.fillMaxWidth(),
             backgroundColor = SurfaceCard,
-            borderColor = BorderSolid
+            borderColor = if (signedInAccount != null) AccentLime else BorderSolid
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -134,10 +164,18 @@ fun SettingsScreen(
                         style = BrexaTypography.labelLarge.copy(color = TextPrimary)
                     )
                     BrutalistBadge(
-                        text = "100% GRATIS",
+                        text = if (signedInAccount != null) "CONECTADO" else "NO CONECTADO",
                         backgroundColor = BackgroundBase,
-                        contentColor = AccentLime,
-                        borderColor = AccentLime
+                        contentColor = if (signedInAccount != null) AccentLime else TextSecondary,
+                        borderColor = if (signedInAccount != null) AccentLime else BorderSolid
+                    )
+                }
+
+                if (signedInAccount != null) {
+                    Text(
+                        text = "Cuenta activa: ${signedInAccount?.email ?: ""}",
+                        style = BrexaTypography.labelMedium.copy(color = AccentPurple, fontWeight = FontWeight.Bold),
+                        modifier = Modifier.padding(top = 4.dp)
                     )
                 }
 
@@ -147,26 +185,149 @@ fun SettingsScreen(
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
 
-                BrutalistButton(
-                    text = if (isDriveSyncing) "SINCRONIZANDO..." else "SINCRONIZAR AHORA CON DRIVE",
-                    onClick = {
-                        isDriveSyncing = true
-                        coroutineScope.launch {
-                            // Simulación instantánea y guardado local
-                            withContext(Dispatchers.IO) {
-                                Thread.sleep(800)
-                            }
-                            isDriveSyncing = false
-                            driveSyncStatus = "Último respaldo: Hoy ${java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())}"
-                            Toast.makeText(context, "Respaldo sincronizado en Google Drive", Toast.LENGTH_SHORT).show()
+                if (signedInAccount == null) {
+                    BrutalistButton(
+                        text = "CONECTAR CUENTA DE GOOGLE",
+                        onClick = {
+                            signInLauncher.launch(syncManager.getGoogleSignInClient().signInIntent)
+                        },
+                        containerColor = AccentLime,
+                        contentColor = Color.Black,
+                        shadowColor = AccentLime,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Subir a Drive
+                        Box(modifier = Modifier.weight(1f)) {
+                            BrutalistButton(
+                                text = if (isDriveSyncing) "SUBIENDO..." else "SUBIR A DRIVE ☁",
+                                onClick = {
+                                    val acc = signedInAccount ?: return@BrutalistButton
+                                    isDriveSyncing = true
+                                    coroutineScope.launch {
+                                        val json = viewModel.exportBackupJson()
+                                        val uploadResult = syncManager.uploadBackup(acc, json)
+                                        isDriveSyncing = false
+                                        uploadResult.onSuccess {
+                                            val timeStr = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+                                            driveSyncStatus = "Último respaldo en Drive: Hoy $timeStr"
+                                            Toast.makeText(context, "Respaldo sincronizado en Google Drive con éxito", Toast.LENGTH_SHORT).show()
+                                        }.onFailure { err ->
+                                            driveSyncStatus = "Error de sincronización: ${err.message}"
+                                            Toast.makeText(context, "Error: ${err.message}", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                },
+                                containerColor = SurfaceCardElevated,
+                                contentColor = AccentLime,
+                                borderColor = AccentLime,
+                                enabled = !isDriveSyncing && !isDriveRestoring,
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
-                    },
-                    containerColor = SurfaceCardElevated,
-                    contentColor = AccentLime,
-                    borderColor = AccentLime,
-                    enabled = !isDriveSyncing
-                )
+
+                        // Restaurar desde Drive
+                        Box(modifier = Modifier.weight(1f)) {
+                            BrutalistButton(
+                                text = if (isDriveRestoring) "RESTAURANDO..." else "RESTAURAR ⬇",
+                                onClick = {
+                                    showRestoreConfirmDialog = true
+                                },
+                                containerColor = SurfaceCardElevated,
+                                contentColor = AccentPurple,
+                                borderColor = AccentPurple,
+                                enabled = !isDriveSyncing && !isDriveRestoring,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        BrutalistBadge(
+                            text = "DESCONECTAR CUENTA ✕",
+                            backgroundColor = BackgroundBase,
+                            contentColor = ExpenseRed,
+                            borderColor = ExpenseRed,
+                            modifier = Modifier.clickable {
+                                syncManager.signOut {
+                                    signedInAccount = null
+                                    driveSyncStatus = "Inicia sesión con tu cuenta de Google para respaldar en tu nube privada de Drive."
+                                    Toast.makeText(context, "Sesión de Google cerrada", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        )
+                    }
+                }
             }
+        }
+
+        // Diálogo de Confirmación para Restaurar
+        if (showRestoreConfirmDialog) {
+            AlertDialog(
+                onDismissRequest = { showRestoreConfirmDialog = false },
+                shape = RectangleShape,
+                containerColor = SurfaceCard,
+                title = {
+                    Text(text = "RESTAURAR DESDE GOOGLE DRIVE", style = BrexaTypography.titleLarge.copy(color = AccentPurple))
+                },
+                text = {
+                    Text(
+                        text = "Esta acción descargará el respaldo guardado en tu Google Drive y actualizará tus cuentas, monedas y transacciones sin duplicar registros. ¿Deseas continuar?",
+                        style = BrexaTypography.bodyMedium.copy(color = TextPrimary)
+                    )
+                },
+                confirmButton = {
+                    BrutalistBadge(
+                        text = "RESTAURAR AHORA",
+                        backgroundColor = AccentPurple,
+                        contentColor = Color.Black,
+                        borderColor = AccentPurple,
+                        modifier = Modifier.clickable {
+                            showRestoreConfirmDialog = false
+                            val acc = signedInAccount ?: return@clickable
+                            isDriveRestoring = true
+                            coroutineScope.launch {
+                                val downloadRes = syncManager.downloadBackup(acc)
+                                isDriveRestoring = false
+                                downloadRes.onSuccess { content ->
+                                    if (content.isNullOrBlank()) {
+                                        Toast.makeText(context, "No se encontró ningún respaldo en tu Google Drive.", Toast.LENGTH_LONG).show()
+                                    } else {
+                                        val restoreRes = viewModel.restoreBackupFromJson(content)
+                                        restoreRes.onSuccess {
+                                            val timeStr = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
+                                            driveSyncStatus = "Datos restaurados exitosamente hoy a las $timeStr"
+                                            Toast.makeText(context, "¡Respaldo restaurado con éxito!", Toast.LENGTH_SHORT).show()
+                                        }.onFailure { err ->
+                                            Toast.makeText(context, "Error restaurando datos: ${err.message}", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                }.onFailure { err ->
+                                    Toast.makeText(context, "Error descargando de Drive: ${err.message}", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    )
+                },
+                dismissButton = {
+                    BrutalistBadge(
+                        text = "CANCELAR",
+                        backgroundColor = BackgroundBase,
+                        contentColor = TextSecondary,
+                        borderColor = BorderSolid,
+                        modifier = Modifier.clickable { showRestoreConfirmDialog = false }
+                    )
+                }
+            )
         }
 
         Spacer(modifier = Modifier.height(24.dp))

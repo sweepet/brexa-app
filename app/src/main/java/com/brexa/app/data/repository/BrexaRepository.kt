@@ -463,6 +463,28 @@ class BrexaRepository(private val db: BrexaDatabase) {
         }
     }
 
+    // --- RESPALDO Y RESTAURACIÓN INTEGRAL ---
+    suspend fun getAllTransactionsSync(): List<TransactionEntity> {
+        return transactionDao.getAllTransactionsSync()
+    }
+
+    suspend fun restoreBackup(
+        currencies: List<CurrencyEntity>,
+        accounts: List<AccountEntity>,
+        categories: List<CategoryEntity>,
+        transactions: List<TransactionEntity>
+    ): Result<Unit> {
+        return try {
+            if (currencies.isNotEmpty()) currencyDao.insertAll(currencies)
+            if (accounts.isNotEmpty()) accountDao.insertAll(accounts)
+            if (categories.isNotEmpty()) categoryDao.insertAll(categories)
+            if (transactions.isNotEmpty()) transactionDao.insertAll(transactions)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     // --- AJUSTES Y PRIVACIDAD ---
     fun getIncognitoMode(): Flow<Boolean> = combine(
         appSettingDao.getSetting("incognito_mode")
