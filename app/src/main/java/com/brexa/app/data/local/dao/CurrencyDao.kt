@@ -36,6 +36,9 @@ interface CurrencyDao {
     @Query("UPDATE currencies SET rate_to_usd = :newRate, updated_at = :updatedAt WHERE id = :currencyId")
     suspend fun updateExchangeRate(currencyId: String, newRate: Double, updatedAt: Long = System.currentTimeMillis())
 
+    @Query("UPDATE currencies SET code = :code, name = :name, symbol = :symbol, updated_at = :updatedAt WHERE id = :id")
+    suspend fun updateBaseCurrencyDetails(id: String, code: String, name: String, symbol: String, updatedAt: Long = System.currentTimeMillis())
+
     @Delete
     suspend fun deleteCurrency(currency: CurrencyEntity)
 }

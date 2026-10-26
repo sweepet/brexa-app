@@ -32,6 +32,9 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
     val allCurrencies: StateFlow<List<CurrencyEntity>> = repository.getAllCurrencies()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val baseCurrency: StateFlow<CurrencyEntity?> = repository.getBaseCurrency()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     val recentTransactions: StateFlow<List<TransactionEntity>> = repository.getRecentTransactions(30)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -240,6 +243,20 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
             )
             result.onSuccess { onSuccess() }
                 .onFailure { onError(it.message ?: "Error al crear moneda.") }
+        }
+    }
+
+    fun updateBaseCurrency(
+        code: String,
+        name: String,
+        symbol: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = repository.updateBaseCurrency(code, name, symbol)
+            result.onSuccess { onSuccess() }
+                .onFailure { onError(it.message ?: "Error al actualizar moneda principal.") }
         }
     }
 

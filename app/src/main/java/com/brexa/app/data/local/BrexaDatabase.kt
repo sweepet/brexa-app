@@ -64,9 +64,9 @@ abstract class BrexaDatabase : RoomDatabase() {
         }
 
         private suspend fun populateInitialData(db: BrexaDatabase) {
-            // 1. Moneda Base USD y Moneda Secundaria VES inicial
-            val usd = CurrencyEntity(
-                id = "CUR_USD",
+            // 1. Moneda Base Principal (Preconfigurada como USD, pero 100% editable por el usuario)
+            val baseCurrency = CurrencyEntity(
+                id = "CUR_BASE",
                 code = "USD",
                 name = "Dólar Estadounidense",
                 symbol = "$",
@@ -76,24 +76,13 @@ abstract class BrexaDatabase : RoomDatabase() {
                 isActive = true,
                 sortOrder = 0
             )
-            val ves = CurrencyEntity(
-                id = "CUR_VES",
-                code = "VES",
-                name = "Bolívar Digital",
-                symbol = "Bs",
-                rateToUsd = 72.50,
-                iconId = "ic_account_bank",
-                isBase = false,
-                isActive = true,
-                sortOrder = 1
-            )
-            db.currencyDao().insertAll(listOf(usd, ves))
+            db.currencyDao().insertCurrency(baseCurrency)
 
-            // 2. Cuenta Predeterminada: Dólares Efectivo
-            val cashAccount = AccountEntity(
-                id = "ACC_DEFAULT_USD",
-                name = "Dólares Efectivo",
-                currencyId = "CUR_USD",
+            // 2. Cuenta Predeterminada vinculada a la Moneda Base
+            val defaultAccount = AccountEntity(
+                id = "ACC_DEFAULT",
+                name = "Efectivo Principal",
+                currencyId = "CUR_BASE",
                 iconType = "CASH",
                 colorHex = "#D4FF00",
                 initialBalance = 0.0,
@@ -103,7 +92,7 @@ abstract class BrexaDatabase : RoomDatabase() {
                 isArchived = false,
                 sortOrder = 0
             )
-            db.accountDao().insertAccount(cashAccount)
+            db.accountDao().insertAccount(defaultAccount)
 
             // 3. 5 Categorías de Gastos Predeterminadas
             val expenseCategories = listOf(

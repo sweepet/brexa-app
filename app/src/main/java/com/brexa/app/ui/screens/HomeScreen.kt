@@ -41,18 +41,22 @@ fun HomeScreen(
     val totalUsd by viewModel.consolidatedUsdBalance.collectAsState()
     val accounts by viewModel.activeAccounts.collectAsState()
     val currencies by viewModel.allCurrencies.collectAsState()
+    val baseCurrency by viewModel.baseCurrency.collectAsState()
     val recentTransactions by viewModel.recentTransactions.collectAsState()
     val isIncognito by viewModel.incognitoMode.collectAsState()
 
     var transactionToDelete by remember { mutableStateOf<TransactionEntity?>(null) }
 
     val formatter = remember { DecimalFormat("#,##0.00") }
-    val dateFormatter = remember { SimpleDateFormat("dd MMM, HH:mm", Locale("es", "VE")) }
+    val dateFormatter = remember { SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()) }
 
-    // Tasa del Bolívar para mostrar la referencia
-    val vesCurrency = currencies.find { it.code == "VES" }
-    val vesRate = vesCurrency?.rateToUsd ?: 72.50
-    val equivalentVes = totalUsd * vesRate
+    // Moneda Base y Primera Moneda Secundaria (si el usuario la ha creado)
+    val baseCode = baseCurrency?.code ?: "USD"
+    val baseSymbol = baseCurrency?.symbol ?: "$"
+    val secondaryCurrency = currencies.find { !it.isBase }
+    val hasSecondary = secondaryCurrency != null
+    val secRate = secondaryCurrency?.rateToUsd ?: 1.0
+    val equivalentSec = totalUsd * secRate
 
     Column(
         modifier = Modifier
@@ -90,7 +94,7 @@ fun HomeScreen(
                         style = BrexaTypography.labelLarge.copy(color = AccentLime)
                     )
                     Text(
-                        text = "1 USD = ${String.format("%.2f", vesRate)} VES",
+                        text = if (hasSecondary) "1 $baseCode = ${String.format("%.2f", secRate)} ${secondaryCurrency?.code}" else "MONEDA ANCLA: $baseCode",
                         style = BrexaTypography.labelMedium.copy(color = AccentPurple)
                     )
                 }
@@ -154,7 +158,7 @@ fun HomeScreen(
                                 )
                             )
                             BrutalistBadge(
-                                text = "USD BASE",
+                                text = "$baseCode BASE",
                                 backgroundColor = BackgroundBase,
                                 contentColor = AccentLime,
                                 borderColor = AccentLime
@@ -165,7 +169,7 @@ fun HomeScreen(
 
                         // Monto gigante en Lima Neón
                         Text(
-                            text = if (isIncognito) "$ •••••••" else "$ ${formatter.format(totalUsd)}",
+                            text = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(totalUsd)}",
                             style = BrexaTypography.displayLarge.copy(
                                 color = AccentLime,
                                 fontWeight = FontWeight.Bold,
@@ -176,7 +180,13 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(4.dp))
 
                         Text(
-                            text = if (isIncognito) "≈ ••••••• VES" else "≈ ${formatter.format(equivalentVes)} VES (VALUACIÓN VIVA)",
+                            text = if (isIncognito) {
+                                "≈ •••••••"
+                            } else if (hasSecondary) {
+                                "≈ ${formatter.format(equivalentSec)} ${secondaryCurrency?.code} (VALUACIÓN VIVA)"
+                            } else {
+                                "MONEDA PRINCIPAL: ${baseCurrency?.name ?: "Dólar"}"
+                            },
                             style = BrexaTypography.labelMedium.copy(
                                 color = AccentPurple,
                                 fontWeight = FontWeight.Bold

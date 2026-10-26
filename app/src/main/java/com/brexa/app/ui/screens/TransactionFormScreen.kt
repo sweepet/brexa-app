@@ -43,6 +43,7 @@ fun TransactionFormScreen(
 ) {
     val accounts by viewModel.activeAccounts.collectAsState()
     val currencies by viewModel.allCurrencies.collectAsState()
+    val baseCurrency by viewModel.baseCurrency.collectAsState()
     val expenseCategories by viewModel.expenseCategories.collectAsState()
     val incomeCategories by viewModel.incomeCategories.collectAsState()
 
@@ -218,7 +219,7 @@ fun TransactionFormScreen(
                                 )
                             )
                             Text(
-                                text = "${currencyFormatter.format(acc.currentBalance)} ${curr?.code ?: "USD"}",
+                                text = "${currencyFormatter.format(acc.currentBalance)} ${curr?.code ?: (baseCurrency?.code ?: "USD")}",
                                 style = BrexaTypography.labelMedium.copy(color = TextSecondary)
                             )
                         }
@@ -235,7 +236,7 @@ fun TransactionFormScreen(
             onValueChange = { amountText = it },
             label = if (selectedType == "EXCHANGE") "MONTO A TRANSFERIR" else "MONTO",
             placeholder = "0.00",
-            suffix = accountCurrency?.code ?: "USD",
+            suffix = accountCurrency?.code ?: (baseCurrency?.code ?: "USD"),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth()
         )
@@ -250,7 +251,7 @@ fun TransactionFormScreen(
                 onValueChange = { destinationAmountText = it },
                 label = "MONTO RECIBIDO EN DESTINO",
                 placeholder = "0.00",
-                suffix = destCurr?.code ?: "USD",
+                suffix = destCurr?.code ?: (baseCurrency?.code ?: "USD"),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 borderColor = ExchangeBlue,
                 modifier = Modifier.fillMaxWidth()
@@ -280,7 +281,7 @@ fun TransactionFormScreen(
                             style = BrexaTypography.labelMedium.copy(color = TextSecondary)
                         )
                         BrutalistBadge(
-                            text = "1 USD = ${String.format("%.2f", currentRate)} ${accountCurrency?.code}",
+                            text = "1 ${baseCurrency?.code ?: "USD"} = ${String.format("%.2f", currentRate)} ${accountCurrency?.code}",
                             backgroundColor = BackgroundBase,
                             contentColor = AccentLime,
                             borderColor = AccentLime
@@ -344,7 +345,7 @@ fun TransactionFormScreen(
                                 style = BrexaTypography.labelMedium.copy(color = TextSecondary, fontSize = 10.sp)
                             )
                             Text(
-                                text = "⚡ $ ${currencyFormatter.format(equivalentUsd)} USD",
+                                text = "⚡ ${baseCurrency?.symbol ?: "$"} ${currencyFormatter.format(equivalentUsd)} ${baseCurrency?.code ?: "USD"}",
                                 style = BrexaTypography.displayMedium.copy(
                                     color = AccentLime,
                                     fontWeight = FontWeight.Bold
@@ -423,7 +424,7 @@ fun TransactionFormScreen(
             value = noteText,
             onValueChange = { noteText = it },
             label = "NOTA / CONCEPTO (OPCIONAL)",
-            placeholder = "ej. Almuerzo, Pago Móvil Banesco...",
+            placeholder = "ej. Supermercado, Almuerzo, Transporte...",
             isMonospace = false,
             modifier = Modifier.fillMaxWidth()
         )

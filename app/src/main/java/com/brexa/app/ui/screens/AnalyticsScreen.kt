@@ -30,6 +30,7 @@ fun AnalyticsScreen(
     onBack: () -> Unit
 ) {
     val distribution by viewModel.categoryDistribution.collectAsState()
+    val baseCurrency by viewModel.baseCurrency.collectAsState()
     val currentMonth by viewModel.analyticsMonth.collectAsState()
     val currentYear by viewModel.analyticsYear.collectAsState()
     val currentType by viewModel.analyticsType.collectAsState()
@@ -164,12 +165,14 @@ fun AnalyticsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column {
+                    val baseCode = baseCurrency?.code ?: "USD"
+                    val baseSymbol = baseCurrency?.symbol ?: "$"
                     Text(
-                        text = if (currentType == "EXPENSE") "TOTAL GASTADO EN USD" else "TOTAL INGRESADO EN USD",
+                        text = if (currentType == "EXPENSE") "TOTAL GASTADO EN $baseCode" else "TOTAL INGRESADO EN $baseCode",
                         style = BrexaTypography.labelMedium.copy(color = TextSecondary)
                     )
                     Text(
-                        text = "$ ${formatter.format(totalPeriodUsd)} USD",
+                        text = "$baseSymbol ${formatter.format(totalPeriodUsd)} $baseCode",
                         style = BrexaTypography.displayMedium.copy(
                             color = if (currentType == "EXPENSE") ExpenseRed else IncomeGreen,
                             fontWeight = FontWeight.Bold
@@ -252,7 +255,7 @@ fun AnalyticsScreen(
                                 }
 
                                 Text(
-                                    text = "$ ${formatter.format(item.totalUsd)} USD",
+                                    text = "${baseCurrency?.symbol ?: "$"} ${formatter.format(item.totalUsd)} ${baseCurrency?.code ?: "USD"}",
                                     style = BrexaTypography.labelLarge.copy(
                                         color = AccentLime,
                                         fontWeight = FontWeight.Bold

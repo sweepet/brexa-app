@@ -30,6 +30,24 @@ class BrexaRepository(private val db: BrexaDatabase) {
     // --- MONEDAS ---
     fun getAllCurrencies(): Flow<List<CurrencyEntity>> = currencyDao.getAllCurrencies()
     fun getActiveCurrencies(): Flow<List<CurrencyEntity>> = currencyDao.getActiveCurrencies()
+    fun getBaseCurrency(): Flow<CurrencyEntity?> = currencyDao.getBaseCurrency()
+
+    suspend fun updateBaseCurrency(code: String, name: String, symbol: String): Result<Unit> {
+        val cleanCode = code.trim().uppercase().take(4)
+        if (cleanCode.isEmpty()) {
+            return Result.failure(IllegalArgumentException("La sigla de la moneda principal no puede estar vacía."))
+        }
+        val baseCurr = currencyDao.getBaseCurrency().first()
+            ?: return Result.failure(IllegalStateException("Moneda principal no encontrada."))
+
+        currencyDao.updateBaseCurrencyDetails(
+            id = baseCurr.id,
+            code = cleanCode,
+            name = name.trim().ifEmpty { "Moneda Principal" },
+            symbol = symbol.trim().ifEmpty { cleanCode }
+        )
+        return Result.success(Unit)
+    }
 
     suspend fun addCustomCurrency(
         code: String,
@@ -311,10 +329,10 @@ class BrexaRepository(private val db: BrexaDatabase) {
 
         // Tasa real implícita del canje
         val implicitRate = if (sourceCurrency?.isBase == true) {
-            // Salió USD, entraron VES -> Tasa = VES / USD
+            // Salió Moneda Base, entró Secundaria -> Tasa = Secundaria / Base
             BigDecimal(targetReceivedAmount).divide(BigDecimal(sourceAmount), 4, RoundingMode.HALF_EVEN).toDouble()
         } else if (targetCurrency?.isBase == true) {
-            // Salieron VES, entraron USD -> Tasa = VES / USD
+            // Salió Secundaria, entró Moneda Base -> Tasa = Secundaria / Base
             BigDecimal(sourceAmount).divide(BigDecimal(targetReceivedAmount), 4, RoundingMode.HALF_EVEN).toDouble()
         } else {
             BigDecimal(targetReceivedAmount).divide(BigDecimal(sourceAmount), 4, RoundingMode.HALF_EVEN).toDouble()

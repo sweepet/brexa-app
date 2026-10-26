@@ -36,12 +36,14 @@ fun AccountsCurrenciesScreen(
 ) {
     val accounts by viewModel.activeAccounts.collectAsState()
     val currencies by viewModel.allCurrencies.collectAsState()
+    val baseCurrency by viewModel.baseCurrency.collectAsState()
 
     var activeTab by remember { mutableStateOf("ACCOUNTS") } // "ACCOUNTS" o "CURRENCIES"
 
     // Modales
     var showCreateAccountDialog by remember { mutableStateOf(false) }
     var showCreateCurrencyDialog by remember { mutableStateOf(false) }
+    var showEditBaseCurrencyDialog by remember { mutableStateOf(false) }
     var editingRateCurrency by remember { mutableStateOf<CurrencyEntity?>(null) }
     var adjustingAccount by remember { mutableStateOf<AccountEntity?>(null) }
 
@@ -252,8 +254,9 @@ fun AccountsCurrenciesScreen(
                                     )
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
+                                val baseCode = baseCurrency?.code ?: "USD"
                                 Text(
-                                    text = if (curr.isBase) "1 USD = 1.00 USD (MONEDA BASE)" else "1 USD = ${String.format("%.2f", curr.rateToUsd)} ${curr.code}",
+                                    text = if (curr.isBase) "1 $baseCode = 1.00 $baseCode (MONEDA BASE ANCLA)" else "1 $baseCode = ${String.format("%.2f", curr.rateToUsd)} ${curr.code}",
                                     style = BrexaTypography.labelMedium.copy(
                                         color = if (curr.isBase) AccentLime else TextSecondary,
                                         fontWeight = FontWeight.Bold
@@ -261,7 +264,15 @@ fun AccountsCurrenciesScreen(
                                 )
                             }
 
-                            if (!curr.isBase) {
+                            if (curr.isBase) {
+                                BrutalistBadge(
+                                    text = "EDITAR ✎",
+                                    backgroundColor = BackgroundBase,
+                                    contentColor = AccentLime,
+                                    borderColor = AccentLime,
+                                    modifier = Modifier.clickable { showEditBaseCurrencyDialog = true }
+                                )
+                            } else {
                                 BrutalistBadge(
                                     text = "EDITAR TASA ✎",
                                     backgroundColor = BackgroundBase,
@@ -306,7 +317,7 @@ fun AccountsCurrenciesScreen(
                         value = accountName,
                         onValueChange = { accountName = it },
                         label = "NOMBRE DE LA CUENTA",
-                        placeholder = "ej. Banesco Pago Móvil"
+                        placeholder = "ej. Billetera, Cuenta Bancaria, Ahorros"
                     )
 
                     Text(text = "MONEDA", style = BrexaTypography.labelMedium.copy(color = TextSecondary))
@@ -422,7 +433,7 @@ fun AccountsCurrenciesScreen(
                     BrutalistTextField(
                         value = rateText,
                         onValueChange = { rateText = it },
-                        label = "TASA DE CAMBIO: 1 USD = [ X ] SIGLA",
+                        label = "TASA DE CAMBIO: 1 ${baseCurrency?.code ?: "USD"} = [ X ] SIGLA",
                         placeholder = "ej. 72.50",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
@@ -479,14 +490,15 @@ fun AccountsCurrenciesScreen(
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    val baseCode = baseCurrency?.code ?: "USD"
                     Text(
-                        text = "Introduce cuántas unidades de ${curr.code} equivalen a 1 USD hoy:",
+                        text = "Introduce cuántas unidades de ${curr.code} equivalen a 1 $baseCode hoy:",
                         style = BrexaTypography.bodyMedium.copy(color = TextPrimary)
                     )
                     BrutalistTextField(
                         value = newRateText,
                         onValueChange = { newRateText = it },
-                        label = "1 USD = [ X ] ${curr.code}",
+                        label = "1 $baseCode = [ X ] ${curr.code}",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
                     if (dialogError != null) {
@@ -518,6 +530,83 @@ fun AccountsCurrenciesScreen(
                     contentColor = TextSecondary,
                     borderColor = BorderSolid,
                     modifier = Modifier.clickable { editingRateCurrency = null }
+                )
+            }
+        )
+    }
+
+    // Modal: Editar Moneda Base
+    if (showEditBaseCurrencyDialog && baseCurrency != null) {
+        val baseCurr = baseCurrency!!
+        var baseCodeText by remember { mutableStateOf(baseCurr.code) }
+        var baseNameText by remember { mutableStateOf(baseCurr.name) }
+        var baseSymbolText by remember { mutableStateOf(baseCurr.symbol) }
+        var dialogError by remember { mutableStateOf<String?>(null) }
+
+        AlertDialog(
+            onDismissRequest = { showEditBaseCurrencyDialog = false },
+            shape = RectangleShape,
+            containerColor = SurfaceCard,
+            title = {
+                Text(text = "CONFIGURAR MONEDA BASE", style = BrexaTypography.titleLarge.copy(color = AccentLime))
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "La moneda base es la ancla contable para calcular el patrimonio total consolidado y registrar el valor histórico de todas las operaciones.",
+                        style = BrexaTypography.bodyMedium.copy(color = TextSecondary, fontSize = 11.sp)
+                    )
+
+                    BrutalistTextField(
+                        value = baseCodeText,
+                        onValueChange = { if (it.length <= 4) baseCodeText = it.uppercase() },
+                        label = "SIGLA (HASTA 4 LETRAS)",
+                        placeholder = "ej. USD, EUR, USDT"
+                    )
+
+                    BrutalistTextField(
+                        value = baseNameText,
+                        onValueChange = { baseNameText = it },
+                        label = "NOMBRE DE LA MONEDA",
+                        placeholder = "ej. Dólar Estadounidense"
+                    )
+
+                    BrutalistTextField(
+                        value = baseSymbolText,
+                        onValueChange = { if (it.length <= 3) baseSymbolText = it },
+                        label = "SÍMBOLO",
+                        placeholder = "ej. $, €, ₮"
+                    )
+
+                    if (dialogError != null) {
+                        Text(text = "⚠️ $dialogError", style = BrexaTypography.labelMedium.copy(color = ExpenseRed))
+                    }
+                }
+            },
+            confirmButton = {
+                BrutalistBadge(
+                    text = "GUARDAR CAMBIOS",
+                    backgroundColor = AccentLime,
+                    contentColor = Color.Black,
+                    borderColor = AccentLime,
+                    modifier = Modifier.clickable {
+                        viewModel.updateBaseCurrency(
+                            code = baseCodeText,
+                            name = baseNameText,
+                            symbol = baseSymbolText,
+                            onSuccess = { showEditBaseCurrencyDialog = false },
+                            onError = { dialogError = it }
+                        )
+                    }
+                )
+            },
+            dismissButton = {
+                BrutalistBadge(
+                    text = "CANCELAR",
+                    backgroundColor = BackgroundBase,
+                    contentColor = TextSecondary,
+                    borderColor = BorderSolid,
+                    modifier = Modifier.clickable { showEditBaseCurrencyDialog = false }
                 )
             }
         )
