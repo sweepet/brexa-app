@@ -21,7 +21,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.brexa.app.data.sync.AppUpdateManager
 import com.brexa.app.data.sync.GoogleDriveSyncManager
+import com.brexa.app.data.sync.UpdateInfo
 import com.brexa.app.presentation.BrexaViewModel
 import com.brexa.app.ui.components.BrutalistBadge
 import com.brexa.app.ui.components.BrutalistButton
@@ -45,8 +47,12 @@ fun SettingsScreen(
     val coroutineScope = rememberCoroutineScope()
 
     val syncManager = remember { GoogleDriveSyncManager(context) }
+    val updateManager = remember { AppUpdateManager(context) }
     var signedInAccount by remember { mutableStateOf(syncManager.getLastSignedInAccount()) }
     var isCheckingUpdates by remember { mutableStateOf(false) }
+    var availableUpdateInSettings by remember { mutableStateOf<UpdateInfo?>(null) }
+    var isDownloadingInSettings by remember { mutableStateOf(false) }
+    var settingsDownloadProgress by remember { mutableFloatStateOf(0f) }
     var updateResultText by remember { mutableStateOf<String?>(null) }
     var isDriveSyncing by remember { mutableStateOf(false) }
     var isDriveRestoring by remember { mutableStateOf(false) }
@@ -368,43 +374,87 @@ fun SettingsScreen(
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
 
-                BrutalistButton(
-                    text = if (isCheckingUpdates) "CONSULTANDO GITHUB..." else "BUSCAR ACTUALIZACIONES",
-                    onClick = {
-                        isCheckingUpdates = true
-                        updateResultText = null
-                        coroutineScope.launch {
-                            try {
-                                val client = OkHttpClient()
-                                val request = Request.Builder()
-                                    .url("https://api.github.com/repos/sweepet/brexa-app/releases/latest")
-                                    .header("User-Agent", "Brexa-Android-App")
-                                    .build()
-
-                                val response = withContext(Dispatchers.IO) { client.newCall(request).execute() }
-                                if (response.isSuccessful) {
-                                    val body = response.body?.string() ?: ""
-                                    val json = JSONObject(body)
-                                    val tagName = json.optString("tag_name", "v1.0.0")
-                                    updateResultText = if (tagName != "v1.0.0") {
-                                        "⚡ ¡Nueva versión disponible: $tagName! Consulta el enlace de descarga en GitHub."
+                if (availableUpdateInSettings == null) {
+                    BrutalistButton(
+                        text = if (isCheckingUpdates) "CONSULTANDO GITHUB..." else "BUSCAR ACTUALIZACIONES",
+                        onClick = {
+                            isCheckingUpdates = true
+                            updateResultText = null
+                            availableUpdateInSettings = null
+                            coroutineScope.launch {
+                                val result = updateManager.checkForUpdate("v1.0.0")
+                                isCheckingUpdates = false
+                                result.onSuccess { update ->
+                                    if (update != null) {
+                                        availableUpdateInSettings = update
                                     } else {
-                                        "✅ Brexa está al día (v1.0.0). No hay nuevas versiones."
+                                        updateResultText = "✅ Brexa está al día (v1.0.0). No hay nuevas versiones."
                                     }
-                                } else {
+                                }.onFailure { err ->
                                     updateResultText = "✅ Brexa está al día (v1.0.0). No hay nuevas versiones."
                                 }
-                            } catch (e: Exception) {
-                                updateResultText = "✅ Brexa está al día (v1.0.0). No hay nuevas versiones."
-                            } finally {
-                                isCheckingUpdates = false
                             }
+                        },
+                        containerColor = AccentPurple,
+                        contentColor = Color.Black,
+                        enabled = !isCheckingUpdates,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    val update = availableUpdateInSettings!!
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "⚡ ¡NUEVA VERSIÓN DETECTADA: ${update.versionName}!",
+                            style = BrexaTypography.labelLarge.copy(color = AccentLime, fontWeight = FontWeight.Bold)
+                        )
+                        if (update.releaseNotes.isNotEmpty()) {
+                            Text(
+                                text = update.releaseNotes,
+                                style = BrexaTypography.bodyMedium.copy(color = TextSecondary, fontSize = 11.sp)
+                            )
                         }
-                    },
-                    containerColor = AccentPurple,
-                    contentColor = Color.Black,
-                    enabled = !isCheckingUpdates
-                )
+
+                        if (isDownloadingInSettings) {
+                            Text(
+                                text = "DESCARGANDO APK: ${(settingsDownloadProgress * 100).toInt()}%",
+                                style = BrexaTypography.labelLarge.copy(color = AccentLime)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(14.dp)
+                                    .background(BackgroundBase, RectangleShape)
+                                    .border(1.5.dp, BorderSolid, RectangleShape)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .fillMaxWidth(fraction = settingsDownloadProgress.coerceIn(0.01f, 1f))
+                                        .background(AccentLime, RectangleShape)
+                                )
+                            }
+                        } else {
+                            BrutalistButton(
+                                text = "DESCARGAR E INSTALAR AHORA",
+                                onClick = {
+                                    isDownloadingInSettings = true
+                                    coroutineScope.launch {
+                                        val res = updateManager.downloadAndInstall(update) { progress ->
+                                            settingsDownloadProgress = progress
+                                        }
+                                        isDownloadingInSettings = false
+                                        res.onFailure { err ->
+                                            Toast.makeText(context, "Error: ${err.message}", Toast.LENGTH_LONG).show()
+                                        }
+                                    }
+                                },
+                                containerColor = AccentLime,
+                                contentColor = Color.Black,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
 
                 if (updateResultText != null) {
                     Spacer(modifier = Modifier.height(10.dp))
