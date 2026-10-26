@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brexa.app.R
@@ -151,33 +152,33 @@ fun AccountsCurrenciesScreen(
                         borderColor = if (acc.isDefault) AccentLime else BorderSolid
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
+                            // Fila Superior: Icono + Nombre (izquierda con peso y ellipsis) y Badge de Estado (derecha)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Icon(
                                         painter = painterResource(id = iconRes),
                                         contentDescription = acc.name,
                                         tint = if (acc.isDefault) AccentLime else AccentPurple,
                                         modifier = Modifier.size(20.dp)
                                     )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Column {
-                                        Text(
-                                            text = acc.name.uppercase(),
-                                            style = BrexaTypography.labelLarge.copy(color = TextPrimary)
-                                        )
-                                        Text(
-                                            text = "${formatter.format(acc.currentBalance)} ${curr?.code ?: "USD"}",
-                                            style = BrexaTypography.titleLarge.copy(
-                                                color = if (acc.currentBalance < 0.0) ExpenseRed else TextPrimary,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        )
-                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = acc.name.uppercase(),
+                                        style = BrexaTypography.labelLarge.copy(color = TextPrimary),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
                                 }
+
+                                Spacer(modifier = Modifier.width(8.dp))
 
                                 BrutalistBadge(
                                     text = if (acc.includeInTotal) "INCLUIDA EN TOTAL" else "EXCLUIDA",
@@ -192,11 +193,27 @@ fun AccountsCurrenciesScreen(
 
                             Spacer(modifier = Modifier.height(10.dp))
 
+                            // Fila Inferior: Saldo grande (izquierda con ellipsis) y Botón Ajustar Saldo (derecha)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End,
+                                horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                val baseCode = baseCurrency?.code ?: "USD"
+                                Text(
+                                    text = "${formatter.format(acc.currentBalance)} ${curr?.code ?: baseCode}",
+                                    style = BrexaTypography.titleLarge.copy(
+                                        color = if (acc.currentBalance < 0.0) ExpenseRed else TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 18.sp
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
                                 BrutalistBadge(
                                     text = "AJUSTAR SALDO",
                                     backgroundColor = SurfaceCardElevated,
@@ -239,7 +256,7 @@ fun AccountsCurrenciesScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     BrutalistBadge(
                                         text = curr.code,
@@ -250,7 +267,10 @@ fun AccountsCurrenciesScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = curr.name.uppercase(),
-                                        style = BrexaTypography.labelLarge.copy(color = TextPrimary)
+                                        style = BrexaTypography.labelLarge.copy(color = TextPrimary),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
                                     )
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
@@ -259,10 +279,15 @@ fun AccountsCurrenciesScreen(
                                     text = if (curr.isBase) "1 $baseCode = 1.00 $baseCode (MONEDA BASE ANCLA)" else "1 $baseCode = ${String.format("%.2f", curr.rateToUsd)} ${curr.code}",
                                     style = BrexaTypography.labelMedium.copy(
                                         color = if (curr.isBase) AccentLime else TextSecondary,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
+
+                            Spacer(modifier = Modifier.width(8.dp))
 
                             if (curr.isBase) {
                                 BrutalistBadge(

@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brexa.app.R
@@ -63,20 +65,23 @@ fun HomeScreen(
             .fillMaxSize()
             .background(BackgroundBase)
     ) {
-        // --- 1. BARRA SUPERIOR TERMINAL ---
+        // --- 1. BARRA SUPERIOR TERMINAL (100% RESPONSIVE) ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(SurfaceCard)
                 .border(width = 1.dp, color = BorderSolid)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(horizontal = 14.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(34.dp)
                         .background(BackgroundBase, RectangleShape)
                         .border(1.5.dp, AccentLime, RectangleShape)
                         .padding(4.dp)
@@ -87,20 +92,26 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxSize()
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
-                Column {
+                Spacer(modifier = Modifier.width(8.dp))
+                Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
                         text = "BREXA // TERMINAL",
-                        style = BrexaTypography.labelLarge.copy(color = AccentLime)
+                        style = BrexaTypography.labelLarge.copy(color = AccentLime, fontSize = 12.sp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = if (hasSecondary) "1 $baseCode = ${String.format("%.2f", secRate)} ${secondaryCurrency?.code}" else "MONEDA ANCLA: $baseCode",
-                        style = BrexaTypography.labelMedium.copy(color = AccentPurple)
+                        style = BrexaTypography.labelMedium.copy(color = AccentPurple, fontSize = 10.sp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Spacer(modifier = Modifier.width(6.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 // Botón Incógnito
                 BrutalistBadge(
                     text = if (isIncognito) "👁 OCULTO" else "👁 VISIBLE",
@@ -168,13 +179,16 @@ fun HomeScreen(
                         Spacer(modifier = Modifier.height(10.dp))
 
                         // Monto gigante en Lima Neón
+                        val balanceDisplay = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(totalUsd)}"
                         Text(
-                            text = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(totalUsd)}",
+                            text = balanceDisplay,
                             style = BrexaTypography.displayLarge.copy(
                                 color = AccentLime,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 32.sp
-                            )
+                                fontSize = if (balanceDisplay.length > 13) 24.sp else 30.sp
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
 
                         Spacer(modifier = Modifier.height(4.dp))
@@ -189,14 +203,17 @@ fun HomeScreen(
                             },
                             style = BrexaTypography.labelMedium.copy(
                                 color = AccentPurple,
-                                fontWeight = FontWeight.Bold
-                            )
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
             }
 
-            // --- 3. BOTONES DE ACCIÓN RÁPIDA ---
+            // --- 3. BOTONES DE ACCIÓN RÁPIDA (100% RESPONSIVE) ---
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -209,15 +226,19 @@ fun HomeScreen(
                             .background(ExpenseRed, RectangleShape)
                             .border(2.dp, BorderBright, RectangleShape)
                             .clickable { onOpenTransactionForm("EXPENSE") }
-                            .padding(vertical = 14.dp),
+                            .padding(vertical = 12.dp, horizontal = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "− GASTAR",
                             style = BrexaTypography.labelLarge.copy(
                                 color = Color.Black,
-                                fontWeight = FontWeight.Bold
-                            )
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
@@ -228,15 +249,19 @@ fun HomeScreen(
                             .background(IncomeGreen, RectangleShape)
                             .border(2.dp, BorderBright, RectangleShape)
                             .clickable { onOpenTransactionForm("INCOME") }
-                            .padding(vertical = 14.dp),
+                            .padding(vertical = 12.dp, horizontal = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "+ INGRESAR",
                             style = BrexaTypography.labelLarge.copy(
                                 color = Color.Black,
-                                fontWeight = FontWeight.Bold
-                            )
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
 
@@ -247,15 +272,19 @@ fun HomeScreen(
                             .background(ExchangeBlue, RectangleShape)
                             .border(2.dp, BorderBright, RectangleShape)
                             .clickable { onOpenTransactionForm("EXCHANGE") }
-                            .padding(vertical = 14.dp),
+                            .padding(vertical = 12.dp, horizontal = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "⇄ EXCHANGE",
                             style = BrexaTypography.labelLarge.copy(
                                 color = Color.Black,
-                                fontWeight = FontWeight.Bold
-                            )
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                textAlign = TextAlign.Center
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -340,7 +369,8 @@ fun HomeScreen(
                                             fontSize = 12.sp,
                                             color = TextPrimary
                                         ),
-                                        maxLines = 1
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
                                         text = if (isIncognito) "••••••" else "${formatter.format(account.currentBalance)} ${curr?.symbol ?: ""}",
@@ -348,15 +378,19 @@ fun HomeScreen(
                                             color = if (account.currentBalance < 0.0) ExpenseRed else TextPrimary,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 15.sp
-                                        )
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                     if (curr?.isBase == false) {
                                         Text(
-                                            text = if (isIncognito) "≈ $ •••" else "≈ $ ${formatter.format(usdVal)} USD",
+                                            text = if (isIncognito) "≈ $baseSymbol •••" else "≈ $baseSymbol ${formatter.format(usdVal)} $baseCode",
                                             style = BrexaTypography.labelMedium.copy(
                                                 color = AccentLime,
                                                 fontSize = 10.sp
-                                            )
+                                            ),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
                                 }
@@ -432,7 +466,7 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Izquierda: Badge y Concepto
+                            // Izquierda: Badge y Concepto (con peso flexible y ellipsis)
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     BrutalistBadge(
@@ -448,32 +482,42 @@ fun HomeScreen(
                                             color = TextPrimary,
                                             fontSize = 13.sp
                                         ),
-                                        maxLines = 1
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
                                     )
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "${acc?.name ?: "Cuenta"} ${if (destAcc != null) "➔ ${destAcc.name}" else ""} • ${dateFormatter.format(Date(tx.dateTimestamp))}",
-                                    style = BrexaTypography.labelMedium.copy(color = TextMuted, fontSize = 10.sp)
+                                    style = BrexaTypography.labelMedium.copy(color = TextMuted, fontSize = 10.sp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
 
+                            Spacer(modifier = Modifier.width(10.dp))
+
                             // Derecha: Cifras bimonetarias
-                            Column(horizontalAlignment = Alignment.End) {
+                            Column(horizontalAlignment = Alignment.End, modifier = Modifier.wrapContentWidth()) {
                                 val prefix = if (tx.type == "EXPENSE") "− " else if (tx.type == "INCOME") "+ " else "⇄ "
                                 Text(
                                     text = if (isIncognito) "••••••" else "$prefix${formatter.format(tx.nativeAmount)} ${tx.currencyCode}",
                                     style = BrexaTypography.labelLarge.copy(
                                         color = if (tx.type == "EXPENSE") ExpenseRed else if (tx.type == "INCOME") IncomeGreen else TextPrimary,
                                         fontWeight = FontWeight.Bold
-                                    )
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = if (isIncognito) "≈ •••• USD" else "≈ $ ${formatter.format(tx.usdEquivalent)} USD",
+                                    text = if (isIncognito) "≈ •••• $baseCode" else "≈ $baseSymbol ${formatter.format(tx.usdEquivalent)} $baseCode",
                                     style = BrexaTypography.labelMedium.copy(
                                         color = AccentLime,
                                         fontSize = 10.sp
-                                    )
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
                         }

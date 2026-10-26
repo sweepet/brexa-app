@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brexa.app.R
@@ -278,8 +279,12 @@ fun TransactionFormScreen(
                     ) {
                         Text(
                             text = "TASA DE CAMBIO APLICADA",
-                            style = BrexaTypography.labelMedium.copy(color = TextSecondary)
+                            style = BrexaTypography.labelMedium.copy(color = TextSecondary, fontSize = 11.sp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f, fill = false)
                         )
+                        Spacer(modifier = Modifier.width(6.dp))
                         BrutalistBadge(
                             text = "1 ${baseCurrency?.code ?: "USD"} = ${String.format("%.2f", currentRate)} ${accountCurrency?.code}",
                             backgroundColor = BackgroundBase,
@@ -348,8 +353,11 @@ fun TransactionFormScreen(
                                 text = "⚡ ${baseCurrency?.symbol ?: "$"} ${currencyFormatter.format(equivalentUsd)} ${baseCurrency?.code ?: "USD"}",
                                 style = BrexaTypography.displayMedium.copy(
                                     color = AccentLime,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 22.sp
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }

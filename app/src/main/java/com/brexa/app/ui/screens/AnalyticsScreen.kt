@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brexa.app.R
@@ -70,7 +71,7 @@ fun AnalyticsScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Navegador de Mes
+        // Navegador de Mes (100% Responsive)
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -81,7 +82,7 @@ fun AnalyticsScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             BrutalistBadge(
-                text = "◀ MES ANTERIOR",
+                text = "◀ ANTERIOR",
                 backgroundColor = BackgroundBase,
                 contentColor = TextPrimary,
                 borderColor = BorderSolid,
@@ -92,8 +93,11 @@ fun AnalyticsScreen(
                 text = "${monthNames[currentMonth]} $currentYear",
                 style = BrexaTypography.labelLarge.copy(
                     color = AccentLime,
-                    fontWeight = FontWeight.Bold
-                )
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
 
             BrutalistBadge(
@@ -123,11 +127,13 @@ fun AnalyticsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "DISTRIBUCIÓN DE GASTOS",
+                    text = "GASTOS (TOTAL)",
                     style = BrexaTypography.labelLarge.copy(
                         color = if (isExpense) Color.Black else TextSecondary,
                         fontSize = 11.sp
-                    )
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
             Box(
@@ -139,11 +145,13 @@ fun AnalyticsScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "DISTRIBUCIÓN DE INGRESOS",
+                    text = "INGRESOS (TOTAL)",
                     style = BrexaTypography.labelLarge.copy(
                         color = if (!isExpense) Color.Black else TextSecondary,
                         fontSize = 11.sp
-                    )
+                    ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -240,7 +248,10 @@ fun AnalyticsScreen(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Icon(
                                         painter = painterResource(id = iconRes),
                                         contentDescription = item.categoryName,
@@ -250,16 +261,22 @@ fun AnalyticsScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = item.categoryName.uppercase(),
-                                        style = BrexaTypography.labelLarge.copy(color = TextPrimary)
+                                        style = BrexaTypography.labelLarge.copy(color = TextPrimary),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
+
+                                Spacer(modifier = Modifier.width(8.dp))
 
                                 Text(
                                     text = "${baseCurrency?.symbol ?: "$"} ${formatter.format(item.totalUsd)} ${baseCurrency?.code ?: "USD"}",
                                     style = BrexaTypography.labelLarge.copy(
                                         color = AccentLime,
                                         fontWeight = FontWeight.Bold
-                                    )
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
 

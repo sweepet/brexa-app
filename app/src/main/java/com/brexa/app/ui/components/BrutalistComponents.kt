@@ -22,6 +22,8 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -139,10 +141,13 @@ fun BrutalistButton(
                 style = TextStyle(
                     fontFamily = SpaceMonoFontFamily,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp,
-                    letterSpacing = 1.sp,
-                    color = if (enabled) contentColor else TextMuted
-                )
+                    fontSize = 13.sp,
+                    letterSpacing = 0.5.sp,
+                    color = if (enabled) contentColor else TextMuted,
+                    textAlign = TextAlign.Center
+                ),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -219,9 +224,11 @@ fun BrutalistTextField(
                             text = placeholder,
                             style = TextStyle(
                                 fontFamily = if (isMonospace) SpaceMonoFontFamily else FontFamily.SansSerif,
-                                fontSize = 16.sp,
+                                fontSize = 15.sp,
                                 color = TextMuted
-                            )
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                     innerTextField()
@@ -237,6 +244,8 @@ fun BrutalistTextField(
                         fontSize = 13.sp,
                         color = TextSecondary
                     ),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(start = 8.dp)
                 )
             }
@@ -269,7 +278,9 @@ fun BrutalistBadge(
                 fontSize = 10.sp,
                 letterSpacing = 0.5.sp,
                 color = contentColor
-            )
+            ),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
