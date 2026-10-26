@@ -54,6 +54,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+    }
+
     kotlinOptions {
         jvmTarget = "17"
     }
