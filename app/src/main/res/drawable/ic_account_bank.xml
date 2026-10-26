@@ -1,0 +1,24 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Techo triangular angular -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:fillColor="#00000000"
+        android:pathData="M2,8 L12,2 L22,8 Z" />
+    <!-- Columnas del banco -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:fillColor="#00000000"
+        android:pathData="M5,10 L5,18 M10,10 L10,18 M14,10 L14,18 M19,10 L19,18" />
+    <!-- Base del banco -->
+    <path
+        android:strokeColor="#D4FF00"
+        android:strokeWidth="2"
+        android:fillColor="#00000000"
+        android:pathData="M2,20 L22,20" />
+</vector>

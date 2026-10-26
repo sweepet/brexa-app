@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Marco angular neobrutalista -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:fillColor="#00000000"
+        android:pathData="M2,5 L22,5 L22,19 L2,19 Z" />
+    <!-- Círculo interior / símbolo dólar angular -->
+    <path
+        android:strokeColor="#D4FF00"
+        android:strokeWidth="2"
+        android:fillColor="#00000000"
+        android:pathData="M12,8 L12,16 M9.5,10 L14.5,10 L14.5,12 L9.5,12 L9.5,14 L14.5,14" />
+</vector>
