@@ -382,16 +382,17 @@ fun SettingsScreen(
                             updateResultText = null
                             availableUpdateInSettings = null
                             coroutineScope.launch {
-                                val result = updateManager.checkForUpdate("v1.0.0")
+                                val currentVer = updateManager.getInstalledVersionName()
+                                val result = updateManager.checkForUpdate()
                                 isCheckingUpdates = false
                                 result.onSuccess { update ->
                                     if (update != null) {
                                         availableUpdateInSettings = update
                                     } else {
-                                        updateResultText = "✅ Brexa está al día (v1.0.0). No hay nuevas versiones."
+                                        updateResultText = "✅ Brexa está al día ($currentVer). No hay nuevas versiones."
                                     }
                                 }.onFailure { err ->
-                                    updateResultText = "✅ Brexa está al día (v1.0.0). No hay nuevas versiones."
+                                    updateResultText = "✅ Brexa está al día ($currentVer). No hay nuevas versiones."
                                 }
                             }
                         },

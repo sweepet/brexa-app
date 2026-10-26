@@ -34,9 +34,21 @@ class AppUpdateManager(private val context: Context) {
     private val releasesApiUrl = "https://api.github.com/repos/sweepet/brexa-app/releases/latest"
 
     /**
+     * Retorna la versión actualmente instalada en el dispositivo (ej. v1.0.1)
+     */
+    fun getInstalledVersionName(): String {
+        return try {
+            val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            "v${pInfo.versionName ?: "1.0.0"}"
+        } catch (e: Exception) {
+            "v1.0.0"
+        }
+    }
+
+    /**
      * Consulta la API de GitHub Releases para verificar si hay una versión superior a la instalada.
      */
-    suspend fun checkForUpdate(currentVersion: String = "v1.0.0"): Result<UpdateInfo?> = withContext(Dispatchers.IO) {
+    suspend fun checkForUpdate(currentVersion: String = getInstalledVersionName()): Result<UpdateInfo?> = withContext(Dispatchers.IO) {
         try {
             val request = Request.Builder()
                 .url(releasesApiUrl)

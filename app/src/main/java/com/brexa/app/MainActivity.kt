@@ -65,7 +65,7 @@ class MainActivity : ComponentActivity() {
 
                 // Comprobación automática de actualización en segundo plano al iniciar la app
                 LaunchedEffect(Unit) {
-                    val result = updateManager.checkForUpdate("v1.0.0")
+                    val result = updateManager.checkForUpdate()
                     result.onSuccess { update ->
                         if (update != null) {
                             availableUpdate = update
