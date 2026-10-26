@@ -61,20 +61,23 @@ fun TransactionFormScreen(
     val accountCurrency = currencies.find { it.id == selectedAccount?.currencyId }
     val isForeignCurrency = accountCurrency?.isBase == false
 
-    // Estado de la tasa: iniciada con la tasa configurada de la moneda
-    var currentRate by remember(selectedAccount) {
-        mutableFloatStateOf((accountCurrency?.rateToUsd ?: 1.0).toFloat())
+    // Estado de la tasa: texto editable iniciado con la tasa configurada de la moneda
+    var rateText by remember(selectedAccount) {
+        val defaultRate = accountCurrency?.rateToUsd ?: 1.0
+        val str = if (defaultRate % 1.0 == 0.0) defaultRate.toLong().toString() else defaultRate.toString()
+        mutableStateOf(str)
     }
 
-    // Centrado del Slider interactivo (+- 25% de sensibilidad)
-    val baseRate = (accountCurrency?.rateToUsd ?: 1.0).toFloat()
-    val minSlider = (baseRate * 0.75f).coerceAtLeast(0.1f)
-    val maxSlider = (baseRate * 1.35f).coerceAtLeast(baseRate + 1f)
+    val rateNum = rateText.replace(",", ".").toDoubleOrNull() ?: 0.0
 
-    // Cálculo reactivo instantáneo del costo en USD
+    // Cálculo reactivo instantáneo del costo en moneda base
     val amountNum = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
-    val equivalentUsd = if (isForeignCurrency && currentRate > 0f) {
-        BigDecimal(amountNum).divide(BigDecimal(currentRate.toDouble()), 2, RoundingMode.HALF_EVEN).toDouble()
+    val equivalentUsd = if (isForeignCurrency && rateNum > 0.0) {
+        try {
+            BigDecimal(amountNum).divide(BigDecimal(rateNum), 2, RoundingMode.HALF_EVEN).toDouble()
+        } catch (e: Exception) {
+            0.0
+        }
     } else {
         amountNum
     }
@@ -166,7 +169,9 @@ fun TransactionFormScreen(
                         .background(if (isSel) SurfaceCardElevated else SurfaceCard, RectangleShape)
                         .clickable {
                             selectedAccountId = acc.id
-                            curr?.rateToUsd?.let { currentRate = it.toFloat() }
+                            curr?.rateToUsd?.let { r ->
+                                rateText = if (r % 1.0 == 0.0) r.toLong().toString() else r.toString()
+                            }
                         }
                         .padding(horizontal = 14.dp, vertical = 10.dp)
                 ) {
@@ -260,10 +265,15 @@ fun TransactionFormScreen(
         }
 
         // =========================================================================
-        // COMPONENTE ESTRELLA: SLIDER INTERACTIVO DE TASA DE CAMBIO EN TIEMPO REAL
+        // TASA DE COTIZACIÓN MANUAL PRECISA EN TIEMPO REAL
         // =========================================================================
         if (selectedType != "EXCHANGE" && isForeignCurrency) {
             Spacer(modifier = Modifier.height(20.dp))
+
+            val officialRate = accountCurrency?.rateToUsd ?: 1.0
+            val officialRateStr = if (officialRate % 1.0 == 0.0) officialRate.toLong().toString() else officialRate.toString()
+            val baseCode = baseCurrency?.code ?: "USD"
+            val currCode = accountCurrency?.code ?: ""
 
             BrutalistCard(
                 modifier = Modifier.fillMaxWidth(),
@@ -278,7 +288,7 @@ fun TransactionFormScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "TASA DE CAMBIO APLICADA",
+                            text = "TASA DE COTIZACIÓN",
                             style = BrexaTypography.labelMedium.copy(color = TextSecondary, fontSize = 11.sp),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -286,54 +296,31 @@ fun TransactionFormScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         BrutalistBadge(
-                            text = "1 ${baseCurrency?.code ?: "USD"} = ${String.format("%.2f", currentRate)} ${accountCurrency?.code}",
+                            text = "OFICIAL: $officialRateStr",
                             backgroundColor = BackgroundBase,
                             contentColor = AccentLime,
-                            borderColor = AccentLime
+                            borderColor = AccentLime,
+                            modifier = Modifier.clickable {
+                                rateText = officialRateStr
+                            }
                         )
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Slider ancho interactivo neobrutalista
-                    Slider(
-                        value = currentRate,
-                        onValueChange = { currentRate = it },
-                        valueRange = minSlider..maxSlider,
-                        colors = SliderDefaults.colors(
-                            thumbColor = AccentLime,
-                            activeTrackColor = AccentLime,
-                            inactiveTrackColor = BorderSolid
-                        ),
+                    // Campo de entrada manual numérica con precisión decimal
+                    BrutalistTextField(
+                        value = rateText,
+                        onValueChange = { rateText = it },
+                        label = "TASA APLICADA (1 $baseCode =)",
+                        placeholder = officialRateStr,
+                        suffix = currCode,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        borderColor = AccentLime,
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    // Botones de micro-ajuste rápido (+- 0.50)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        BrutalistBadge(
-                            text = "− 0.50",
-                            backgroundColor = SurfaceCardElevated,
-                            contentColor = TextPrimary,
-                            borderColor = BorderSolid,
-                            modifier = Modifier.clickable { currentRate = (currentRate - 0.50f).coerceAtLeast(0.1f) }
-                        )
-                        Text(
-                            text = "DESLIZA PARA AJUSTAR TASA",
-                            style = BrexaTypography.labelMedium.copy(color = TextMuted, fontSize = 9.sp)
-                        )
-                        BrutalistBadge(
-                            text = "+ 0.50",
-                            backgroundColor = SurfaceCardElevated,
-                            contentColor = TextPrimary,
-                            borderColor = BorderSolid,
-                            modifier = Modifier.clickable { currentRate = currentRate + 0.50f }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     // VISUALIZADOR DE IMPACTO EN TIEMPO REAL EN LIMA NEÓN
                     Box(
@@ -349,8 +336,13 @@ fun TransactionFormScreen(
                                 text = "EQUIVALENTE EN TIEMPO REAL",
                                 style = BrexaTypography.labelMedium.copy(color = TextSecondary, fontSize = 10.sp)
                             )
+                            val displayEquivalent = if (rateNum > 0.0) {
+                                "${baseCurrency?.symbol ?: "$"}${currencyFormatter.format(equivalentUsd)} ${baseCurrency?.code ?: "USD"}"
+                            } else {
+                                "---"
+                            }
                             Text(
-                                text = "⚡ ${baseCurrency?.symbol ?: "$"} ${currencyFormatter.format(equivalentUsd)} ${baseCurrency?.code ?: "USD"}",
+                                text = "⚡ $displayEquivalent",
                                 style = BrexaTypography.displayMedium.copy(
                                     color = AccentLime,
                                     fontWeight = FontWeight.Bold,
@@ -468,13 +460,18 @@ fun TransactionFormScreen(
                     return@BrutalistButton
                 }
 
+                if (isForeignCurrency && selectedType != "EXCHANGE" && rateNum <= 0.0) {
+                    errorMessage = "Ingresa una tasa de cotización válida mayor a 0."
+                    return@BrutalistButton
+                }
+
                 when (selectedType) {
                     "EXPENSE" -> {
                         viewModel.registerExpense(
                             accountId = selectedAccountId,
                             categoryId = selectedCategoryId.ifEmpty { "CAT_EXP_1" },
                             amount = amountNum,
-                            rate = if (isForeignCurrency) currentRate.toDouble() else 1.0,
+                            rate = if (isForeignCurrency) rateNum else 1.0,
                             note = noteText,
                             onSuccess = onDismiss,
                             onError = { errorMessage = it }
@@ -485,7 +482,7 @@ fun TransactionFormScreen(
                             accountId = selectedAccountId,
                             categoryId = selectedCategoryId.ifEmpty { "CAT_INC_1" },
                             amount = amountNum,
-                            rate = if (isForeignCurrency) currentRate.toDouble() else 1.0,
+                            rate = if (isForeignCurrency) rateNum else 1.0,
                             note = noteText,
                             onSuccess = onDismiss,
                             onError = { errorMessage = it }

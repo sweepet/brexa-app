@@ -6,7 +6,7 @@
 
 ## 🎨 Características Principales
 - **Diseño Neobrutalista Estricto**: Alto contraste (`#111111`, Lima Neón `#D4FF00`, Violeta Eléctrico `#9D4EDD`), bordes sólidos de `2.dp`, esquinas rectas (`0.dp`), sombras duras offset y tipografía `Space Mono`.
-- **Formulario Inteligente con Slider de Tasa en Tiempo Real**: Cálculo interactivo y reactivo del equivalente en USD con rango auto-centrado para microajustes suaves de decimales.
+- **Formulario Inteligente con Tasa Manual en Tiempo Real**: Entrada numérica precisa de la cotización con cálculo interactivo y reactivo del equivalente en moneda base.
 - **Transacciones Bimonetarias Inmutables**: Congelación histórica del poder adquisitivo en USD al momento de cada gasto/ingreso.
 - **Operación "Exchange"**: Canje neutral entre cuentas propias sin distorsión de gastos ni ingresos.
 - **Patrimonio Consolidado Vivo**: Valuación en tiempo real del saldo disponible según las tasas vigentes configuradas.
