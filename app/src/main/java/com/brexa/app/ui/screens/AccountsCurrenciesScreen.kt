@@ -914,7 +914,7 @@ fun AccountsCurrenciesScreen(
     // Modal: Editar Tasa de Cambio
     if (editingRateCurrency != null) {
         val curr = editingRateCurrency!!
-        var newRateText by remember { mutableStateOf(CurrencyFormat.formatRate(curr.rateToUsd)) }
+        var newRateText by remember { mutableStateOf(CurrencyFormat.formatForInput(curr.rateToUsd)) }
         var dialogError by remember { mutableStateOf<String?>(null) }
 
         AlertDialog(
@@ -1051,7 +1051,7 @@ fun AccountsCurrenciesScreen(
     // Modal: Ajustar Saldo Real
     if (adjustingAccount != null) {
         val acc = adjustingAccount!!
-        var newBalText by remember { mutableStateOf(CurrencyFormat.format(acc.currentBalance)) }
+        var newBalText by remember { mutableStateOf(CurrencyFormat.formatForInput(acc.currentBalance)) }
         var dialogError by remember { mutableStateOf<String?>(null) }
 
         AlertDialog(

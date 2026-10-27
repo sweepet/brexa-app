@@ -65,7 +65,7 @@ fun TransactionFormScreen(
     // Estado de la tasa: texto editable iniciado con la tasa configurada de la moneda
     var rateText by remember(selectedAccount) {
         val defaultRate = accountCurrency?.rateToUsd ?: 1.0
-        mutableStateOf(CurrencyFormat.formatRate(defaultRate))
+        mutableStateOf(CurrencyFormat.formatForInput(defaultRate))
     }
 
     val rateNum = CurrencyFormat.parseNumber(rateText) ?: 0.0
@@ -170,7 +170,7 @@ fun TransactionFormScreen(
                         .clickable {
                             selectedAccountId = acc.id
                             curr?.rateToUsd?.let { r ->
-                                rateText = CurrencyFormat.formatRate(r)
+                                rateText = CurrencyFormat.formatForInput(r)
                             }
                         }
                         .padding(horizontal = 14.dp, vertical = 10.dp)
@@ -301,7 +301,7 @@ fun TransactionFormScreen(
                             contentColor = AccentLime,
                             borderColor = AccentLime,
                             modifier = Modifier.clickable {
-                                rateText = officialRateStr
+                                rateText = CurrencyFormat.formatForInput(officialRate)
                             }
                         )
                     }
