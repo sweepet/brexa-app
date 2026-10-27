@@ -32,6 +32,10 @@ jobs:
         run: chmod +x gradlew
 
       - name: Compilar APK Release
+        env:
+          KEYSTORE_PASSWORD: brexa1234
+          KEY_ALIAS: brexakey
+          KEY_PASSWORD: brexa1234
         run: ./gradlew assembleRelease -x lint -x lintVitalRelease --stacktrace
 
       - name: Subir APK como Artefacto
