@@ -31,9 +31,9 @@ import com.brexa.app.ui.components.BrutalistButton
 import com.brexa.app.ui.components.BrutalistCard
 import com.brexa.app.ui.components.BrutalistTextField
 import com.brexa.app.ui.theme.*
+import com.brexa.app.ui.util.CurrencyFormat
 import java.math.BigDecimal
 import java.math.RoundingMode
-import java.text.DecimalFormat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,6 +56,7 @@ fun TransactionFormScreen(
     var destinationAmountText by remember { mutableStateOf("") }
     var noteText by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var showCreateCategoryDialog by remember { mutableStateOf(false) }
 
     val selectedAccount = accounts.find { it.id == selectedAccountId } ?: accounts.firstOrNull()
     val accountCurrency = currencies.find { it.id == selectedAccount?.currencyId }
@@ -64,14 +65,13 @@ fun TransactionFormScreen(
     // Estado de la tasa: texto editable iniciado con la tasa configurada de la moneda
     var rateText by remember(selectedAccount) {
         val defaultRate = accountCurrency?.rateToUsd ?: 1.0
-        val str = if (defaultRate % 1.0 == 0.0) defaultRate.toLong().toString() else defaultRate.toString()
-        mutableStateOf(str)
+        mutableStateOf(CurrencyFormat.formatRate(defaultRate))
     }
 
-    val rateNum = rateText.replace(",", ".").toDoubleOrNull() ?: 0.0
+    val rateNum = CurrencyFormat.parseNumber(rateText) ?: 0.0
 
     // Cálculo reactivo instantáneo del costo en moneda base
-    val amountNum = amountText.replace(",", ".").toDoubleOrNull() ?: 0.0
+    val amountNum = CurrencyFormat.parseNumber(amountText) ?: 0.0
     val equivalentUsd = if (isForeignCurrency && rateNum > 0.0) {
         try {
             BigDecimal(amountNum).divide(BigDecimal(rateNum), 2, RoundingMode.HALF_EVEN).toDouble()
@@ -82,7 +82,7 @@ fun TransactionFormScreen(
         amountNum
     }
 
-    val currencyFormatter = remember { DecimalFormat("#,##0.00") }
+    val currencyFormatter = remember { CurrencyFormat.standardFormatter }
 
     Column(
         modifier = Modifier
@@ -170,7 +170,7 @@ fun TransactionFormScreen(
                         .clickable {
                             selectedAccountId = acc.id
                             curr?.rateToUsd?.let { r ->
-                                rateText = if (r % 1.0 == 0.0) r.toLong().toString() else r.toString()
+                                rateText = CurrencyFormat.formatRate(r)
                             }
                         }
                         .padding(horizontal = 14.dp, vertical = 10.dp)
@@ -271,7 +271,7 @@ fun TransactionFormScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             val officialRate = accountCurrency?.rateToUsd ?: 1.0
-            val officialRateStr = if (officialRate % 1.0 == 0.0) officialRate.toLong().toString() else officialRate.toString()
+            val officialRateStr = CurrencyFormat.formatRate(officialRate)
             val baseCode = baseCurrency?.code ?: "USD"
             val currCode = accountCurrency?.code ?: ""
 
@@ -414,6 +414,30 @@ fun TransactionFormScreen(
                         }
                     }
                 }
+
+                item {
+                    Box(
+                        modifier = Modifier
+                            .border(
+                                width = 2.dp,
+                                color = AccentLime,
+                                shape = RectangleShape
+                            )
+                            .background(SurfaceCard, RectangleShape)
+                            .clickable { showCreateCategoryDialog = true }
+                            .padding(12.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "+ NUEVA",
+                                style = BrexaTypography.labelMedium.copy(
+                                    color = AccentLime,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -489,7 +513,7 @@ fun TransactionFormScreen(
                         )
                     }
                     "EXCHANGE" -> {
-                        val destNum = destinationAmountText.replace(",", ".").toDoubleOrNull() ?: 0.0
+                        val destNum = CurrencyFormat.parseNumber(destinationAmountText) ?: 0.0
                         if (destNum <= 0.0) {
                             errorMessage = "Ingresa el monto recibido en destino."
                             return@BrutalistButton
@@ -510,6 +534,145 @@ fun TransactionFormScreen(
             contentColor = Color.Black,
             shadowColor = AccentLime,
             modifier = Modifier.fillMaxWidth()
+        )
+    }
+
+    // Modal: Crear Categoría al vuelo desde el formulario
+    if (showCreateCategoryDialog) {
+        var catName by remember { mutableStateOf("") }
+        var selectedIconId by remember { mutableStateOf("ic_cat_general") }
+        var dialogError by remember { mutableStateOf<String?>(null) }
+        val catType = if (selectedType == "INCOME") "INCOME" else "EXPENSE"
+        val typeAccent = if (catType == "EXPENSE") ExpenseRed else IncomeGreen
+
+        val iconOptions = listOf(
+            Pair("ic_cat_general", "GENERAL"),
+            Pair("ic_cat_food", "COMIDA"),
+            Pair("ic_cat_housing", "VIVIENDA"),
+            Pair("ic_cat_transport", "TRANSPORTE"),
+            Pair("ic_cat_health", "SALUD"),
+            Pair("ic_cat_leisure", "OCIO"),
+            Pair("ic_account_bank", "BANCO"),
+            Pair("ic_account_cash", "EFECTIVO"),
+            Pair("ic_account_crypto", "CRIPTO")
+        )
+
+        fun getIconRes(id: String): Int = when (id) {
+            "ic_cat_food" -> R.drawable.ic_cat_food
+            "ic_cat_housing" -> R.drawable.ic_cat_housing
+            "ic_cat_transport" -> R.drawable.ic_cat_transport
+            "ic_cat_health" -> R.drawable.ic_cat_health
+            "ic_cat_leisure" -> R.drawable.ic_cat_leisure
+            "ic_account_bank" -> R.drawable.ic_account_bank
+            "ic_account_cash" -> R.drawable.ic_account_cash
+            "ic_account_crypto" -> R.drawable.ic_account_crypto
+            else -> R.drawable.ic_cat_general
+        }
+
+        AlertDialog(
+            onDismissRequest = { showCreateCategoryDialog = false },
+            shape = RectangleShape,
+            containerColor = SurfaceCard,
+            title = {
+                Text(
+                    text = "NUEVA CATEGORÍA DE ${if (catType == "EXPENSE") "GASTO" else "INGRESO"}",
+                    style = BrexaTypography.titleLarge.copy(color = typeAccent)
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    BrutalistTextField(
+                        value = catName,
+                        onValueChange = { catName = it },
+                        label = "NOMBRE DE LA CATEGORÍA",
+                        placeholder = "ej. Mascotas, Proyectos, Freelance..."
+                    )
+
+                    Text(text = "SELECCIONA UN ÍCONO", style = BrexaTypography.labelMedium.copy(color = TextSecondary))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        iconOptions.take(5).forEach { (iconKey, label) ->
+                            val isSel = selectedIconId == iconKey
+                            Box(
+                                modifier = Modifier
+                                    .border(1.5.dp, if (isSel) typeAccent else BorderSolid, RectangleShape)
+                                    .background(if (isSel) SurfaceCardElevated else BackgroundBase, RectangleShape)
+                                    .clickable { selectedIconId = iconKey }
+                                    .padding(8.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = getIconRes(iconKey)),
+                                    contentDescription = label,
+                                    tint = if (isSel) typeAccent else TextSecondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        iconOptions.drop(5).forEach { (iconKey, label) ->
+                            val isSel = selectedIconId == iconKey
+                            Box(
+                                modifier = Modifier
+                                    .border(1.5.dp, if (isSel) typeAccent else BorderSolid, RectangleShape)
+                                    .background(if (isSel) SurfaceCardElevated else BackgroundBase, RectangleShape)
+                                    .clickable { selectedIconId = iconKey }
+                                    .padding(8.dp)
+                            ) {
+                                Icon(
+                                    painter = painterResource(id = getIconRes(iconKey)),
+                                    contentDescription = label,
+                                    tint = if (isSel) typeAccent else TextSecondary,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (dialogError != null) {
+                        Text(text = "⚠️ $dialogError", style = BrexaTypography.labelMedium.copy(color = ExpenseRed))
+                    }
+                }
+            },
+            confirmButton = {
+                BrutalistBadge(
+                    text = "CREAR CATEGORÍA",
+                    backgroundColor = typeAccent,
+                    contentColor = Color.Black,
+                    borderColor = typeAccent,
+                    modifier = Modifier.clickable {
+                        if (catName.trim().isEmpty()) {
+                            dialogError = "Escribe un nombre para la categoría."
+                            return@clickable
+                        }
+                        viewModel.addCustomCategory(
+                            name = catName.trim(),
+                            type = catType,
+                            iconId = selectedIconId,
+                            colorHex = if (catType == "EXPENSE") "#FF4D4D" else "#00FF66",
+                            onSuccess = {
+                                showCreateCategoryDialog = false
+                            },
+                            onError = { dialogError = it }
+                        )
+                    }
+                )
+            },
+            dismissButton = {
+                BrutalistBadge(
+                    text = "CANCELAR",
+                    backgroundColor = BackgroundBase,
+                    contentColor = TextSecondary,
+                    borderColor = BorderSolid,
+                    modifier = Modifier.clickable { showCreateCategoryDialog = false }
+                )
+            }
         )
     }
 }

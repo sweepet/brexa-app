@@ -273,6 +273,47 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
         }
     }
 
+    fun deleteCurrency(
+        currencyId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = repository.deleteCurrency(currencyId)
+            result.onSuccess { onSuccess() }
+                .onFailure { onError(it.message ?: "Error al eliminar moneda.") }
+        }
+    }
+
+    fun updateAccount(
+        accountId: String,
+        name: String,
+        currencyId: String,
+        iconType: String,
+        colorHex: String = "#D4FF00",
+        includeInTotal: Boolean = true,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = repository.updateAccount(accountId, name, currencyId, iconType, colorHex, includeInTotal)
+            result.onSuccess { onSuccess() }
+                .onFailure { onError(it.message ?: "Error al actualizar cuenta.") }
+        }
+    }
+
+    fun deleteAccount(
+        accountId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = repository.deleteAccount(accountId)
+            result.onSuccess { onSuccess() }
+                .onFailure { onError(it.message ?: "Error al eliminar cuenta.") }
+        }
+    }
+
     fun addCustomCategory(
         name: String,
         type: String,
@@ -285,6 +326,18 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
             val result = repository.addCustomCategory(name, type, iconId, colorHex)
             result.onSuccess { onSuccess() }
                 .onFailure { onError(it.message ?: "Error al crear categoría.") }
+        }
+    }
+
+    fun deleteCategory(
+        categoryId: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = repository.deleteCategory(categoryId)
+            result.onSuccess { onSuccess() }
+                .onFailure { onError(it.message ?: "Error al eliminar categoría.") }
         }
     }
 

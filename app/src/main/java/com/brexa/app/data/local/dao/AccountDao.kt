@@ -48,6 +48,12 @@ interface AccountDao {
     @Query("UPDATE accounts SET is_archived = :isArchived WHERE id = :accountId")
     suspend fun setArchived(accountId: String, isArchived: Boolean)
 
+    @Query("SELECT COUNT(*) FROM accounts WHERE currency_id = :currencyId")
+    suspend fun countAccountsByCurrency(currencyId: String): Int
+
     @Delete
     suspend fun deleteAccount(account: AccountEntity)
+
+    @Query("DELETE FROM accounts WHERE id = :accountId")
+    suspend fun deleteAccountById(accountId: String)
 }

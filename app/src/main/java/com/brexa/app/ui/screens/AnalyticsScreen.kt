@@ -23,7 +23,8 @@ import com.brexa.app.presentation.BrexaViewModel
 import com.brexa.app.ui.components.BrutalistBadge
 import com.brexa.app.ui.components.BrutalistCard
 import com.brexa.app.ui.theme.*
-import java.text.DecimalFormat
+import com.brexa.app.ui.util.CurrencyFormat
+import java.util.Locale
 
 @Composable
 fun AnalyticsScreen(
@@ -41,7 +42,7 @@ fun AnalyticsScreen(
         "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"
     )
 
-    val formatter = remember { DecimalFormat("#,##0.00") }
+    val formatter = remember { CurrencyFormat.standardFormatter }
     val totalPeriodUsd = distribution.sumOf { it.totalUsd }
 
     Column(
@@ -309,7 +310,7 @@ fun AnalyticsScreen(
                                 horizontalArrangement = Arrangement.End
                             ) {
                                 Text(
-                                    text = "${String.format("%.1f", item.percentage)} % DEL TOTAL",
+                                    text = "${String.format(Locale("es", "ES"), "%.1f", item.percentage)} % DEL TOTAL",
                                     style = BrexaTypography.labelMedium.copy(
                                         color = TextSecondary,
                                         fontSize = 10.sp

@@ -105,6 +105,20 @@ class BrexaRepository(private val db: BrexaDatabase) {
         return Result.success(Unit)
     }
 
+    suspend fun deleteCurrency(currencyId: String): Result<Unit> {
+        val currency = currencyDao.getCurrencyByIdSync(currencyId)
+            ?: return Result.failure(IllegalArgumentException("Moneda no encontrada."))
+        if (currency.isBase) {
+            return Result.failure(IllegalStateException("No se puede eliminar la moneda base ancla."))
+        }
+        val accountsCount = accountDao.countAccountsByCurrency(currencyId)
+        if (accountsCount > 0) {
+            return Result.failure(IllegalStateException("No puedes borrar esta moneda porque está asignada a $accountsCount cuenta(s). Modifica o elimina esas cuentas primero."))
+        }
+        currencyDao.deleteCurrency(currency)
+        return Result.success(Unit)
+    }
+
     // --- CUENTAS ---
     fun getActiveAccounts(): Flow<List<AccountEntity>> = accountDao.getActiveAccounts()
     fun getAllAccounts(): Flow<List<AccountEntity>> = accountDao.getAllAccounts()
@@ -179,6 +193,44 @@ class BrexaRepository(private val db: BrexaDatabase) {
         accountDao.setIncludeInTotal(accountId, include)
     }
 
+    suspend fun updateAccount(
+        accountId: String,
+        name: String,
+        currencyId: String,
+        iconType: String,
+        colorHex: String = "#D4FF00",
+        includeInTotal: Boolean = true
+    ): Result<Unit> {
+        val account = accountDao.getAccountByIdSync(accountId)
+            ?: return Result.failure(IllegalArgumentException("Cuenta no encontrada."))
+        val cleanName = name.trim()
+        if (cleanName.isEmpty()) {
+            return Result.failure(IllegalArgumentException("El nombre de la cuenta no puede estar vacío."))
+        }
+        val updated = account.copy(
+            name = cleanName,
+            currencyId = currencyId,
+            iconType = iconType,
+            colorHex = colorHex,
+            includeInTotal = includeInTotal,
+            updatedAt = System.currentTimeMillis()
+        )
+        accountDao.updateAccount(updated)
+        return Result.success(Unit)
+    }
+
+    suspend fun deleteAccount(accountId: String): Result<Unit> {
+        val account = accountDao.getAccountByIdSync(accountId)
+            ?: return Result.failure(IllegalArgumentException("Cuenta no encontrada."))
+        if (account.isDefault) {
+            return Result.failure(IllegalStateException("No se puede eliminar la cuenta principal predeterminada."))
+        }
+        // Eliminar transacciones vinculadas a esta cuenta para evitar violaciones de clave foránea
+        transactionDao.deleteTransactionsByAccount(accountId)
+        accountDao.deleteAccount(account)
+        return Result.success(Unit)
+    }
+
     // --- CATEGORÍAS ---
     fun getActiveCategoriesByType(type: String): Flow<List<CategoryEntity>> =
         categoryDao.getActiveCategoriesByType(type)
@@ -213,6 +265,16 @@ class BrexaRepository(private val db: BrexaDatabase) {
             return Result.failure(IllegalStateException("No se pueden archivar categorías predeterminadas."))
         }
         categoryDao.setArchived(categoryId, true)
+        return Result.success(Unit)
+    }
+
+    suspend fun deleteCategory(categoryId: String): Result<Unit> {
+        val cat = categoryDao.getCategoryByIdSync(categoryId)
+            ?: return Result.failure(IllegalArgumentException("Categoría no encontrada."))
+        if (cat.isDefault) {
+            return Result.failure(IllegalStateException("No se pueden eliminar categorías base del sistema."))
+        }
+        categoryDao.deleteCategory(cat)
         return Result.success(Unit)
     }
 

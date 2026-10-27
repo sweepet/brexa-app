@@ -41,4 +41,7 @@ interface CurrencyDao {
 
     @Delete
     suspend fun deleteCurrency(currency: CurrencyEntity)
+
+    @Query("DELETE FROM currencies WHERE id = :currencyId")
+    suspend fun deleteCurrencyById(currencyId: String)
 }

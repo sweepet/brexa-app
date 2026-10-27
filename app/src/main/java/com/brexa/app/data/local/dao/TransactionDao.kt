@@ -59,6 +59,15 @@ interface TransactionDao {
     @Update
     suspend fun updateTransaction(transaction: TransactionEntity)
 
+    @Query("SELECT COUNT(*) FROM transactions WHERE account_id = :accountId OR destination_account_id = :accountId")
+    suspend fun countTransactionsByAccount(accountId: String): Int
+
+    @Query("DELETE FROM transactions WHERE account_id = :accountId OR destination_account_id = :accountId")
+    suspend fun deleteTransactionsByAccount(accountId: String)
+
+    @Query("SELECT COUNT(*) FROM transactions WHERE category_id = :categoryId")
+    suspend fun countTransactionsByCategory(categoryId: String): Int
+
     @Delete
     suspend fun deleteTransaction(transaction: TransactionEntity)
 }

@@ -27,7 +27,7 @@ import com.brexa.app.presentation.BrexaViewModel
 import com.brexa.app.ui.components.BrutalistBadge
 import com.brexa.app.ui.components.BrutalistCard
 import com.brexa.app.ui.theme.*
-import java.text.DecimalFormat
+import com.brexa.app.ui.util.CurrencyFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -49,7 +49,7 @@ fun HomeScreen(
 
     var transactionToDelete by remember { mutableStateOf<TransactionEntity?>(null) }
 
-    val formatter = remember { DecimalFormat("#,##0.00") }
+    val formatter = remember { CurrencyFormat.standardFormatter }
     val dateFormatter = remember { SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()) }
 
     // Moneda Base y Primera Moneda Secundaria (si el usuario la ha creado)
@@ -101,7 +101,7 @@ fun HomeScreen(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = if (hasSecondary) "1 $baseCode = ${String.format("%.2f", secRate)} ${secondaryCurrency?.code}" else "MONEDA ANCLA: $baseCode",
+                        text = if (hasSecondary) "1 $baseCode = ${formatter.format(secRate)} ${secondaryCurrency?.code}" else "MONEDA ANCLA: $baseCode",
                         style = BrexaTypography.labelMedium.copy(color = AccentPurple, fontSize = 10.sp),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
