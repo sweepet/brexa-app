@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brexa.app.ui.theme.*
@@ -262,20 +263,22 @@ fun BrutalistBadge(
     modifier: Modifier = Modifier,
     backgroundColor: Color = SurfaceCardElevated,
     contentColor: Color = TextPrimary,
-    borderColor: Color = BorderSolid
+    borderColor: Color = BorderSolid,
+    fontSize: TextUnit = 10.sp,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
 ) {
     Box(
         modifier = modifier
             .background(backgroundColor, RectangleShape)
             .border(1.5.dp, borderColor, RectangleShape)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
+            .padding(contentPadding)
     ) {
         Text(
             text = text.uppercase(),
             style = TextStyle(
                 fontFamily = SpaceMonoFontFamily,
                 fontWeight = FontWeight.Bold,
-                fontSize = 10.sp,
+                fontSize = fontSize,
                 letterSpacing = 0.5.sp,
                 color = contentColor
             ),

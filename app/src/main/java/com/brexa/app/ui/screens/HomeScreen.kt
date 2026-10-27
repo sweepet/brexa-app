@@ -15,9 +15,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brexa.app.R
@@ -46,6 +49,11 @@ fun HomeScreen(
     val baseCurrency by viewModel.baseCurrency.collectAsState()
     val recentTransactions by viewModel.recentTransactions.collectAsState()
     val isIncognito by viewModel.incognitoMode.collectAsState()
+    val expenseCats by viewModel.expenseCategories.collectAsState()
+    val incomeCats by viewModel.incomeCategories.collectAsState()
+    val categoryMap = remember(expenseCats, incomeCats) {
+        (expenseCats + incomeCats).associateBy { it.id }
+    }
 
     var transactionToDelete by remember { mutableStateOf<TransactionEntity?>(null) }
 
@@ -93,20 +101,13 @@ fun HomeScreen(
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Column(modifier = Modifier.weight(1f, fill = false)) {
-                    Text(
-                        text = "BREXA // TERMINAL",
-                        style = BrexaTypography.labelLarge.copy(color = AccentLime, fontSize = 12.sp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Text(
-                        text = if (hasSecondary) "1 $baseCode = ${formatter.format(secRate)} ${secondaryCurrency?.code}" else "MONEDA ANCLA: $baseCode",
-                        style = BrexaTypography.labelMedium.copy(color = AccentPurple, fontSize = 10.sp),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                Text(
+                    text = "BREXA // TERMINAL",
+                    style = BrexaTypography.labelLarge.copy(color = AccentLime, fontSize = 12.sp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
             }
 
             Spacer(modifier = Modifier.width(6.dp))
@@ -445,12 +446,21 @@ fun HomeScreen(
                 items(recentTransactions) { tx ->
                     val acc = accounts.find { it.id == tx.accountId }
                     val destAcc = tx.destinationAccountId?.let { id -> accounts.find { it.id == id } }
+                    val cat = tx.categoryId?.let { categoryMap[it] }
 
                     val badgeColor = when (tx.type) {
                         "EXPENSE" -> ExpenseRed
                         "INCOME" -> IncomeGreen
                         "EXCHANGE" -> ExchangeBlue
                         else -> AccentPurple
+                    }
+
+                    val typeLabel = when (tx.type) {
+                        "EXPENSE" -> "GASTO"
+                        "INCOME" -> "INGRESO"
+                        "EXCHANGE" -> "CAMBIO"
+                        "BALANCE_ADJUSTMENT" -> "AJUSTE"
+                        else -> tx.type
                     }
 
                     BrutalistCard(
@@ -470,14 +480,16 @@ fun HomeScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     BrutalistBadge(
-                                        text = tx.type,
+                                        text = typeLabel,
                                         backgroundColor = BackgroundBase,
                                         contentColor = badgeColor,
-                                        borderColor = badgeColor
+                                        borderColor = badgeColor,
+                                        fontSize = 8.5.sp,
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = if (tx.note.isNotEmpty()) tx.note else (if (tx.type == "EXCHANGE") "Exchange entre cuentas" else "Sin descripción"),
+                                        text = if (tx.note.isNotEmpty()) tx.note else (cat?.name ?: if (tx.type == "EXCHANGE") "Exchange entre cuentas" else "Sin descripción"),
                                         style = BrexaTypography.titleMedium.copy(
                                             color = TextPrimary,
                                             fontSize = 13.sp
@@ -488,9 +500,23 @@ fun HomeScreen(
                                     )
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))
+                                val subtitle = buildAnnotatedString {
+                                    withStyle(SpanStyle(color = TextMuted)) {
+                                        append(acc?.name ?: "Cuenta")
+                                        if (destAcc != null) append(" ➔ ${destAcc.name}")
+                                    }
+                                    if (cat != null) {
+                                        withStyle(SpanStyle(color = TextMuted)) { append(" • ") }
+                                        withStyle(SpanStyle(color = AccentLime)) { append(cat.name) }
+                                    }
+                                    withStyle(SpanStyle(color = TextMuted)) {
+                                        append(" • ")
+                                        append(dateFormatter.format(Date(tx.dateTimestamp)))
+                                    }
+                                }
                                 Text(
-                                    text = "${acc?.name ?: "Cuenta"} ${if (destAcc != null) "➔ ${destAcc.name}" else ""} • ${dateFormatter.format(Date(tx.dateTimestamp))}",
-                                    style = BrexaTypography.labelMedium.copy(color = TextMuted, fontSize = 10.sp),
+                                    text = subtitle,
+                                    style = BrexaTypography.labelMedium.copy(fontSize = 10.sp),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -541,8 +567,10 @@ fun HomeScreen(
                 )
             },
             text = {
+                val cat = tx.categoryId?.let { categoryMap[it] }
+                val detail = if (tx.note.isNotEmpty()) "\"${tx.note}\"" else (cat?.name ?: "")
                 Text(
-                    text = "Se eliminará el registro de ${formatter.format(tx.nativeAmount)} ${tx.currencyCode} y el saldo de la cuenta se recalculará automáticamente de forma inversa.",
+                    text = "Se eliminará el registro de ${formatter.format(tx.nativeAmount)} ${tx.currencyCode} ${if (detail.isNotEmpty()) "($detail) " else ""}y el saldo de la cuenta se recalculará automáticamente de forma inversa.",
                     style = BrexaTypography.bodyMedium.copy(color = TextPrimary)
                 )
             },
