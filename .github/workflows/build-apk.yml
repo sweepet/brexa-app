@@ -36,7 +36,7 @@ jobs:
           KEYSTORE_PASSWORD: brexa1234
           KEY_ALIAS: brexakey
           KEY_PASSWORD: brexa1234
-        run: ./gradlew assembleRelease -x lint -x lintVitalRelease --stacktrace
+        run: ./gradlew assembleRelease --stacktrace
 
       - name: Subir APK como Artefacto
         uses: actions/upload-artifact@v4
