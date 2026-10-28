@@ -86,15 +86,13 @@ class BrexaViewModel(
     private val _analyticsType = MutableStateFlow("EXPENSE") // "EXPENSE" o "INCOME"
     val analyticsType = _analyticsType.asStateFlow()
 
-    // Distribución por categoría para el período seleccionado (Semanal o Mensual)
-    val categoryDistribution: StateFlow<List<CategoryDistribution>> = combine(
-        _analyticsType,
-        _analyticsPeriod,
-        _analyticsMonth,
-        _analyticsYear,
-        _analyticsWeekCalendar
-    ) { type, period, month, year, weekCal ->
-        val (startDate, endDate) = if (period == AnalyticsPeriod.MONTH) {
+    private fun calculatePeriodDateRange(
+        period: AnalyticsPeriod,
+        month: Int,
+        year: Int,
+        weekCal: Calendar
+    ): Pair<Long, Long> {
+        return if (period == AnalyticsPeriod.MONTH) {
             val cal = Calendar.getInstance()
             cal.set(year, month, 1, 0, 0, 0)
             cal.set(Calendar.MILLISECOND, 0)
@@ -127,10 +125,36 @@ class BrexaViewModel(
             val end = cal.timeInMillis
             Pair(start, end)
         }
+    }
 
+    // Distribución por categoría para el período seleccionado (Semanal o Mensual)
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val categoryDistribution: StateFlow<List<CategoryDistribution>> = combine(
+        _analyticsType,
+        _analyticsPeriod,
+        _analyticsMonth,
+        _analyticsYear,
+        _analyticsWeekCalendar
+    ) { type, period, month, year, weekCal ->
+        val (startDate, endDate) = calculatePeriodDateRange(period, month, year, weekCal)
         repository.getCategoryDistribution(type, startDate, endDate)
     }.flatMapLatest { it }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Movimientos individuales del período seleccionado para ver el desglose detallado
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val analyticsTransactions: StateFlow<List<TransactionEntity>> = combine(
+        _analyticsType,
+        _analyticsPeriod,
+        _analyticsMonth,
+        _analyticsYear,
+        _analyticsWeekCalendar
+    ) { type, period, month, year, weekCal ->
+        val (startDate, endDate) = calculatePeriodDateRange(period, month, year, weekCal)
+        Pair(type, Pair(startDate, endDate))
+    }.flatMapLatest { (type, range) ->
+        repository.getTransactionsByTypeAndPeriod(type, range.first, range.second)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // --- ACCIONES ---
 

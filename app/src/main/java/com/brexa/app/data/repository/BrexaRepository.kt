@@ -285,6 +285,9 @@ class BrexaRepository(private val db: BrexaDatabase) {
     fun getTransactionsByPeriod(startDate: Long, endDate: Long): Flow<List<TransactionEntity>> =
         transactionDao.getTransactionsByDateRange(startDate, endDate)
 
+    fun getTransactionsByTypeAndPeriod(type: String, startDate: Long, endDate: Long): Flow<List<TransactionEntity>> =
+        transactionDao.getTransactionsByTypeAndDateRange(type, startDate, endDate)
+
     suspend fun registerExpense(
         accountId: String,
         categoryId: String,

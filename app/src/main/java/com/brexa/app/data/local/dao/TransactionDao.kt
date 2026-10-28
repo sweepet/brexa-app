@@ -26,6 +26,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE type = :type ORDER BY date_timestamp DESC, created_at DESC")
     fun getTransactionsByType(type: String): Flow<List<TransactionEntity>>
 
+    @Query("SELECT * FROM transactions WHERE type = :type AND date_timestamp BETWEEN :startDate AND :endDate ORDER BY date_timestamp DESC, created_at DESC")
+    fun getTransactionsByTypeAndDateRange(type: String, startDate: Long, endDate: Long): Flow<List<TransactionEntity>>
+
     @Query("SELECT * FROM transactions WHERE account_id = :accountId OR destination_account_id = :accountId ORDER BY date_timestamp DESC, created_at DESC")
     fun getTransactionsByAccount(accountId: String): Flow<List<TransactionEntity>>
 

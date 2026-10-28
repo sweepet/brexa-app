@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -19,13 +20,16 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brexa.app.R
+import com.brexa.app.data.repository.CategoryDistribution
 import com.brexa.app.presentation.AnalyticsPeriod
 import com.brexa.app.presentation.BrexaViewModel
 import com.brexa.app.ui.components.BrutalistBadge
 import com.brexa.app.ui.components.BrutalistCard
 import com.brexa.app.ui.theme.*
 import com.brexa.app.ui.util.CurrencyFormat
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Date
 import java.util.Locale
 
 @Composable
@@ -34,12 +38,17 @@ fun AnalyticsScreen(
     onBack: () -> Unit
 ) {
     val distribution by viewModel.categoryDistribution.collectAsState()
+    val periodTransactions by viewModel.analyticsTransactions.collectAsState()
+    val accounts by viewModel.activeAccounts.collectAsState()
     val baseCurrency by viewModel.baseCurrency.collectAsState()
     val currentMonth by viewModel.analyticsMonth.collectAsState()
     val currentYear by viewModel.analyticsYear.collectAsState()
     val currentType by viewModel.analyticsType.collectAsState()
     val currentPeriod by viewModel.analyticsPeriod.collectAsState()
     val weekCalendar by viewModel.analyticsWeekCalendar.collectAsState()
+
+    var selectedCategoryForDetail by remember { mutableStateOf<CategoryDistribution?>(null) }
+    val txDateFormatter = remember { SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale("es", "ES")) }
 
     val monthNames = listOf(
         "ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO",
@@ -319,7 +328,10 @@ fun AnalyticsScreen(
                     BrutalistCard(
                         modifier = Modifier.fillMaxWidth(),
                         backgroundColor = SurfaceCard,
-                        borderColor = BorderSolid
+                        borderColor = BorderSolid,
+                        onClick = {
+                            selectedCategoryForDetail = item
+                        }
                     ) {
                         Column(modifier = Modifier.padding(14.dp)) {
                             Row(
@@ -368,7 +380,7 @@ fun AnalyticsScreen(
                                     .height(14.dp)
                                     .background(BackgroundBase, RectangleShape)
                                     .border(1.5.dp, BorderSolid, RectangleShape)
-                            ) {
+                                ) {
                                 val fillFraction = (item.percentage.toFloat() / 100f).coerceIn(0.01f, 1f)
                                 Box(
                                     modifier = Modifier
@@ -381,12 +393,22 @@ fun AnalyticsScreen(
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
 
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.End
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Text(
+                                    text = if (currentType == "EXPENSE") "TOCA PARA VER GASTOS ➔" else "TOCA PARA VER INGRESOS ➔",
+                                    style = BrexaTypography.labelSmall.copy(
+                                        color = AccentLime,
+                                        fontSize = 9.5.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+
                                 Text(
                                     text = "${String.format(Locale("es", "ES"), "%.1f", item.percentage)} % DEL TOTAL",
                                     style = BrexaTypography.labelMedium.copy(
@@ -399,6 +421,253 @@ fun AnalyticsScreen(
                     }
                 }
             }
+        }
+
+        // Modal Neobrutalista con el desglose de movimientos de la categoría
+        val selectedCat = selectedCategoryForDetail
+        if (selectedCat != null) {
+            val catTxs = remember(periodTransactions, selectedCat) {
+                periodTransactions.filter { it.categoryId == selectedCat.categoryId }
+            }
+            val modalIconRes = when (selectedCat.categoryIconId) {
+                "ic_cat_food" -> R.drawable.ic_cat_food
+                "ic_cat_housing" -> R.drawable.ic_cat_housing
+                "ic_cat_transport" -> R.drawable.ic_cat_transport
+                "ic_cat_health" -> R.drawable.ic_cat_health
+                "ic_cat_leisure" -> R.drawable.ic_cat_leisure
+                "ic_account_cash" -> R.drawable.ic_account_cash
+                "ic_account_bank" -> R.drawable.ic_account_bank
+                "ic_account_crypto" -> R.drawable.ic_account_crypto
+                else -> R.drawable.ic_cat_general
+            }
+            val typePlural = if (currentType == "EXPENSE") "GASTOS" else "INGRESOS"
+            val prefix = if (currentType == "EXPENSE") "− " else "+ "
+            val amountColor = if (currentType == "EXPENSE") ExpenseRed else IncomeGreen
+
+            AlertDialog(
+                onDismissRequest = { selectedCategoryForDetail = null },
+                shape = RectangleShape,
+                containerColor = SurfaceCard,
+                title = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                painter = painterResource(id = modalIconRes),
+                                contentDescription = selectedCat.categoryName,
+                                tint = AccentLime,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = selectedCat.categoryName.uppercase(),
+                                style = BrexaTypography.titleMedium.copy(
+                                    color = AccentLime,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        BrutalistBadge(
+                            text = "${String.format(Locale("es", "ES"), "%.1f", selectedCat.percentage)}%",
+                            backgroundColor = BackgroundBase,
+                            contentColor = AccentLime,
+                            borderColor = BorderSolid,
+                            fontSize = 9.sp,
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                    }
+                },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Tarjeta de Resumen de la Categoría
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(BackgroundBase, RectangleShape)
+                                .border(1.5.dp, BorderSolid, RectangleShape)
+                                .padding(12.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "TOTAL EN $periodDisplayLabel",
+                                    style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 9.5.sp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "${catTxs.size} ${if (catTxs.size == 1) "movimiento" else "movimientos"}",
+                                    style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 9.5.sp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "${baseCurrency?.symbol ?: "$"} ${formatter.format(selectedCat.totalUsd)} ${baseCurrency?.code ?: "USD"}",
+                                style = BrexaTypography.titleLarge.copy(
+                                    color = amountColor,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 20.sp
+                                )
+                            )
+                        }
+
+                        // Encabezado de la lista
+                        Text(
+                            text = "DETALLE DE $typePlural REGISTRADOS:",
+                            style = BrexaTypography.labelSmall.copy(
+                                color = TextPrimary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp,
+                                letterSpacing = 0.5.sp
+                            )
+                        )
+
+                        // Lista desplazable de movimientos con fecha, descripción, cuenta y monto
+                        if (catTxs.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(BackgroundBase, RectangleShape)
+                                    .border(1.dp, BorderSolid, RectangleShape)
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "No se encontraron $typePlural para este período",
+                                    style = BrexaTypography.labelSmall.copy(color = TextMuted)
+                                )
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 340.dp)
+                            ) {
+                                LazyColumn(
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    items(catTxs, key = { it.id }) { tx ->
+                                        val acc = accounts.find { it.id == tx.accountId }
+                                        val description = if (tx.note.isNotBlank()) tx.note else "Sin descripción"
+                                        val formattedDate = txDateFormatter.format(Date(tx.dateTimestamp))
+
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(BackgroundBase, RectangleShape)
+                                                .border(1.dp, BorderSolid, RectangleShape)
+                                                .padding(10.dp)
+                                        ) {
+                                            // Fila 1: Descripción y Monto Nativo
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.Top
+                                            ) {
+                                                Text(
+                                                    text = description,
+                                                    style = BrexaTypography.bodyMedium.copy(
+                                                        color = TextPrimary,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 12.sp
+                                                    ),
+                                                    modifier = Modifier.weight(1f),
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "$prefix${formatter.format(tx.nativeAmount)} ${tx.currencyCode}",
+                                                    style = BrexaTypography.labelLarge.copy(
+                                                        color = amountColor,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 12.5.sp
+                                                    )
+                                                )
+                                            }
+
+                                            Spacer(modifier = Modifier.height(4.dp))
+
+                                            // Fila 2: Fecha / Hora y Cuenta (o equivalencia USD)
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Row(
+                                                    modifier = Modifier.weight(1f),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Text(
+                                                        text = formattedDate,
+                                                        style = BrexaTypography.labelSmall.copy(
+                                                            color = TextSecondary,
+                                                            fontSize = 9.5.sp
+                                                        )
+                                                    )
+                                                    if (acc != null) {
+                                                        Text(
+                                                            text = " • ${acc.name}",
+                                                            style = BrexaTypography.labelSmall.copy(
+                                                                color = TextMuted,
+                                                                fontSize = 9.5.sp
+                                                            ),
+                                                            maxLines = 1,
+                                                            overflow = TextOverflow.Ellipsis
+                                                        )
+                                                    }
+                                                }
+
+                                                if (tx.currencyCode != (baseCurrency?.code ?: "USD")) {
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        text = "≈ ${baseCurrency?.symbol ?: "$"} ${formatter.format(tx.usdEquivalent)}",
+                                                        style = BrexaTypography.labelSmall.copy(
+                                                            color = AccentLime,
+                                                            fontSize = 9.5.sp,
+                                                            fontWeight = FontWeight.SemiBold
+                                                        )
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    BrutalistBadge(
+                        text = "CERRAR",
+                        backgroundColor = AccentLime,
+                        contentColor = Color.Black,
+                        borderColor = BorderSolid,
+                        fontSize = 11.sp,
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.clickable { selectedCategoryForDetail = null }
+                    )
+                }
+            )
         }
     }
 }
