@@ -22,6 +22,10 @@ data class BackupPayload(
     val transactions: List<TransactionEntity>
 )
 
+enum class AnalyticsPeriod {
+    WEEK, MONTH
+}
+
 class BrexaViewModel(
     private val repository: BrexaRepository,
     private val syncManager: GoogleDriveSyncManager? = null
@@ -67,31 +71,62 @@ class BrexaViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     // Filtros de fecha para analítica
+    private val _analyticsPeriod = MutableStateFlow(AnalyticsPeriod.MONTH)
+    val analyticsPeriod = _analyticsPeriod.asStateFlow()
+
     private val _analyticsMonth = MutableStateFlow(Calendar.getInstance().get(Calendar.MONTH))
     val analyticsMonth = _analyticsMonth.asStateFlow()
 
     private val _analyticsYear = MutableStateFlow(Calendar.getInstance().get(Calendar.YEAR))
     val analyticsYear = _analyticsYear.asStateFlow()
 
+    private val _analyticsWeekCalendar = MutableStateFlow(Calendar.getInstance())
+    val analyticsWeekCalendar = _analyticsWeekCalendar.asStateFlow()
+
     private val _analyticsType = MutableStateFlow("EXPENSE") // "EXPENSE" o "INCOME"
     val analyticsType = _analyticsType.asStateFlow()
 
-    // Distribución por categoría para el período seleccionado
+    // Distribución por categoría para el período seleccionado (Semanal o Mensual)
     val categoryDistribution: StateFlow<List<CategoryDistribution>> = combine(
         _analyticsType,
+        _analyticsPeriod,
         _analyticsMonth,
-        _analyticsYear
-    ) { type, month, year ->
-        val cal = Calendar.getInstance()
-        cal.set(year, month, 1, 0, 0, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        val startDate = cal.timeInMillis
+        _analyticsYear,
+        _analyticsWeekCalendar
+    ) { type, period, month, year, weekCal ->
+        val (startDate, endDate) = if (period == AnalyticsPeriod.MONTH) {
+            val cal = Calendar.getInstance()
+            cal.set(year, month, 1, 0, 0, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+            val start = cal.timeInMillis
 
-        cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH))
-        cal.set(Calendar.HOUR_OF_DAY, 23)
-        cal.set(Calendar.MINUTE, 59)
-        cal.set(Calendar.SECOND, 59)
-        val endDate = cal.timeInMillis
+            cal.set(Calendar.DAY_OF_MONTH, cal.getActualMaximum(Calendar.DAY_OF_MONTH))
+            cal.set(Calendar.HOUR_OF_DAY, 23)
+            cal.set(Calendar.MINUTE, 59)
+            cal.set(Calendar.SECOND, 59)
+            cal.set(Calendar.MILLISECOND, 999)
+            val end = cal.timeInMillis
+            Pair(start, end)
+        } else {
+            // Semana de Lunes a Domingo
+            val cal = weekCal.clone() as Calendar
+            val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
+            val daysFromMonday = if (dayOfWeek == Calendar.SUNDAY) 6 else dayOfWeek - Calendar.MONDAY
+            cal.add(Calendar.DAY_OF_MONTH, -daysFromMonday)
+            cal.set(Calendar.HOUR_OF_DAY, 0)
+            cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.SECOND, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+            val start = cal.timeInMillis
+
+            cal.add(Calendar.DAY_OF_MONTH, 6)
+            cal.set(Calendar.HOUR_OF_DAY, 23)
+            cal.set(Calendar.MINUTE, 59)
+            cal.set(Calendar.SECOND, 59)
+            cal.set(Calendar.MILLISECOND, 999)
+            val end = cal.timeInMillis
+            Pair(start, end)
+        }
 
         repository.getCategoryDistribution(type, startDate, endDate)
     }.flatMapLatest { it }
@@ -107,6 +142,30 @@ class BrexaViewModel(
 
     fun setAnalyticsType(type: String) {
         _analyticsType.value = type
+    }
+
+    fun setAnalyticsPeriod(period: AnalyticsPeriod) {
+        _analyticsPeriod.value = period
+    }
+
+    fun previousPeriod() {
+        if (_analyticsPeriod.value == AnalyticsPeriod.MONTH) {
+            previousMonth()
+        } else {
+            val cal = _analyticsWeekCalendar.value.clone() as Calendar
+            cal.add(Calendar.DAY_OF_MONTH, -7)
+            _analyticsWeekCalendar.value = cal
+        }
+    }
+
+    fun nextPeriod() {
+        if (_analyticsPeriod.value == AnalyticsPeriod.MONTH) {
+            nextMonth()
+        } else {
+            val cal = _analyticsWeekCalendar.value.clone() as Calendar
+            cal.add(Calendar.DAY_OF_MONTH, 7)
+            _analyticsWeekCalendar.value = cal
+        }
     }
 
     fun previousMonth() {
