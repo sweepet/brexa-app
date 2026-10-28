@@ -9,6 +9,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -155,10 +157,20 @@ class MainActivity : ComponentActivity() {
                                         style = BrexaTypography.bodyMedium.copy(color = TextPrimary)
                                     )
                                     if (update.releaseNotes.isNotEmpty()) {
-                                        Text(
-                                            text = update.releaseNotes,
-                                            style = BrexaTypography.labelMedium.copy(color = TextSecondary, fontSize = 11.sp)
-                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .heightIn(max = 140.dp)
+                                                .background(BackgroundBase, RectangleShape)
+                                                .border(1.dp, BorderSolid, RectangleShape)
+                                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                                                .verticalScroll(rememberScrollState())
+                                        ) {
+                                            Text(
+                                                text = update.releaseNotes,
+                                                style = BrexaTypography.labelMedium.copy(color = TextSecondary, fontSize = 11.sp)
+                                            )
+                                        }
                                     }
                                     if (isDownloadingUpdate) {
                                         Spacer(modifier = Modifier.height(6.dp))

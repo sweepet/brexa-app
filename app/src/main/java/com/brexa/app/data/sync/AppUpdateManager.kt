@@ -80,7 +80,7 @@ class AppUpdateManager(private val context: Context) {
                                 return@withContext Result.success(
                                     UpdateInfo(
                                         versionName = tagName,
-                                        releaseNotes = bodyNotes,
+                                        releaseNotes = cleanReleaseNotes(bodyNotes, tagName),
                                         downloadUrl = downloadUrl,
                                         fileSize = size
                                     )
@@ -114,6 +114,43 @@ class AppUpdateManager(private val context: Context) {
             if (r < c) return false
         }
         return false
+    }
+
+    /**
+     * Limpia y formatea las notas de la versión para mostrar solo los cambios de esta versión
+     * sin enlaces técnicos de git ni acumulación de versiones anteriores.
+     */
+    fun cleanReleaseNotes(raw: String, tagName: String): String {
+        if (raw.isBlank()) return "Mejoras de estabilidad y rendimiento."
+
+        val lines = raw.lines()
+        val cleanedLines = mutableListOf<String>()
+
+        for (line in lines) {
+            val trimmed = line.trim()
+            if (trimmed.startsWith("**Full Changelog**", ignoreCase = true) ||
+                trimmed.startsWith("Full Changelog:", ignoreCase = true) ||
+                trimmed.startsWith("https://github.com", ignoreCase = true) ||
+                trimmed.startsWith("## Novedades", ignoreCase = true) ||
+                trimmed.startsWith("## What's Changed", ignoreCase = true) ||
+                trimmed.startsWith("⚡ Brexa", ignoreCase = true)
+            ) {
+                continue
+            }
+            val cleanLine = trimmed
+                .replace("**", "")
+                .replace("`", "")
+
+            if (cleanLine.isNotBlank()) {
+                cleanedLines.add(cleanLine)
+            }
+        }
+
+        return if (cleanedLines.isEmpty()) {
+            "Mejoras y correcciones en $tagName."
+        } else {
+            cleanedLines.take(6).joinToString("\n")
+        }
     }
 
     /**

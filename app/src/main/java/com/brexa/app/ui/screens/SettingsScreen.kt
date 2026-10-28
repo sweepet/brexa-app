@@ -413,10 +413,20 @@ fun SettingsScreen(
                             style = BrexaTypography.labelLarge.copy(color = AccentLime, fontWeight = FontWeight.Bold)
                         )
                         if (update.releaseNotes.isNotEmpty()) {
-                            Text(
-                                text = update.releaseNotes,
-                                style = BrexaTypography.bodyMedium.copy(color = TextSecondary, fontSize = 11.sp)
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 140.dp)
+                                    .background(BackgroundBase, RectangleShape)
+                                    .border(1.dp, BorderSolid, RectangleShape)
+                                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                                    .verticalScroll(rememberScrollState())
+                            ) {
+                                Text(
+                                    text = update.releaseNotes,
+                                    style = BrexaTypography.bodyMedium.copy(color = TextSecondary, fontSize = 11.sp)
+                                )
+                            }
                         }
 
                         if (isDownloadingInSettings) {
