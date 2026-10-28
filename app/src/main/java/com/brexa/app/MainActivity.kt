@@ -41,14 +41,15 @@ class MainActivity : ComponentActivity() {
         // Inicialización de persistencia y casos de uso
         val database = BrexaDatabase.getDatabase(applicationContext, lifecycleScope)
         val repository = BrexaRepository(database)
+        val syncManagerInstance = GoogleDriveSyncManager(applicationContext)
         val viewModel = ViewModelProvider(
             this,
-            BrexaViewModelFactory(repository)
+            BrexaViewModelFactory(repository, syncManagerInstance)
         )[BrexaViewModel::class.java]
 
         setContent {
             BrexaTheme {
-                val syncManager = remember { GoogleDriveSyncManager(applicationContext) }
+                val syncManager = remember { syncManagerInstance }
                 val updateManager = remember { AppUpdateManager(applicationContext) }
                 val prefs = remember { getSharedPreferences("brexa_prefs", Context.MODE_PRIVATE) }
                 val isUserSignedIn = remember { syncManager.getLastSignedInAccount() != null }

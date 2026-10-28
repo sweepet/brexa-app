@@ -166,14 +166,18 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "RESPALDO PRIVADO GOOGLE DRIVE",
-                        style = BrexaTypography.labelLarge.copy(color = TextPrimary)
+                        text = "RESPALDO GOOGLE DRIVE",
+                        style = BrexaTypography.labelLarge.copy(color = TextPrimary),
+                        modifier = Modifier.weight(1f, fill = false)
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
                     BrutalistBadge(
                         text = if (signedInAccount != null) "CONECTADO" else "NO CONECTADO",
                         backgroundColor = BackgroundBase,
                         contentColor = if (signedInAccount != null) AccentLime else TextSecondary,
-                        borderColor = if (signedInAccount != null) AccentLime else BorderSolid
+                        borderColor = if (signedInAccount != null) AccentLime else BorderSolid,
+                        fontSize = 8.5.sp,
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
                     )
                 }
 
@@ -361,7 +365,7 @@ fun SettingsScreen(
                         style = BrexaTypography.labelLarge.copy(color = TextPrimary)
                     )
                     BrutalistBadge(
-                        text = "v1.0.0 // BUILD 1",
+                        text = updateManager.getInstalledVersionName(),
                         backgroundColor = BackgroundBase,
                         contentColor = AccentLime,
                         borderColor = AccentLime
@@ -369,7 +373,7 @@ fun SettingsScreen(
                 }
 
                 Text(
-                    text = "Como esta app se actualiza vía GitHub, puedes verificar si publicaste una nueva versión con un solo toque sin perder tus datos:",
+                    text = "Consulta si hay una nueva versión disponible para disfrutar de las últimas mejoras y funciones en tu dispositivo con un solo toque:",
                     style = BrexaTypography.bodyMedium.copy(color = TextSecondary),
                     modifier = Modifier.padding(vertical = 8.dp)
                 )

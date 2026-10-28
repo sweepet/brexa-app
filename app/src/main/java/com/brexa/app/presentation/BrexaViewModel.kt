@@ -6,7 +6,9 @@ import androidx.lifecycle.viewModelScope
 import com.brexa.app.data.local.entity.*
 import com.brexa.app.data.repository.BrexaRepository
 import com.brexa.app.data.repository.CategoryDistribution
+import com.brexa.app.data.sync.GoogleDriveSyncManager
 import com.google.gson.Gson
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -20,7 +22,24 @@ data class BackupPayload(
     val transactions: List<TransactionEntity>
 )
 
-class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
+class BrexaViewModel(
+    private val repository: BrexaRepository,
+    private val syncManager: GoogleDriveSyncManager? = null
+) : ViewModel() {
+
+    /**
+     * Sincronización automática silenciosa con Google Drive si la sesión está activa
+     */
+    fun triggerAutoBackup() {
+        val manager = syncManager ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val account = manager.getLastSignedInAccount() ?: return@launch
+            try {
+                val json = exportBackupJson()
+                manager.uploadBackup(account, json)
+            } catch (_: Exception) { }
+        }
+    }
 
     // --- ESTADO REACTIVO ---
     val consolidatedUsdBalance: StateFlow<Double> = repository.calculateConsolidatedUsdBalance()
@@ -125,7 +144,10 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
                 exchangeRate = rate,
                 note = note
             )
-            result.onSuccess { onSuccess() }
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }
                 .onFailure { onError(it.message ?: "Error al registrar gasto.") }
         }
     }
@@ -147,7 +169,10 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
                 exchangeRate = rate,
                 note = note
             )
-            result.onSuccess { onSuccess() }
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }
                 .onFailure { onError(it.message ?: "Error al registrar ingreso.") }
         }
     }
@@ -169,7 +194,10 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
                 targetReceivedAmount = targetReceivedAmount,
                 note = note
             )
-            result.onSuccess { onSuccess() }
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }
                 .onFailure { onError(it.message ?: "Error al realizar Exchange.") }
         }
     }
@@ -177,6 +205,7 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
     fun deleteTransaction(transactionId: String, onComplete: () -> Unit) {
         viewModelScope.launch {
             repository.revertTransaction(transactionId)
+            triggerAutoBackup()
             onComplete()
         }
     }
@@ -200,7 +229,10 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
                 initialBalance = initialBalance,
                 includeInTotal = includeInTotal
             )
-            result.onSuccess { onSuccess() }
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }
                 .onFailure { onError(it.message ?: "Error al crear cuenta.") }
         }
     }
@@ -213,7 +245,10 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
     ) {
         viewModelScope.launch {
             val result = repository.adjustAccountBalance(accountId, newBalance)
-            result.onSuccess { onSuccess() }
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }
                 .onFailure { onError(it.message ?: "Error al ajustar saldo.") }
         }
     }
@@ -221,6 +256,7 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
     fun toggleIncludeInTotal(accountId: String, currentVal: Boolean) {
         viewModelScope.launch {
             repository.toggleIncludeInTotal(accountId, !currentVal)
+            triggerAutoBackup()
         }
     }
 
@@ -241,7 +277,10 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
                 rateToUsd = rateToUsd,
                 iconId = iconId
             )
-            result.onSuccess { onSuccess() }
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }
                 .onFailure { onError(it.message ?: "Error al crear moneda.") }
         }
     }
@@ -255,7 +294,10 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
     ) {
         viewModelScope.launch {
             val result = repository.updateBaseCurrency(code, name, symbol)
-            result.onSuccess { onSuccess() }
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }
                 .onFailure { onError(it.message ?: "Error al actualizar moneda principal.") }
         }
     }
@@ -268,7 +310,10 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
     ) {
         viewModelScope.launch {
             val result = repository.updateCurrencyRate(currencyId, newRate)
-            result.onSuccess { onSuccess() }
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }
                 .onFailure { onError(it.message ?: "Error al actualizar tasa.") }
         }
     }
@@ -280,7 +325,10 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
     ) {
         viewModelScope.launch {
             val result = repository.deleteCurrency(currencyId)
-            result.onSuccess { onSuccess() }
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }
                 .onFailure { onError(it.message ?: "Error al eliminar moneda.") }
         }
     }
@@ -297,7 +345,10 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
     ) {
         viewModelScope.launch {
             val result = repository.updateAccount(accountId, name, currencyId, iconType, colorHex, includeInTotal)
-            result.onSuccess { onSuccess() }
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }
                 .onFailure { onError(it.message ?: "Error al actualizar cuenta.") }
         }
     }
@@ -309,7 +360,10 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
     ) {
         viewModelScope.launch {
             val result = repository.deleteAccount(accountId)
-            result.onSuccess { onSuccess() }
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }
                 .onFailure { onError(it.message ?: "Error al eliminar cuenta.") }
         }
     }
@@ -324,7 +378,10 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
     ) {
         viewModelScope.launch {
             val result = repository.addCustomCategory(name, type, iconId, colorHex)
-            result.onSuccess { onSuccess() }
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }
                 .onFailure { onError(it.message ?: "Error al crear categoría.") }
         }
     }
@@ -336,7 +393,10 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
     ) {
         viewModelScope.launch {
             val result = repository.deleteCategory(categoryId)
-            result.onSuccess { onSuccess() }
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }
                 .onFailure { onError(it.message ?: "Error al eliminar categoría.") }
         }
     }
@@ -375,11 +435,14 @@ class BrexaViewModel(private val repository: BrexaRepository) : ViewModel() {
     }
 }
 
-class BrexaViewModelFactory(private val repository: BrexaRepository) : ViewModelProvider.Factory {
+class BrexaViewModelFactory(
+    private val repository: BrexaRepository,
+    private val syncManager: GoogleDriveSyncManager? = null
+) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(BrexaViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return BrexaViewModel(repository) as T
+            return BrexaViewModel(repository, syncManager) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

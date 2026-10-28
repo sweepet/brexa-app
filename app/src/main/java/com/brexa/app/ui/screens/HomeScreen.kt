@@ -55,18 +55,22 @@ fun HomeScreen(
         (expenseCats + incomeCats).associateBy { it.id }
     }
 
-    var transactionToDelete by remember { mutableStateOf<TransactionEntity?>(null) }
+    var selectedTxDetail by remember { mutableStateOf<TransactionEntity?>(null) }
+    var showConfirmDeleteTx by remember { mutableStateOf(false) }
 
     val formatter = remember { CurrencyFormat.standardFormatter }
     val dateFormatter = remember { SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()) }
+    val fullDateFormatter = remember { SimpleDateFormat("dd 'de' MMMM, yyyy - HH:mm", Locale("es", "ES")) }
 
-    // Moneda Base y Primera Moneda Secundaria (si el usuario la ha creado)
+    // Moneda Base y Monedas Secundarias
     val baseCode = baseCurrency?.code ?: "USD"
     val baseSymbol = baseCurrency?.symbol ?: "$"
-    val secondaryCurrency = currencies.find { !it.isBase }
-    val hasSecondary = secondaryCurrency != null
-    val secRate = secondaryCurrency?.rateToUsd ?: 1.0
-    val equivalentSec = totalUsd * secRate
+    val secondaryCurrencies = remember(currencies) { currencies.filter { !it.isBase } }
+    var selectedSecondaryIndex by remember { mutableIntStateOf(0) }
+    val activeSecondaryCurrency = if (secondaryCurrencies.isNotEmpty()) {
+        secondaryCurrencies[selectedSecondaryIndex.coerceIn(0, secondaryCurrencies.lastIndex)]
+    } else null
+    val equivalentSec = if (activeSecondaryCurrency != null) totalUsd * activeSecondaryCurrency.rateToUsd else 0.0
 
     Column(
         modifier = Modifier
@@ -163,7 +167,7 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Text(
-                                text = "PATRIMONIO TOTAL DISPONIBLE",
+                                text = "DINERO TOTAL",
                                 style = BrexaTypography.labelMedium.copy(
                                     color = TextSecondary,
                                     letterSpacing = 1.sp
@@ -194,22 +198,56 @@ fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(4.dp))
 
-                        Text(
-                            text = if (isIncognito) {
-                                "≈ •••••••"
-                            } else if (hasSecondary) {
-                                "≈ ${formatter.format(equivalentSec)} ${secondaryCurrency?.code} (VALUACIÓN VIVA)"
-                            } else {
-                                "MONEDA PRINCIPAL: ${baseCurrency?.name ?: "Dólar"}"
-                            },
-                            style = BrexaTypography.labelMedium.copy(
-                                color = AccentPurple,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        if (isIncognito) {
+                            Text(
+                                text = "≈ •••••••",
+                                style = BrexaTypography.labelMedium.copy(
+                                    color = AccentPurple,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                )
+                            )
+                        } else if (activeSecondaryCurrency != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.clickable(enabled = secondaryCurrencies.size > 1) {
+                                    selectedSecondaryIndex = (selectedSecondaryIndex + 1) % secondaryCurrencies.size
+                                }
+                            ) {
+                                Text(
+                                    text = "≈ ${formatter.format(equivalentSec)} ${activeSecondaryCurrency.code}",
+                                    style = BrexaTypography.labelMedium.copy(
+                                        color = AccentPurple,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (secondaryCurrencies.size > 1) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "⇄",
+                                        style = BrexaTypography.labelMedium.copy(
+                                            color = AccentLime,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 10.sp
+                                        )
+                                    )
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = "MONEDA PRINCIPAL: ${baseCurrency?.name ?: "Dólar"}",
+                                style = BrexaTypography.labelMedium.copy(
+                                    color = AccentPurple,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
                 }
             }
@@ -277,7 +315,7 @@ fun HomeScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "⇄ EXCHANGE",
+                            text = "⇄ TRANSFERIR",
                             style = BrexaTypography.labelLarge.copy(
                                 color = Color.Black,
                                 fontWeight = FontWeight.Bold,
@@ -467,7 +505,10 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                         backgroundColor = SurfaceCard,
                         borderColor = BorderSolid,
-                        onClick = { transactionToDelete = tx }
+                        onClick = {
+                            selectedTxDetail = tx
+                            showConfirmDeleteTx = false
+                        }
                     ) {
                         Row(
                             modifier = Modifier
@@ -553,47 +594,220 @@ fun HomeScreen(
         }
     }
 
-    // Modal de Confirmación para Reversión / Borrado de Transacción
-    if (transactionToDelete != null) {
-        val tx = transactionToDelete!!
+    // Modal de Detalle de Movimiento
+    if (selectedTxDetail != null) {
+        val tx = selectedTxDetail!!
+        val acc = accounts.find { it.id == tx.accountId }
+        val destAcc = tx.destinationAccountId?.let { id -> accounts.find { it.id == id } }
+        val cat = tx.categoryId?.let { categoryMap[it] }
+
+        val badgeColor = when (tx.type) {
+            "EXPENSE" -> ExpenseRed
+            "INCOME" -> IncomeGreen
+            "EXCHANGE" -> ExchangeBlue
+            else -> AccentPurple
+        }
+
+        val typeLabel = when (tx.type) {
+            "EXPENSE" -> "GASTO"
+            "INCOME" -> "INGRESO"
+            "EXCHANGE" -> "TRANSFERENCIA"
+            "BALANCE_ADJUSTMENT" -> "AJUSTE DE SALDO"
+            else -> tx.type
+        }
+
+        val prefix = if (tx.type == "EXPENSE") "− " else if (tx.type == "INCOME") "+ " else "⇄ "
+
         AlertDialog(
-            onDismissRequest = { transactionToDelete = null },
+            onDismissRequest = {
+                selectedTxDetail = null
+                showConfirmDeleteTx = false
+            },
             shape = RectangleShape,
             containerColor = SurfaceCard,
             title = {
-                Text(
-                    text = "¿ELIMINAR Y REVERTIR MOVIMIENTO?",
-                    style = BrexaTypography.titleLarge.copy(color = ExpenseRed)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "DETALLE DE MOVIMIENTO",
+                        style = BrexaTypography.titleLarge.copy(color = AccentLime, fontSize = 15.sp)
+                    )
+                    BrutalistBadge(
+                        text = typeLabel,
+                        backgroundColor = BackgroundBase,
+                        contentColor = badgeColor,
+                        borderColor = badgeColor,
+                        fontSize = 8.5.sp,
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
             },
             text = {
-                val cat = tx.categoryId?.let { categoryMap[it] }
-                val detail = if (tx.note.isNotEmpty()) "\"${tx.note}\"" else (cat?.name ?: "")
-                Text(
-                    text = "Se eliminará el registro de ${formatter.format(tx.nativeAmount)} ${tx.currencyCode} ${if (detail.isNotEmpty()) "($detail) " else ""}y el saldo de la cuenta se recalculará automáticamente de forma inversa.",
-                    style = BrexaTypography.bodyMedium.copy(color = TextPrimary)
-                )
-            },
-            confirmButton = {
-                BrutalistBadge(
-                    text = "SÍ, REVERTIR",
-                    backgroundColor = ExpenseRed,
-                    contentColor = Color.Black,
-                    borderColor = ExpenseRed,
-                    modifier = Modifier.clickable {
-                        viewModel.deleteTransaction(tx.id) {
-                            transactionToDelete = null
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    // Tarjeta de Cifras
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(BackgroundBase, RectangleShape)
+                            .border(1.5.dp, BorderSolid, RectangleShape)
+                            .padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "$prefix${formatter.format(tx.nativeAmount)} ${tx.currencyCode}",
+                            style = BrexaTypography.titleLarge.copy(
+                                color = badgeColor,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 22.sp
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "≈ $baseSymbol ${formatter.format(tx.usdEquivalent)} $baseCode",
+                            style = BrexaTypography.labelLarge.copy(
+                                color = AccentLime,
+                                fontSize = 13.sp
+                            )
+                        )
+                        if (tx.currencyCode != baseCode) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Tasa de cotización: 1 $baseCode = ${CurrencyFormat.formatRate(tx.exchangeRate)} ${tx.currencyCode}",
+                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp)
+                            )
                         }
                     }
-                )
+
+                    // Concepto / Nota completa sin recortes
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(
+                            text = "CONCEPTO // NOTA",
+                            style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp, letterSpacing = 0.5.sp)
+                        )
+                        Text(
+                            text = if (tx.note.isNotEmpty()) tx.note else (cat?.name ?: "Sin descripción"),
+                            style = BrexaTypography.bodyMedium.copy(color = TextPrimary, fontWeight = FontWeight.SemiBold)
+                        )
+                    }
+
+                    // Cuenta y Categoría
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (destAcc != null) "ORIGEN ➔ DESTINO" else "CUENTA",
+                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp, letterSpacing = 0.5.sp)
+                            )
+                            Text(
+                                text = "${acc?.name ?: "Cuenta"} ${if (destAcc != null) "➔ ${destAcc.name}" else ""}",
+                                style = BrexaTypography.bodyMedium.copy(color = TextPrimary)
+                            )
+                        }
+
+                        if (cat != null) {
+                            Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
+                                Text(
+                                    text = "CATEGORÍA",
+                                    style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp, letterSpacing = 0.5.sp)
+                                )
+                                Text(
+                                    text = cat.name,
+                                    style = BrexaTypography.bodyMedium.copy(
+                                        color = AccentLime,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                            }
+                        }
+                    }
+
+                    // Fecha y Hora
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(
+                            text = "FECHA Y HORA",
+                            style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp, letterSpacing = 0.5.sp)
+                        )
+                        Text(
+                            text = fullDateFormatter.format(Date(tx.dateTimestamp)),
+                            style = BrexaTypography.bodySmall.copy(color = TextSecondary)
+                        )
+                    }
+
+                    // Sección de Confirmación para Reversión / Borrado si se pulsa eliminar
+                    if (showConfirmDeleteTx) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(BackgroundBase, RectangleShape)
+                                .border(1.5.dp, ExpenseRed, RectangleShape)
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "¿CONFIRMAS REVERTIR Y ELIMINAR ESTE MOVIMIENTO?",
+                                style = BrexaTypography.labelMedium.copy(color = ExpenseRed, fontWeight = FontWeight.Bold)
+                            )
+                            Text(
+                                text = "El saldo de ${acc?.name ?: "la cuenta"} se restaurará automáticamente de forma inversa.",
+                                style = BrexaTypography.labelSmall.copy(color = TextPrimary, fontSize = 10.sp)
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                BrutalistBadge(
+                                    text = "SÍ, ELIMINAR Y REVERTIR",
+                                    backgroundColor = ExpenseRed,
+                                    contentColor = Color.Black,
+                                    borderColor = ExpenseRed,
+                                    modifier = Modifier.clickable {
+                                        viewModel.deleteTransaction(tx.id) {
+                                            selectedTxDetail = null
+                                            showConfirmDeleteTx = false
+                                        }
+                                    }
+                                )
+                                BrutalistBadge(
+                                    text = "CANCELAR",
+                                    backgroundColor = BackgroundBase,
+                                    contentColor = TextSecondary,
+                                    borderColor = BorderSolid,
+                                    modifier = Modifier.clickable { showConfirmDeleteTx = false }
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                if (!showConfirmDeleteTx) {
+                    BrutalistBadge(
+                        text = "🗑 ELIMINAR",
+                        backgroundColor = BackgroundBase,
+                        contentColor = ExpenseRed,
+                        borderColor = ExpenseRed,
+                        modifier = Modifier.clickable { showConfirmDeleteTx = true }
+                    )
+                }
             },
             dismissButton = {
                 BrutalistBadge(
-                    text = "CANCELAR",
+                    text = "CERRAR",
                     backgroundColor = BackgroundBase,
-                    contentColor = TextSecondary,
+                    contentColor = TextPrimary,
                     borderColor = BorderSolid,
-                    modifier = Modifier.clickable { transactionToDelete = null }
+                    modifier = Modifier.clickable {
+                        selectedTxDetail = null
+                        showConfirmDeleteTx = false
+                    }
                 )
             }
         )
