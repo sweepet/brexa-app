@@ -1,10 +1,15 @@
 package com.brexa.app
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -22,9 +27,11 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import com.brexa.app.data.local.BrexaDatabase
+import com.brexa.app.data.reminder.DailyReminderManager
 import com.brexa.app.data.repository.BrexaRepository
 import com.brexa.app.data.sync.AppUpdateManager
 import com.brexa.app.data.sync.GoogleDriveSyncManager
@@ -66,8 +73,28 @@ class MainActivity : ComponentActivity() {
                 var isDownloadingUpdate by remember { mutableStateOf(false) }
                 var downloadProgress by remember { mutableFloatStateOf(0f) }
 
-                // Comprobación automática de actualización en segundo plano al iniciar la app
+                // Permiso de notificaciones para Android 13+ (API 33+)
+                val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { isGranted ->
+                    if (isGranted) {
+                        DailyReminderManager.scheduleDailyReminder(applicationContext)
+                    }
+                }
+
+                // Comprobaciones iniciales (actualización en GitHub y recordatorio diario)
                 LaunchedEffect(Unit) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        if (ContextCompat.checkSelfPermission(
+                                applicationContext,
+                                Manifest.permission.POST_NOTIFICATIONS
+                            ) != PackageManager.PERMISSION_GRANTED
+                        ) {
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    }
+                    DailyReminderManager.scheduleDailyReminder(applicationContext)
+
                     val result = updateManager.checkForUpdate()
                     result.onSuccess { update ->
                         if (update != null) {

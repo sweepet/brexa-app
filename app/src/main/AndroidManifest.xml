@@ -8,6 +8,7 @@
     <!-- Instalación de Actualizaciones APK In-App -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <application
         android:name=".BrexaApplication"
@@ -39,6 +40,17 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Receptor del Recordatorio Diario de Movimientos -->
+        <receiver
+            android:name=".data.reminder.DailyReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.brexa.app.ACTION_DAILY_REMINDER" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

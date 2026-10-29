@@ -1,5 +1,6 @@
 package com.brexa.app.ui.screens
 
+import android.app.TimePickerDialog
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -21,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.brexa.app.data.reminder.DailyReminderManager
 import com.brexa.app.data.sync.AppUpdateManager
 import com.brexa.app.data.sync.GoogleDriveSyncManager
 import com.brexa.app.data.sync.UpdateInfo
@@ -63,6 +65,20 @@ fun SettingsScreen(
     var isDriveRestoring by remember { mutableStateOf(false) }
     var showRestoreConfirmDialog by remember { mutableStateOf(false) }
     var driveSyncErrorMessage by remember { mutableStateOf<String?>(null) }
+
+    // Estados del Recordatorio Diario
+    var isReminderEnabled by remember { mutableStateOf(DailyReminderManager.isEnabled(context)) }
+    var reminderHour by remember { mutableIntStateOf(DailyReminderManager.getHour(context)) }
+    var reminderMinute by remember { mutableIntStateOf(DailyReminderManager.getMinute(context)) }
+
+    fun formatHourMinute(hour: Int, minute: Int): String {
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+        }
+        val sdf = SimpleDateFormat("hh:mm a", Locale("es", "ES"))
+        return sdf.format(cal.time).uppercase()
+    }
 
     fun formatBackupTimestamp(timestamp: Long?): String {
         if (timestamp == null || timestamp <= 0L) return "Sin respaldo registrado"
@@ -450,6 +466,215 @@ fun SettingsScreen(
                     )
                 }
             )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // SECCIÓN: RECORDATORIO DIARIO DE MOVIMIENTOS
+        Text(
+            text = "HÁBITO Y CONTROL DIARIO",
+            style = BrexaTypography.labelLarge.copy(color = AccentLime),
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        BrutalistCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = SurfaceCard,
+            borderColor = if (isReminderEnabled) AccentLime else BorderSolid
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "RECORDATORIO DIARIO",
+                        style = BrexaTypography.labelLarge.copy(color = TextPrimary),
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    BrutalistBadge(
+                        text = if (isReminderEnabled) "ACTIVADO ✓" else "DESACTIVADO ✕",
+                        backgroundColor = BackgroundBase,
+                        contentColor = if (isReminderEnabled) AccentLime else TextSecondary,
+                        borderColor = if (isReminderEnabled) AccentLime else BorderSolid,
+                        fontSize = 8.5.sp,
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Te notifica una vez al día para que anotes tus compras, pagos y transferencias antes de descansar, manteniendo tus finanzas exactas sin esfuerzo.",
+                    style = BrexaTypography.bodyMedium.copy(color = TextSecondary)
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Selector de Hora
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(BackgroundBase, RectangleShape)
+                        .border(1.dp, BorderSolid, RectangleShape)
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = "HORA PROGRAMADA",
+                        style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 9.5.sp, letterSpacing = 0.5.sp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${formatHourMinute(reminderHour, reminderMinute)} ${if (reminderHour == 20 && reminderMinute == 30) "(Hora recomendada)" else ""}",
+                        style = BrexaTypography.titleMedium.copy(color = AccentLime, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "HORAS SUGERIDAS:",
+                        style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 9.sp)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // 08:00 PM
+                        Box(modifier = Modifier.weight(1f)) {
+                            BrutalistBadge(
+                                text = "8:00 PM",
+                                backgroundColor = if (reminderHour == 20 && reminderMinute == 0) AccentLime else SurfaceCard,
+                                contentColor = if (reminderHour == 20 && reminderMinute == 0) Color.Black else TextPrimary,
+                                borderColor = BorderSolid,
+                                fontSize = 9.5.sp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        DailyReminderManager.setTime(context, 20, 0)
+                                        reminderHour = 20
+                                        reminderMinute = 0
+                                        Toast.makeText(context, "Recordatorio fijado a las 08:00 PM", Toast.LENGTH_SHORT).show()
+                                    }
+                            )
+                        }
+
+                        // 08:30 PM (Recomendada)
+                        Box(modifier = Modifier.weight(1f)) {
+                            BrutalistBadge(
+                                text = "8:30 PM ★",
+                                backgroundColor = if (reminderHour == 20 && reminderMinute == 30) AccentLime else SurfaceCard,
+                                contentColor = if (reminderHour == 20 && reminderMinute == 30) Color.Black else TextPrimary,
+                                borderColor = BorderSolid,
+                                fontSize = 9.5.sp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        DailyReminderManager.setTime(context, 20, 30)
+                                        reminderHour = 20
+                                        reminderMinute = 30
+                                        Toast.makeText(context, "Recordatorio fijado a las 08:30 PM", Toast.LENGTH_SHORT).show()
+                                    }
+                            )
+                        }
+
+                        // 09:00 PM
+                        Box(modifier = Modifier.weight(1f)) {
+                            BrutalistBadge(
+                                text = "9:00 PM",
+                                backgroundColor = if (reminderHour == 21 && reminderMinute == 0) AccentLime else SurfaceCard,
+                                contentColor = if (reminderHour == 21 && reminderMinute == 0) Color.Black else TextPrimary,
+                                borderColor = BorderSolid,
+                                fontSize = 9.5.sp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        DailyReminderManager.setTime(context, 21, 0)
+                                        reminderHour = 21
+                                        reminderMinute = 0
+                                        Toast.makeText(context, "Recordatorio fijado a las 09:00 PM", Toast.LENGTH_SHORT).show()
+                                    }
+                            )
+                        }
+
+                        // Otra hora
+                        Box(modifier = Modifier.weight(1f)) {
+                            BrutalistBadge(
+                                text = "OTRA ⏱",
+                                backgroundColor = SurfaceCard,
+                                contentColor = TextPrimary,
+                                borderColor = BorderSolid,
+                                fontSize = 9.5.sp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        TimePickerDialog(
+                                            context,
+                                            { _, selectedHour, selectedMinute ->
+                                                DailyReminderManager.setTime(context, selectedHour, selectedMinute)
+                                                reminderHour = selectedHour
+                                                reminderMinute = selectedMinute
+                                                Toast.makeText(
+                                                    context,
+                                                    "Recordatorio fijado a las ${formatHourMinute(selectedHour, selectedMinute)}",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            },
+                                            reminderHour,
+                                            reminderMinute,
+                                            false
+                                        ).show()
+                                    }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Botones de Acción
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        BrutalistButton(
+                            text = if (isReminderEnabled) "DESACTIVAR" else "ACTIVAR AVISO",
+                            onClick = {
+                                val newState = !isReminderEnabled
+                                DailyReminderManager.setEnabled(context, newState)
+                                isReminderEnabled = newState
+                                Toast.makeText(
+                                    context,
+                                    if (newState) "Recordatorio diario activado para las ${formatHourMinute(reminderHour, reminderMinute)}"
+                                    else "Recordatorio desactivado",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            containerColor = if (isReminderEnabled) SurfaceCardElevated else AccentLime,
+                            contentColor = if (isReminderEnabled) ExpenseRed else Color.Black,
+                            borderColor = if (isReminderEnabled) ExpenseRed else AccentLime,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Box(modifier = Modifier.weight(1f)) {
+                        BrutalistButton(
+                            text = "PROBAR AVISO ⚡",
+                            onClick = {
+                                DailyReminderManager.showNotification(context)
+                                Toast.makeText(context, "Aviso de prueba enviado. ¡Revisa tus notificaciones!", Toast.LENGTH_SHORT).show()
+                            },
+                            containerColor = SurfaceCardElevated,
+                            contentColor = AccentLime,
+                            borderColor = AccentLime,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))
