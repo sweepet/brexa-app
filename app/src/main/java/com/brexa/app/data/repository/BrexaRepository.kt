@@ -1,13 +1,26 @@
 package com.brexa.app.data.repository
 
+import androidx.room.withTransaction
 import com.brexa.app.data.local.BrexaDatabase
 import com.brexa.app.data.local.entity.*
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.util.UUID
+
+data class BackupPayload(
+    val exportTimestamp: Long = System.currentTimeMillis(),
+    val appVersion: String = "1.0.9",
+    val currencies: List<CurrencyEntity> = emptyList(),
+    val accounts: List<AccountEntity> = emptyList(),
+    val categories: List<CategoryEntity> = emptyList(),
+    val transactions: List<TransactionEntity> = emptyList(),
+    val exchangeRateHistory: List<ExchangeRateHistoryEntity> = emptyList(),
+    val appSettings: List<AppSettingEntity> = emptyList()
+)
 
 data class CategoryDistribution(
     val categoryId: String?,
@@ -533,17 +546,51 @@ class BrexaRepository(private val db: BrexaDatabase) {
         return transactionDao.getAllTransactionsSync()
     }
 
-    suspend fun restoreBackup(
-        currencies: List<CurrencyEntity>,
-        accounts: List<AccountEntity>,
-        categories: List<CategoryEntity>,
-        transactions: List<TransactionEntity>
-    ): Result<Unit> {
+    suspend fun exportAllDataSync(): BackupPayload {
+        val currencies = currencyDao.getAllCurrenciesSync()
+        val accounts = accountDao.getAllAccountsSync()
+        val categories = categoryDao.getAllCategoriesSync()
+        val transactions = transactionDao.getAllTransactionsSync()
+        val history = exchangeRateHistoryDao.getAllHistorySync()
+        val settings = appSettingDao.getAllSettingsSync()
+
+        return BackupPayload(
+            exportTimestamp = System.currentTimeMillis(),
+            currencies = currencies,
+            accounts = accounts,
+            categories = categories,
+            transactions = transactions,
+            exchangeRateHistory = history,
+            appSettings = settings
+        )
+    }
+
+    suspend fun restoreBackup(payload: BackupPayload): Result<Unit> {
         return try {
-            if (currencies.isNotEmpty()) currencyDao.insertAll(currencies)
-            if (accounts.isNotEmpty()) accountDao.insertAll(accounts)
-            if (categories.isNotEmpty()) categoryDao.insertAll(categories)
-            if (transactions.isNotEmpty()) transactionDao.insertAll(transactions)
+            db.withTransaction {
+                val currencies = payload.currencies ?: emptyList()
+                val accounts = payload.accounts ?: emptyList()
+                val categories = payload.categories ?: emptyList()
+                val transactions = payload.transactions ?: emptyList()
+                val history = payload.exchangeRateHistory ?: emptyList()
+                val settings = payload.appSettings ?: emptyList()
+
+                // Si el respaldo contiene datos mínimos, limpiamos e insertamos en orden de dependencias
+                if (currencies.isNotEmpty() || accounts.isNotEmpty() || categories.isNotEmpty() || transactions.isNotEmpty()) {
+                    transactionDao.deleteAllTransactionsSync()
+                    exchangeRateHistoryDao.deleteAllHistorySync()
+                    accountDao.deleteAllAccountsSync()
+                    categoryDao.deleteAllCategoriesSync()
+                    currencyDao.deleteAllCurrenciesSync()
+
+                    if (currencies.isNotEmpty()) currencyDao.insertAll(currencies)
+                    if (accounts.isNotEmpty()) accountDao.insertAll(accounts)
+                    if (categories.isNotEmpty()) categoryDao.insertAll(categories)
+                    if (transactions.isNotEmpty()) transactionDao.insertAll(transactions)
+                    if (history.isNotEmpty()) exchangeRateHistoryDao.insertAll(history)
+                    if (settings.isNotEmpty()) appSettingDao.insertAll(settings)
+                }
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -559,5 +606,19 @@ class BrexaRepository(private val db: BrexaDatabase) {
 
     suspend fun setIncognitoMode(enabled: Boolean) {
         appSettingDao.setSetting(AppSettingEntity("incognito_mode", enabled.toString()))
+    }
+
+    fun getLastBackupTimestamp(): Flow<Long?> = appSettingDao.getSetting("last_backup_timestamp").map { str ->
+        str?.toLongOrNull()
+    }
+
+    suspend fun setLastBackupTimestamp(timestamp: Long = System.currentTimeMillis()) {
+        appSettingDao.setSetting(AppSettingEntity("last_backup_timestamp", timestamp.toString()))
+    }
+
+    suspend fun getSetting(key: String): String? = appSettingDao.getSettingSync(key)
+
+    suspend fun setSetting(key: String, value: String) {
+        appSettingDao.setSetting(AppSettingEntity(key, value))
     }
 }

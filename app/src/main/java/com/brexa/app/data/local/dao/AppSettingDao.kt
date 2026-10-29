@@ -15,6 +15,12 @@ interface AppSettingDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun setSetting(setting: AppSettingEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(settings: List<AppSettingEntity>)
+
+    @Query("SELECT * FROM app_settings")
+    suspend fun getAllSettingsSync(): List<AppSettingEntity>
+
     @Query("DELETE FROM app_settings WHERE `key` = :key")
     suspend fun deleteSetting(key: String)
 }

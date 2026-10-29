@@ -37,6 +37,10 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 @Composable
 fun SettingsScreen(
@@ -48,6 +52,7 @@ fun SettingsScreen(
 
     val syncManager = remember { GoogleDriveSyncManager(context) }
     val updateManager = remember { AppUpdateManager(context) }
+    val lastBackupTimestamp by viewModel.lastBackupTimestamp.collectAsState()
     var signedInAccount by remember { mutableStateOf(syncManager.getLastSignedInAccount()) }
     var isCheckingUpdates by remember { mutableStateOf(false) }
     var availableUpdateInSettings by remember { mutableStateOf<UpdateInfo?>(null) }
@@ -57,11 +62,45 @@ fun SettingsScreen(
     var isDriveSyncing by remember { mutableStateOf(false) }
     var isDriveRestoring by remember { mutableStateOf(false) }
     var showRestoreConfirmDialog by remember { mutableStateOf(false) }
-    var driveSyncStatus by remember {
-        mutableStateOf(
-            if (signedInAccount != null) "Listo para sincronizar o restaurar."
-            else "Inicia sesión con tu cuenta de Google para respaldar en tu nube privada de Drive."
-        )
+    var driveSyncErrorMessage by remember { mutableStateOf<String?>(null) }
+
+    fun formatBackupTimestamp(timestamp: Long?): String {
+        if (timestamp == null || timestamp <= 0L) return "Sin respaldo registrado"
+        val calNow = Calendar.getInstance()
+        val calBackup = Calendar.getInstance().apply { timeInMillis = timestamp }
+
+        val timeFormat = SimpleDateFormat("hh:mm a", Locale("es", "ES"))
+        val formattedTime = timeFormat.format(Date(timestamp)).uppercase()
+
+        val isToday = calNow.get(Calendar.YEAR) == calBackup.get(Calendar.YEAR) &&
+                calNow.get(Calendar.DAY_OF_YEAR) == calBackup.get(Calendar.DAY_OF_YEAR)
+
+        calNow.add(Calendar.DAY_OF_YEAR, -1)
+        val isYesterday = calNow.get(Calendar.YEAR) == calBackup.get(Calendar.YEAR) &&
+                calNow.get(Calendar.DAY_OF_YEAR) == calBackup.get(Calendar.DAY_OF_YEAR)
+
+        return when {
+            isToday -> "Hoy a las $formattedTime"
+            isYesterday -> "Ayer a las $formattedTime"
+            else -> {
+                val fullFormat = SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale("es", "ES"))
+                fullFormat.format(Date(timestamp))
+            }
+        }
+    }
+
+    // Consulta automática a Google Drive si no hay fecha local registrada
+    LaunchedEffect(signedInAccount) {
+        val acc = signedInAccount ?: return@LaunchedEffect
+        if (lastBackupTimestamp == null || lastBackupTimestamp == 0L) {
+            val backupInfo = syncManager.findBackupFile(acc)
+            if (backupInfo != null && backupInfo.modifiedTime.isNotBlank()) {
+                try {
+                    val time = java.time.Instant.parse(backupInfo.modifiedTime).toEpochMilli()
+                    viewModel.setLastBackupTimestamp(time)
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     val signInLauncher = rememberLauncherForActivityResult(
@@ -71,11 +110,19 @@ fun SettingsScreen(
         try {
             val account = task.getResult(ApiException::class.java)
             signedInAccount = account
-            driveSyncStatus = "Conectado. Pulsa 'SUBIR A DRIVE' para crear tu primer respaldo en la nube."
+            coroutineScope.launch {
+                val backupInfo = syncManager.findBackupFile(account)
+                if (backupInfo != null && backupInfo.modifiedTime.isNotBlank()) {
+                    try {
+                        val time = java.time.Instant.parse(backupInfo.modifiedTime).toEpochMilli()
+                        viewModel.setLastBackupTimestamp(time)
+                    } catch (_: Exception) {}
+                }
+            }
             Toast.makeText(context, "Sesión iniciada con Google", Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
-            driveSyncStatus = "Error al iniciar sesión: ${e.localizedMessage ?: "Cancelado"}"
-            Toast.makeText(context, driveSyncStatus, Toast.LENGTH_LONG).show()
+            driveSyncErrorMessage = "Error al iniciar sesión: ${e.localizedMessage ?: "Cancelado"}"
+            Toast.makeText(context, driveSyncErrorMessage ?: "Error", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -187,13 +234,79 @@ fun SettingsScreen(
                         style = BrexaTypography.labelMedium.copy(color = AccentPurple, fontWeight = FontWeight.Bold),
                         modifier = Modifier.padding(top = 4.dp)
                     )
-                }
 
-                Text(
-                    text = driveSyncStatus,
-                    style = BrexaTypography.bodyMedium.copy(color = TextSecondary),
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Tarjeta Informativa de Respaldo Automático y Última Fecha
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(BackgroundBase, RectangleShape)
+                            .border(1.dp, BorderSolid, RectangleShape)
+                            .padding(12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "ESTADO DE RESPALDO",
+                                style = BrexaTypography.labelSmall.copy(
+                                    color = TextMuted,
+                                    fontSize = 9.sp,
+                                    letterSpacing = 0.5.sp
+                                )
+                            )
+                            BrutalistBadge(
+                                text = "AUTOMÁTICO ACTIVO ✓",
+                                backgroundColor = SurfaceCard,
+                                contentColor = AccentLime,
+                                borderColor = AccentLime,
+                                fontSize = 8.sp,
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Text(
+                            text = if (lastBackupTimestamp != null && lastBackupTimestamp!! > 0L) {
+                                "Último guardado: ${formatBackupTimestamp(lastBackupTimestamp)}"
+                            } else {
+                                "Aún no se ha realizado el primer respaldo."
+                            },
+                            style = BrexaTypography.bodyMedium.copy(
+                                color = if (lastBackupTimestamp != null && lastBackupTimestamp!! > 0L) AccentLime else TextSecondary,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.5.sp
+                            )
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = "Se sincroniza automáticamente en tu Google Drive privado ante cualquier cambio (gastos, ingresos, transferencias, cuentas o monedas).",
+                            style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 9.5.sp)
+                        )
+                    }
+
+                    if (driveSyncErrorMessage != null) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = driveSyncErrorMessage!!,
+                            style = BrexaTypography.labelSmall.copy(color = ExpenseRed, fontSize = 10.sp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                } else {
+                    Text(
+                        text = "Inicia sesión con tu cuenta de Google para respaldar de forma automática y privada en tu Google Drive.",
+                        style = BrexaTypography.bodyMedium.copy(color = TextSecondary),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
 
                 if (signedInAccount == null) {
                     BrutalistButton(
@@ -211,23 +324,23 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Subir a Drive
+                        // Subir a Drive Manual
                         Box(modifier = Modifier.weight(1f)) {
                             BrutalistButton(
                                 text = if (isDriveSyncing) "SUBIENDO..." else "SUBIR A DRIVE ☁",
                                 onClick = {
                                     val acc = signedInAccount ?: return@BrutalistButton
                                     isDriveSyncing = true
+                                    driveSyncErrorMessage = null
                                     coroutineScope.launch {
                                         val json = viewModel.exportBackupJson()
                                         val uploadResult = syncManager.uploadBackup(acc, json)
                                         isDriveSyncing = false
                                         uploadResult.onSuccess {
-                                            val timeStr = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
-                                            driveSyncStatus = "Último respaldo en Drive: Hoy $timeStr"
+                                            viewModel.setLastBackupTimestamp(System.currentTimeMillis())
                                             Toast.makeText(context, "Respaldo sincronizado en Google Drive con éxito", Toast.LENGTH_SHORT).show()
                                         }.onFailure { err ->
-                                            driveSyncStatus = "Error de sincronización: ${err.message}"
+                                            driveSyncErrorMessage = "Error: ${err.message}"
                                             Toast.makeText(context, "Error: ${err.message}", Toast.LENGTH_LONG).show()
                                         }
                                     }
@@ -270,7 +383,7 @@ fun SettingsScreen(
                             modifier = Modifier.clickable {
                                 syncManager.signOut {
                                     signedInAccount = null
-                                    driveSyncStatus = "Inicia sesión con tu cuenta de Google para respaldar en tu nube privada de Drive."
+                                    viewModel.setLastBackupTimestamp(0L)
                                     Toast.makeText(context, "Sesión de Google cerrada", Toast.LENGTH_SHORT).show()
                                 }
                             }
@@ -291,7 +404,7 @@ fun SettingsScreen(
                 },
                 text = {
                     Text(
-                        text = "Esta acción descargará el respaldo guardado en tu Google Drive y actualizará tus cuentas, monedas y transacciones sin duplicar registros. ¿Deseas continuar?",
+                        text = "Esta acción descargará el respaldo guardado en tu Google Drive y restaurará el 100% de tus cuentas, monedas, categorías y movimientos exactamente como los tenías. ¿Deseas continuar?",
                         style = BrexaTypography.bodyMedium.copy(color = TextPrimary)
                     )
                 },
@@ -314,8 +427,7 @@ fun SettingsScreen(
                                     } else {
                                         val restoreRes = viewModel.restoreBackupFromJson(content)
                                         restoreRes.onSuccess {
-                                            val timeStr = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date())
-                                            driveSyncStatus = "Datos restaurados exitosamente hoy a las $timeStr"
+                                            viewModel.setLastBackupTimestamp(System.currentTimeMillis())
                                             Toast.makeText(context, "¡Respaldo restaurado con éxito!", Toast.LENGTH_SHORT).show()
                                         }.onFailure { err ->
                                             Toast.makeText(context, "Error restaurando datos: ${err.message}", Toast.LENGTH_LONG).show()

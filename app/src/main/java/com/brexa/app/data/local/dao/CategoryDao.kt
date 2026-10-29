@@ -12,6 +12,9 @@ interface CategoryDao {
     @Query("SELECT * FROM categories WHERE is_archived = 0 ORDER BY type ASC, is_default DESC, sort_order ASC")
     fun getAllActiveCategories(): Flow<List<CategoryEntity>>
 
+    @Query("SELECT * FROM categories ORDER BY type ASC, is_default DESC, sort_order ASC")
+    suspend fun getAllCategoriesSync(): List<CategoryEntity>
+
     @Query("SELECT * FROM categories WHERE id = :id LIMIT 1")
     fun getCategoryById(id: String): Flow<CategoryEntity?>
 
@@ -38,4 +41,7 @@ interface CategoryDao {
 
     @Query("DELETE FROM categories WHERE id = :categoryId")
     suspend fun deleteCategoryById(categoryId: String)
+
+    @Query("DELETE FROM categories")
+    suspend fun deleteAllCategoriesSync()
 }

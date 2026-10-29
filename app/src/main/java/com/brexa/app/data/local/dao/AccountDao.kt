@@ -12,6 +12,9 @@ interface AccountDao {
     @Query("SELECT * FROM accounts ORDER BY is_default DESC, is_archived ASC, sort_order ASC, name ASC")
     fun getAllAccounts(): Flow<List<AccountEntity>>
 
+    @Query("SELECT * FROM accounts ORDER BY is_default DESC, is_archived ASC, sort_order ASC, name ASC")
+    suspend fun getAllAccountsSync(): List<AccountEntity>
+
     @Query("SELECT * FROM accounts WHERE is_archived = 0 AND include_in_total = 1")
     fun getIncludedInTotalAccounts(): Flow<List<AccountEntity>>
 
@@ -56,4 +59,7 @@ interface AccountDao {
 
     @Query("DELETE FROM accounts WHERE id = :accountId")
     suspend fun deleteAccountById(accountId: String)
+
+    @Query("DELETE FROM accounts")
+    suspend fun deleteAllAccountsSync()
 }

@@ -9,6 +9,9 @@ interface CurrencyDao {
     @Query("SELECT * FROM currencies ORDER BY is_base DESC, sort_order ASC, name ASC")
     fun getAllCurrencies(): Flow<List<CurrencyEntity>>
 
+    @Query("SELECT * FROM currencies ORDER BY is_base DESC, sort_order ASC, name ASC")
+    suspend fun getAllCurrenciesSync(): List<CurrencyEntity>
+
     @Query("SELECT * FROM currencies WHERE is_active = 1 ORDER BY is_base DESC, sort_order ASC, name ASC")
     fun getActiveCurrencies(): Flow<List<CurrencyEntity>>
 
@@ -44,4 +47,7 @@ interface CurrencyDao {
 
     @Query("DELETE FROM currencies WHERE id = :currencyId")
     suspend fun deleteCurrencyById(currencyId: String)
+
+    @Query("DELETE FROM currencies")
+    suspend fun deleteAllCurrenciesSync()
 }

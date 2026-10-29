@@ -4,23 +4,18 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.brexa.app.data.local.entity.*
+import com.brexa.app.data.repository.BackupPayload
 import com.brexa.app.data.repository.BrexaRepository
 import com.brexa.app.data.repository.CategoryDistribution
 import com.brexa.app.data.sync.GoogleDriveSyncManager
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
-
-data class BackupPayload(
-    val exportTimestamp: Long,
-    val appVersion: String = "1.0.0",
-    val currencies: List<CurrencyEntity>,
-    val accounts: List<AccountEntity>,
-    val categories: List<CategoryEntity>,
-    val transactions: List<TransactionEntity>
-)
 
 enum class AnalyticsPeriod {
     WEEK, MONTH
@@ -31,17 +26,34 @@ class BrexaViewModel(
     private val syncManager: GoogleDriveSyncManager? = null
 ) : ViewModel() {
 
+    private var autoBackupJob: Job? = null
+
     /**
-     * Sincronización automática silenciosa con Google Drive si la sesión está activa
+     * Sincronización automática silenciosa con Google Drive si la sesión está activa.
+     * Consolida operaciones rápidas con debounce de 1.2s y actualiza el timestamp en Room.
      */
     fun triggerAutoBackup() {
         val manager = syncManager ?: return
-        viewModelScope.launch(Dispatchers.IO) {
+        autoBackupJob?.cancel()
+        autoBackupJob = viewModelScope.launch(Dispatchers.IO) {
+            delay(1200)
             val account = manager.getLastSignedInAccount() ?: return@launch
             try {
                 val json = exportBackupJson()
-                manager.uploadBackup(account, json)
+                val uploadResult = manager.uploadBackup(account, json)
+                uploadResult.onSuccess {
+                    repository.setLastBackupTimestamp(System.currentTimeMillis())
+                }
             } catch (_: Exception) { }
+        }
+    }
+
+    val lastBackupTimestamp: StateFlow<Long?> = repository.getLastBackupTimestamp()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun setLastBackupTimestamp(timestamp: Long = System.currentTimeMillis()) {
+        viewModelScope.launch {
+            repository.setLastBackupTimestamp(timestamp)
         }
     }
 
@@ -485,33 +497,21 @@ class BrexaViewModel(
     }
 
     // --- RESPALDO MANUAL LOCAL Y EN LA NUBE (.JSON / .BREXA) ---
-    suspend fun exportBackupJson(): String {
-        val currencies = allCurrencies.value
-        val accounts = activeAccounts.value
-        val categories = expenseCategories.value + incomeCategories.value
-        val transactions = repository.getAllTransactionsSync()
-
-        val payload = BackupPayload(
-            exportTimestamp = System.currentTimeMillis(),
-            currencies = currencies,
-            accounts = accounts,
-            categories = categories,
-            transactions = transactions
-        )
-        return Gson().toJson(payload)
+    suspend fun exportBackupJson(): String = withContext(Dispatchers.IO) {
+        val payload = repository.exportAllDataSync()
+        Gson().toJson(payload)
     }
 
-    suspend fun restoreBackupFromJson(jsonString: String): Result<Unit> {
-        return try {
+    suspend fun restoreBackupFromJson(jsonString: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
             val payload = Gson().fromJson(jsonString, BackupPayload::class.java)
-                ?: return Result.failure(IllegalArgumentException("El archivo de respaldo está corrupto o vacío."))
+                ?: return@withContext Result.failure(IllegalArgumentException("El archivo de respaldo está corrupto o vacío."))
 
-            repository.restoreBackup(
-                currencies = payload.currencies ?: emptyList(),
-                accounts = payload.accounts ?: emptyList(),
-                categories = payload.categories ?: emptyList(),
-                transactions = payload.transactions ?: emptyList()
-            )
+            val result = repository.restoreBackup(payload)
+            result.onSuccess {
+                repository.setLastBackupTimestamp(System.currentTimeMillis())
+            }
+            result
         } catch (e: Exception) {
             Result.failure(e)
         }

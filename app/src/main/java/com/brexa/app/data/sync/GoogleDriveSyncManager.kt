@@ -67,7 +67,7 @@ class GoogleDriveSyncManager(private val context: Context) {
     suspend fun findBackupFile(account: GoogleSignInAccount): DriveBackupInfo? = withContext(Dispatchers.IO) {
         try {
             val token = getAuthToken(account)
-            val url = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='$fileName'&fields=files(id,name,modifiedTime)"
+            val url = "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='$fileName' and trashed=false&fields=files(id,name,modifiedTime)"
 
             val request = Request.Builder()
                 .url(url)
