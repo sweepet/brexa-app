@@ -64,6 +64,8 @@ fun TransactionFormScreen(
     var noteText by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showCreateCategoryDialog by remember { mutableStateOf(false) }
+    var showNoteModalDialog by remember { mutableStateOf(false) }
+    var tempModalNoteText by remember { mutableStateOf("") }
 
     val context = LocalContext.current
     var selectedDateTimestamp by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -124,6 +126,7 @@ fun TransactionFormScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundBase)
+            .imePadding()
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
@@ -479,15 +482,83 @@ fun TransactionFormScreen(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Campo de Nota / Descripción
-        BrutalistTextField(
-            value = noteText,
-            onValueChange = { noteText = it },
-            label = "NOTA / CONCEPTO (OPCIONAL)",
-            placeholder = "ej. Supermercado, Almuerzo, Transporte...",
-            isMonospace = false,
-            modifier = Modifier.fillMaxWidth()
+        // NOTA / CONCEPTO (Modal interactivo para evitar que el teclado lo tape)
+        Text(
+            text = "NOTA / CONCEPTO",
+            style = BrexaTypography.labelMedium.copy(color = TextSecondary),
+            modifier = Modifier.padding(bottom = 8.dp)
         )
+
+        BrutalistCard(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    tempModalNoteText = noteText
+                    showNoteModalDialog = true
+                },
+            backgroundColor = SurfaceCard,
+            borderColor = if (noteText.isNotBlank()) AccentLime else BorderSolid
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (noteText.isNotBlank()) "CONCEPTO ASIGNADO" else "CONCEPTO (OPCIONAL)",
+                        style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 9.sp, letterSpacing = 0.5.sp)
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Text(
+                        text = if (noteText.isNotBlank()) noteText else "Toca para escribir una nota o concepto...",
+                        style = BrexaTypography.bodyMedium.copy(
+                            color = if (noteText.isNotBlank()) TextPrimary else TextMuted,
+                            fontWeight = if (noteText.isNotBlank()) FontWeight.SemiBold else FontWeight.Normal,
+                            fontSize = 13.5.sp
+                        ),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (noteText.isNotBlank()) {
+                        BrutalistBadge(
+                            text = "✕",
+                            backgroundColor = BackgroundBase,
+                            contentColor = ExpenseRed,
+                            borderColor = ExpenseRed,
+                            fontSize = 9.5.sp,
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                            modifier = Modifier.clickable {
+                                noteText = ""
+                            }
+                        )
+                    }
+
+                    BrutalistBadge(
+                        text = if (noteText.isNotBlank()) "✏ EDITAR" else "+ NOTA",
+                        backgroundColor = BackgroundBase,
+                        contentColor = if (noteText.isNotBlank()) AccentLime else TextPrimary,
+                        borderColor = if (noteText.isNotBlank()) AccentLime else BorderSolid,
+                        fontSize = 9.5.sp,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.clickable {
+                            tempModalNoteText = noteText
+                            showNoteModalDialog = true
+                        }
+                    )
+                }
+            }
+        }
 
         Spacer(modifier = Modifier.height(20.dp))
 
@@ -861,6 +932,118 @@ fun TransactionFormScreen(
                     contentColor = TextSecondary,
                     borderColor = BorderSolid,
                     modifier = Modifier.clickable { showCreateCategoryDialog = false }
+                )
+            }
+        )
+    }
+
+    // Modal Neobrutalista para Escribir Nota / Concepto sin que el teclado la tape
+    if (showNoteModalDialog) {
+        val quickNotes = listOf(
+            "Supermercado", "Almuerzo", "Cena", "Transporte",
+            "Farmacia", "Servicios", "Combustible", "Pago Móvil",
+            "Repuestos", "Salida", "Ropa", "Transferencia"
+        )
+
+        AlertDialog(
+            onDismissRequest = { showNoteModalDialog = false },
+            shape = RectangleShape,
+            containerColor = SurfaceCard,
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "CONCEPTO // NOTA",
+                        style = BrexaTypography.titleLarge.copy(color = AccentLime, fontSize = 16.sp)
+                    )
+                    if (tempModalNoteText.isNotBlank()) {
+                        BrutalistBadge(
+                            text = "BORRAR ✕",
+                            backgroundColor = BackgroundBase,
+                            contentColor = ExpenseRed,
+                            borderColor = ExpenseRed,
+                            fontSize = 8.5.sp,
+                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                            modifier = Modifier.clickable { tempModalNoteText = "" }
+                        )
+                    }
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Escribe el detalle de la compra o pago:",
+                        style = BrexaTypography.bodySmall.copy(color = TextSecondary)
+                    )
+
+                    BrutalistTextField(
+                        value = tempModalNoteText,
+                        onValueChange = { tempModalNoteText = it },
+                        label = "CONCEPTO O DESCRIPCIÓN",
+                        placeholder = "ej. Supermercado, Almuerzo, Repuestos...",
+                        isMonospace = false,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Text(
+                        text = "SUGERENCIAS RÁPIDAS EN 1 TOQUE:",
+                        style = BrexaTypography.labelSmall.copy(
+                            color = TextMuted,
+                            fontSize = 9.sp,
+                            letterSpacing = 0.5.sp
+                        )
+                    )
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(quickNotes) { suggestion ->
+                            val isSel = tempModalNoteText.equals(suggestion, ignoreCase = true)
+                            BrutalistBadge(
+                                text = suggestion,
+                                backgroundColor = if (isSel) AccentLime else BackgroundBase,
+                                contentColor = if (isSel) Color.Black else TextPrimary,
+                                borderColor = if (isSel) AccentLime else BorderSolid,
+                                fontSize = 9.5.sp,
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                modifier = Modifier.clickable {
+                                    tempModalNoteText = suggestion
+                                }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                BrutalistBadge(
+                    text = "LISTO ✓",
+                    backgroundColor = AccentLime,
+                    contentColor = Color.Black,
+                    borderColor = AccentLime,
+                    fontSize = 11.sp,
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.clickable {
+                        noteText = tempModalNoteText.trim()
+                        showNoteModalDialog = false
+                    }
+                )
+            },
+            dismissButton = {
+                BrutalistBadge(
+                    text = "CANCELAR",
+                    backgroundColor = BackgroundBase,
+                    contentColor = TextSecondary,
+                    borderColor = BorderSolid,
+                    fontSize = 11.sp,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    modifier = Modifier.clickable { showNoteModalDialog = false }
                 )
             }
         )

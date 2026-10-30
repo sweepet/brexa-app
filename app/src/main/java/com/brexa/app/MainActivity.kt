@@ -108,7 +108,8 @@ class MainActivity : ComponentActivity() {
                         .fillMaxSize()
                         .background(BackgroundBase)
                         .statusBarsPadding()
-                        .navigationBarsPadding(),
+                        .navigationBarsPadding()
+                        .imePadding(),
                     color = BackgroundBase
                 ) {
                     when (currentScreen) {
