@@ -228,6 +228,7 @@ class BrexaViewModel(
         amount: Double,
         rate: Double,
         note: String,
+        dateTimestamp: Long = System.currentTimeMillis(),
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
@@ -237,7 +238,8 @@ class BrexaViewModel(
                 categoryId = categoryId,
                 nativeAmount = amount,
                 exchangeRate = rate,
-                note = note
+                note = note,
+                dateTimestamp = dateTimestamp
             )
             result.onSuccess {
                 triggerAutoBackup()
@@ -253,6 +255,7 @@ class BrexaViewModel(
         amount: Double,
         rate: Double,
         note: String,
+        dateTimestamp: Long = System.currentTimeMillis(),
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
@@ -262,7 +265,8 @@ class BrexaViewModel(
                 categoryId = categoryId,
                 nativeAmount = amount,
                 exchangeRate = rate,
-                note = note
+                note = note,
+                dateTimestamp = dateTimestamp
             )
             result.onSuccess {
                 triggerAutoBackup()
@@ -278,6 +282,7 @@ class BrexaViewModel(
         sourceAmount: Double,
         targetReceivedAmount: Double,
         note: String,
+        dateTimestamp: Long = System.currentTimeMillis(),
         onSuccess: () -> Unit,
         onError: (String) -> Unit
     ) {
@@ -287,7 +292,8 @@ class BrexaViewModel(
                 targetAccountId = targetAccountId,
                 sourceAmount = sourceAmount,
                 targetReceivedAmount = targetReceivedAmount,
-                note = note
+                note = note,
+                dateTimestamp = dateTimestamp
             )
             result.onSuccess {
                 triggerAutoBackup()

@@ -1,5 +1,7 @@
 package com.brexa.app.ui.screens
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -15,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -34,6 +37,10 @@ import com.brexa.app.ui.theme.*
 import com.brexa.app.ui.util.CurrencyFormat
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +64,35 @@ fun TransactionFormScreen(
     var noteText by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showCreateCategoryDialog by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    var selectedDateTimestamp by remember { mutableLongStateOf(System.currentTimeMillis()) }
+
+    val isToday = remember(selectedDateTimestamp) {
+        val calNow = Calendar.getInstance()
+        val calSelected = Calendar.getInstance().apply { timeInMillis = selectedDateTimestamp }
+        calNow.get(Calendar.YEAR) == calSelected.get(Calendar.YEAR) &&
+                calNow.get(Calendar.DAY_OF_YEAR) == calSelected.get(Calendar.DAY_OF_YEAR)
+    }
+
+    val isYesterday = remember(selectedDateTimestamp) {
+        val calYesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
+        val calSelected = Calendar.getInstance().apply { timeInMillis = selectedDateTimestamp }
+        calYesterday.get(Calendar.YEAR) == calSelected.get(Calendar.YEAR) &&
+                calYesterday.get(Calendar.DAY_OF_YEAR) == calSelected.get(Calendar.DAY_OF_YEAR)
+    }
+
+    val formattedDateText = remember(selectedDateTimestamp, isToday, isYesterday) {
+        val cal = Calendar.getInstance().apply { timeInMillis = selectedDateTimestamp }
+        val timeStr = SimpleDateFormat("hh:mm a", Locale("es", "ES")).format(cal.time).uppercase()
+        val dateFull = SimpleDateFormat("dd MMM yyyy", Locale("es", "ES")).format(cal.time)
+
+        when {
+            isToday -> "HOY, $dateFull • $timeStr"
+            isYesterday -> "AYER, $dateFull • $timeStr"
+            else -> "$dateFull • $timeStr"
+        }
+    }
 
     val selectedAccount = accounts.find { it.id == selectedAccountId } ?: accounts.firstOrNull()
     val accountCurrency = currencies.find { it.id == selectedAccount?.currencyId }
@@ -453,6 +489,157 @@ fun TransactionFormScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // Selector Neobrutalista de Fecha y Hora de la Operación
+        Text(
+            text = "FECHA DE LA OPERACIÓN",
+            style = BrexaTypography.labelMedium.copy(color = TextSecondary),
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        BrutalistCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = SurfaceCard,
+            borderColor = if (!isToday) AccentPurple else BorderSolid
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = if (isToday) "REGISTRANDO HOY" else if (isYesterday) "REGISTRANDO AYER" else "FECHA PERSONALIZADA",
+                            style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 9.sp, letterSpacing = 0.5.sp)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = formattedDateText,
+                            style = BrexaTypography.titleMedium.copy(
+                                color = if (isToday) AccentLime else AccentPurple,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.5.sp
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    BrutalistBadge(
+                        text = "📅 CAMBIAR",
+                        backgroundColor = BackgroundBase,
+                        contentColor = TextPrimary,
+                        borderColor = BorderSolid,
+                        fontSize = 9.5.sp,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.clickable {
+                            val cal = Calendar.getInstance().apply { timeInMillis = selectedDateTimestamp }
+                            DatePickerDialog(
+                                context,
+                                { _, year, month, dayOfMonth ->
+                                    val updatedCal = Calendar.getInstance().apply {
+                                        timeInMillis = selectedDateTimestamp
+                                        set(Calendar.YEAR, year)
+                                        set(Calendar.MONTH, month)
+                                        set(Calendar.DAY_OF_MONTH, dayOfMonth)
+                                    }
+                                    selectedDateTimestamp = updatedCal.timeInMillis
+                                },
+                                cal.get(Calendar.YEAR),
+                                cal.get(Calendar.MONTH),
+                                cal.get(Calendar.DAY_OF_MONTH)
+                            ).show()
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Accesos Rápidos: [ HOY ] [ AYER ] [ ⏱ HORA ]
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        BrutalistBadge(
+                            text = "HOY",
+                            backgroundColor = if (isToday) AccentLime else BackgroundBase,
+                            contentColor = if (isToday) Color.Black else TextSecondary,
+                            borderColor = if (isToday) AccentLime else BorderSolid,
+                            fontSize = 9.5.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val calNow = Calendar.getInstance()
+                                    val updatedCal = Calendar.getInstance().apply {
+                                        timeInMillis = selectedDateTimestamp
+                                        set(Calendar.YEAR, calNow.get(Calendar.YEAR))
+                                        set(Calendar.MONTH, calNow.get(Calendar.MONTH))
+                                        set(Calendar.DAY_OF_MONTH, calNow.get(Calendar.DAY_OF_MONTH))
+                                    }
+                                    selectedDateTimestamp = updatedCal.timeInMillis
+                                }
+                        )
+                    }
+
+                    Box(modifier = Modifier.weight(1f)) {
+                        BrutalistBadge(
+                            text = "AYER",
+                            backgroundColor = if (isYesterday) AccentPurple else BackgroundBase,
+                            contentColor = if (isYesterday) Color.Black else TextSecondary,
+                            borderColor = if (isYesterday) AccentPurple else BorderSolid,
+                            fontSize = 9.5.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val calYesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
+                                    val updatedCal = Calendar.getInstance().apply {
+                                        timeInMillis = selectedDateTimestamp
+                                        set(Calendar.YEAR, calYesterday.get(Calendar.YEAR))
+                                        set(Calendar.MONTH, calYesterday.get(Calendar.MONTH))
+                                        set(Calendar.DAY_OF_MONTH, calYesterday.get(Calendar.DAY_OF_MONTH))
+                                    }
+                                    selectedDateTimestamp = updatedCal.timeInMillis
+                                }
+                        )
+                    }
+
+                    Box(modifier = Modifier.weight(1f)) {
+                        BrutalistBadge(
+                            text = "⏱ HORA",
+                            backgroundColor = BackgroundBase,
+                            contentColor = TextPrimary,
+                            borderColor = BorderSolid,
+                            fontSize = 9.5.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val cal = Calendar.getInstance().apply { timeInMillis = selectedDateTimestamp }
+                                    TimePickerDialog(
+                                        context,
+                                        { _, hourOfDay, minute ->
+                                            val updatedCal = Calendar.getInstance().apply {
+                                                timeInMillis = selectedDateTimestamp
+                                                set(Calendar.HOUR_OF_DAY, hourOfDay)
+                                                set(Calendar.MINUTE, minute)
+                                            }
+                                            selectedDateTimestamp = updatedCal.timeInMillis
+                                        },
+                                        cal.get(Calendar.HOUR_OF_DAY),
+                                        cal.get(Calendar.MINUTE),
+                                        false
+                                    ).show()
+                                }
+                        )
+                    }
+                }
+            }
+        }
+
         if (errorMessage != null) {
             Spacer(modifier = Modifier.height(12.dp))
             Text(
@@ -497,6 +684,7 @@ fun TransactionFormScreen(
                             amount = amountNum,
                             rate = if (isForeignCurrency) rateNum else 1.0,
                             note = noteText,
+                            dateTimestamp = selectedDateTimestamp,
                             onSuccess = onDismiss,
                             onError = { errorMessage = it }
                         )
@@ -508,6 +696,7 @@ fun TransactionFormScreen(
                             amount = amountNum,
                             rate = if (isForeignCurrency) rateNum else 1.0,
                             note = noteText,
+                            dateTimestamp = selectedDateTimestamp,
                             onSuccess = onDismiss,
                             onError = { errorMessage = it }
                         )
@@ -524,6 +713,7 @@ fun TransactionFormScreen(
                             sourceAmount = amountNum,
                             targetReceivedAmount = destNum,
                             note = noteText,
+                            dateTimestamp = selectedDateTimestamp,
                             onSuccess = onDismiss,
                             onError = { errorMessage = it }
                         )
