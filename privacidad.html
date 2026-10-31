@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Política de Privacidad // Brexa</title>
+    <style>
+        :root {
+            --bg: #111111;
+            --surface: #1A1A1A;
+            --border: #2C2C2C;
+            --lime: #D4FF00;
+            --text-primary: #FFFFFF;
+            --text-secondary: #8E8E93;
+            --accent-red: #FF3366;
+            --accent-green: #00FF88;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Space Mono", monospace, sans-serif;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 24px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        header {
+            border: 2px solid var(--lime);
+            background-color: var(--surface);
+            padding: 24px;
+            box-shadow: 4px 4px 0px var(--lime);
+            margin-bottom: 32px;
+        }
+        h1 {
+            color: var(--lime);
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .card {
+            border: 2px solid var(--border);
+            background-color: var(--surface);
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 4px 4px 0px #000;
+        }
+        .card h2 {
+            color: var(--lime);
+            font-size: 16px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 6px;
+        }
+        p {
+            color: #CCCCCC;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        ul {
+            list-style: none;
+            margin-bottom: 14px;
+        }
+        ul li {
+            padding: 6px 0;
+            border-bottom: 1px solid #222;
+            font-size: 14px;
+            color: #E0E0E0;
+        }
+        ul li::before {
+            content: "• ";
+            color: var(--lime);
+            font-weight: bold;
+        }
+        .highlight {
+            color: var(--lime);
+            font-weight: bold;
+        }
+        footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        footer a {
+            color: var(--lime);
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 16px;
+            color: var(--lime);
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+    <a href="index.html" class="back-link">← Volver al inicio</a>
+
+    <header>
+        <h1>POLÍTICA DE PRIVACIDAD</h1>
+        <div class="subtitle">Brexa // Última actualización: Octubre 2026</div>
+    </header>
+
+    <div class="card">
+        <h2>1. Compromiso de Privacidad</h2>
+        <p>En <strong>Brexa</strong>, la privacidad de tus finanzas es la máxima prioridad. Nuestra arquitectura está diseñada bajo el principio de <em>"Privacidad desde el diseño" (Privacy by Design)</em>: la aplicación funciona de forma local en tu dispositivo y no recopila, no comercializa ni transmite tus datos financieros a ningún servidor externo de Brexa.</p>
+    </div>
+
+    <div class="card">
+        <h2>2. Información que Maneja la Aplicación</h2>
+        <p>Brexa almacena exclusivamente la información que tú decides ingresar manualmente para tu control personal:</p>
+        <ul>
+            <li>Nombres de cuentas ficticios o de referencia (ej. "Efectivo", "Banesco").</li>
+            <li>Montos de transacciones, categorías de gastos o ingresos y notas personales.</li>
+            <li>Pagos o compromisos pendientes y fechas límites de pago.</li>
+            <li>Monedas configuradas y tasas de cotización personalizadas.</li>
+        </ul>
+        <p><span class="highlight">Importante:</span> Brexa <strong>NUNCA</strong> te solicitará números de tarjetas de crédito o débito, códigos CVV, claves de acceso bancarias ni credenciales financieras sensibles.</p>
+    </div>
+
+    <div class="card">
+        <h2>3. Uso de Servicios de Google y Permisos de Google Drive</h2>
+        <p>Brexa ofrece la función opcional de <strong>Copia de Seguridad Automática en Google Drive</strong> para que no pierdas tus datos si cambias de teléfono. Para hacer esto posible:</p>
+        <ul>
+            <li><strong>Inicio de Sesión con Google:</strong> Se utiliza el servicio oficial de Google Identity para autenticar tu cuenta de forma segura.</li>
+            <li><strong>Permiso <code>drive.appdata</code>:</strong> Brexa solicita únicamente acceso a su propia carpeta oculta de datos de aplicación en tu Google Drive (<em>Application Data Folder</em>).</li>
+            <li><strong>Aislamiento total:</strong> Brexa <strong>NO tiene acceso</strong> a tus documentos, fotos, hojas de cálculo ni a ningún otro archivo que tengas guardado en tu Google Drive personal. Solo puede leer y escribir su propio archivo de respaldo (<code>brexa_backup_encrypted.json</code>).</li>
+            <li><strong>Cumplimiento con las Políticas de Datos de Usuario de Google:</strong> El uso y la transferencia de la información recibida de las APIs de Google por parte de Brexa se apegan estrictamente a la <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" style="color: var(--lime);">Política de Datos de Usuario de los Servicios de API de Google</a>, incluidos los requisitos de Uso Limitado.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>4. Almacenamiento Local y Seguridad</h2>
+        <p>Todos los datos se guardan en una base de datos local SQLite (Room) en el almacenamiento interno privado de la aplicación en tu dispositivo móvil, protegida por los mecanismos de seguridad y sandboxing del sistema operativo Android.</p>
+    </div>
+
+    <div class="card">
+        <h2>5. Eliminación de Datos</h2>
+        <p>Tú tienes el control absoluto de tus datos en todo momento:</p>
+        <ul>
+            <li><strong>En tu teléfono:</strong> Puedes borrar todos los datos desinstalando la aplicación o borrando el almacenamiento desde los ajustes de Android.</li>
+            <li><strong>En Google Drive:</strong> Puedes borrar tu copia de seguridad en cualquier momento directamente desde los ajustes de Google Drive en <em>Configuración ➔ Administrar aplicaciones ➔ Brexa ➔ Eliminar datos ocultos de la aplicación</em>.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>6. Contacto</h2>
+        <p>Si tienes preguntas, dudas o comentarios acerca de esta Política de Privacidad o del funcionamiento de Brexa, puedes contactar al desarrollador directamente a través de:</p>
+        <p><strong>Correo electrónico:</strong> <a href="mailto:fuenmayorvhfs@gmail.com" style="color: var(--lime);">fuenmayorvhfs@gmail.com</a><br>
+        <strong>Repositorio oficial:</strong> <a href="https://github.com/sweepet/brexa-app" target="_blank" style="color: var(--lime);">github.com/sweepet/brexa-app</a></p>
+    </div>
+
+    <footer>
+        <div>© 2026 Brexa. Desarrollado por Víctor Fuenmayor.</div>
+        <div><a href="index.html">Página Principal</a></div>
+    </footer>
+
+</body>
+</html>
