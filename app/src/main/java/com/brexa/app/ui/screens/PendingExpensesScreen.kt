@@ -289,28 +289,21 @@ fun PendingExpensesScreen(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Saldo Realmente Libre
+                        // Saldo Realmente Libre (Diseño 100% adaptable a cualquier pantalla móvil sin recortes)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "SALDO LIBRE REAL",
-                                    style = BrexaTypography.labelSmall.copy(
-                                        color = AccentLime,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp
-                                    )
+                            Text(
+                                text = "SALDO LIBRE REAL",
+                                style = BrexaTypography.labelSmall.copy(
+                                    color = AccentLime,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.5.sp,
+                                    letterSpacing = 0.5.sp
                                 )
-                                Text(
-                                    text = "Dinero en cuentas ($${formatter.format(totalUsd)}) menos compromisos",
-                                    style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 10.sp),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
+                            )
 
                             val realDisplay = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(realAvailableUsd)}"
                             Text(
@@ -318,10 +311,31 @@ fun PendingExpensesScreen(
                                 style = BrexaTypography.titleLarge.copy(
                                     color = if (realAvailableUsd >= 0.0) IncomeGreen else ExpenseRed,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 18.sp
+                                    fontSize = 17.sp
                                 )
                             )
                         }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // Explicación en ancho completo: nunca se recorta y fluye de forma natural en cualquier pantalla
+                        val pendingExplanation = if (isIncognito) {
+                            "Dinero en cuentas menos compromisos pendientes"
+                        } else if (totalPendingUsd > 0.0) {
+                            "Dinero en cuentas ($baseSymbol${formatter.format(totalUsd)}) menos compromisos ($baseSymbol${formatter.format(totalPendingUsd)})"
+                        } else {
+                            "Dinero en cuentas totalmente libre para gastar ($baseSymbol${formatter.format(totalUsd)})"
+                        }
+
+                        Text(
+                            text = pendingExplanation,
+                            style = BrexaTypography.bodySmall.copy(
+                                color = TextMuted,
+                                fontSize = 10.5.sp,
+                                lineHeight = 14.sp
+                            ),
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
@@ -390,22 +404,10 @@ fun PendingExpensesScreen(
                                 text = if (selectedFilter == "PAGADOS")
                                     "Cuando pagues un compromiso pendiente, aparecerá aquí como comprobante."
                                 else
-                                    "No tienes compromisos anotados para este periodo. Si tienes una deuda, servicio o gasto próximo, anótalo.",
-                                style = BrexaTypography.bodyMedium.copy(color = TextSecondary, fontSize = 12.sp),
+                                    "No tienes compromisos anotados para este periodo. Si tienes una deuda, servicio o gasto próximo, anótalo con el botón de abajo.",
+                                style = BrexaTypography.bodyMedium.copy(color = TextSecondary, fontSize = 12.sp, lineHeight = 16.sp),
                                 textAlign = TextAlign.Center
                             )
-                            if (selectedFilter != "PAGADOS") {
-                                Spacer(modifier = Modifier.height(4.dp))
-                                BrutalistBadge(
-                                    text = "+ ANOTAR PAGO PENDIENTE",
-                                    backgroundColor = AccentLime,
-                                    contentColor = Color.Black,
-                                    borderColor = AccentLime,
-                                    fontSize = 11.sp,
-                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                                    modifier = Modifier.clickable { showCreateModal = true }
-                                )
-                            }
                         }
                     }
                 }
@@ -645,7 +647,7 @@ fun PendingExpensesScreen(
                 onClick = { showCreateModal = true },
                 containerColor = AccentLime,
                 contentColor = Color.Black,
-                shadowColor = AccentLime,
+                shadowColor = Color(0xFF000000),
                 modifier = Modifier.fillMaxWidth()
             )
         }
