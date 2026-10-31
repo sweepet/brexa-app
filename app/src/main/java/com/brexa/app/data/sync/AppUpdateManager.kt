@@ -49,6 +49,9 @@ class AppUpdateManager(private val context: Context) {
      * Consulta la API de GitHub Releases para verificar si hay una versión superior a la instalada.
      */
     suspend fun checkForUpdate(currentVersion: String = getInstalledVersionName()): Result<UpdateInfo?> = withContext(Dispatchers.IO) {
+        // Limpieza preventiva de APKs anteriores descargados para liberar almacenamiento
+        cleanOldApks()
+
         try {
             val request = Request.Builder()
                 .url(releasesApiUrl)
@@ -154,6 +157,36 @@ class AppUpdateManager(private val context: Context) {
     }
 
     /**
+     * Limpia los archivos APK descargados de versiones anteriores o descargas residuales.
+     * Esto evita que se acumulen cientos de megabytes en el almacenamiento del usuario.
+     */
+    fun cleanOldApks(keepFile: File? = null) {
+        try {
+            val candidateDirs = listOfNotNull(
+                context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
+                context.getExternalFilesDir(null),
+                context.cacheDir,
+                context.externalCacheDir,
+                context.filesDir
+            )
+
+            for (dir in candidateDirs) {
+                if (dir.exists() && dir.isDirectory) {
+                    dir.listFiles()?.forEach { file ->
+                        if (file.isFile && file.name.endsWith(".apk", ignoreCase = true)) {
+                            if (keepFile == null || file.absolutePath != keepFile.absolutePath) {
+                                file.delete()
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // Silencioso para evitar excepciones durante operaciones en segundo plano
+        }
+    }
+
+    /**
      * Descarga el archivo APK y lanza el instalador nativo de Android.
      */
     suspend fun downloadAndInstall(
@@ -161,16 +194,19 @@ class AppUpdateManager(private val context: Context) {
         onProgress: (Float) -> Unit
     ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
+            val downloadDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                ?: context.cacheDir
+            val apkFile = File(downloadDir, "Brexa-${updateInfo.versionName}.apk")
+
+            // Limpieza de APKs anteriores antes de iniciar la descarga
+            cleanOldApks(keepFile = apkFile)
+            if (apkFile.exists()) apkFile.delete()
+
             val request = Request.Builder()
                 .url(updateInfo.downloadUrl)
                 .header("User-Agent", "Brexa-Android-App")
                 .get()
                 .build()
-
-            val downloadDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-                ?: context.cacheDir
-            val apkFile = File(downloadDir, "Brexa-${updateInfo.versionName}.apk")
-            if (apkFile.exists()) apkFile.delete()
 
             httpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {

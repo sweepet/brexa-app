@@ -41,7 +41,9 @@ import com.brexa.app.presentation.BrexaViewModelFactory
 import com.brexa.app.ui.components.BrutalistBadge
 import com.brexa.app.ui.screens.*
 import com.brexa.app.ui.theme.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -94,6 +96,11 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     DailyReminderManager.scheduleDailyReminder(applicationContext)
+
+                    // Limpieza proactiva de archivos APK residuales para recuperar almacenamiento
+                    withContext(Dispatchers.IO) {
+                        updateManager.cleanOldApks()
+                    }
 
                     val result = updateManager.checkForUpdate()
                     result.onSuccess { update ->
