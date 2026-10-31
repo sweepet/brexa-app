@@ -13,13 +13,14 @@ import java.util.UUID
 
 data class BackupPayload(
     val exportTimestamp: Long = System.currentTimeMillis(),
-    val appVersion: String = "1.0.9",
+    val appVersion: String = "1.0.14",
     val currencies: List<CurrencyEntity> = emptyList(),
     val accounts: List<AccountEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
     val transactions: List<TransactionEntity> = emptyList(),
     val exchangeRateHistory: List<ExchangeRateHistoryEntity> = emptyList(),
-    val appSettings: List<AppSettingEntity> = emptyList()
+    val appSettings: List<AppSettingEntity> = emptyList(),
+    val pendingExpenses: List<PendingExpenseEntity> = emptyList()
 )
 
 data class CategoryDistribution(
@@ -39,6 +40,7 @@ class BrexaRepository(private val db: BrexaDatabase) {
     private val transactionDao = db.transactionDao()
     private val exchangeRateHistoryDao = db.exchangeRateHistoryDao()
     private val appSettingDao = db.appSettingDao()
+    private val pendingExpenseDao = db.pendingExpenseDao()
 
     // --- MONEDAS ---
     fun getAllCurrencies(): Flow<List<CurrencyEntity>> = currencyDao.getAllCurrencies()
@@ -541,6 +543,153 @@ class BrexaRepository(private val db: BrexaDatabase) {
         }
     }
 
+    // --- GASTOS / PAGOS PENDIENTES ---
+    fun getAllPendingExpenses(): Flow<List<PendingExpenseEntity>> = pendingExpenseDao.getAllPendingExpenses()
+    fun getActivePendingExpenses(): Flow<List<PendingExpenseEntity>> = pendingExpenseDao.getActivePendingExpenses()
+    fun getPaidPendingExpenses(): Flow<List<PendingExpenseEntity>> = pendingExpenseDao.getPaidPendingExpenses()
+
+    suspend fun addPendingExpense(
+        title: String,
+        amount: Double,
+        currencyCode: String,
+        dueDateTimestamp: Long,
+        categoryId: String? = null,
+        accountId: String? = null,
+        note: String = ""
+    ): Result<PendingExpenseEntity> {
+        val cleanTitle = title.trim()
+        if (cleanTitle.isEmpty()) {
+            return Result.failure(IllegalArgumentException("El concepto del pago no puede estar vacío."))
+        }
+        if (amount <= 0.0) {
+            return Result.failure(IllegalArgumentException("El monto a pagar debe ser mayor a cero."))
+        }
+
+        val item = PendingExpenseEntity(
+            id = UUID.randomUUID().toString(),
+            title = cleanTitle,
+            amount = amount,
+            currencyCode = currencyCode.trim().uppercase(),
+            dueDateTimestamp = dueDateTimestamp,
+            categoryId = categoryId,
+            accountId = accountId,
+            note = note.trim(),
+            isPaid = false,
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+        pendingExpenseDao.insert(item)
+        return Result.success(item)
+    }
+
+    suspend fun updatePendingExpense(item: PendingExpenseEntity): Result<Unit> {
+        if (item.title.isBlank()) {
+            return Result.failure(IllegalArgumentException("El concepto no puede estar vacío."))
+        }
+        if (item.amount <= 0.0) {
+            return Result.failure(IllegalArgumentException("El monto debe ser mayor a cero."))
+        }
+        pendingExpenseDao.update(item.copy(updatedAt = System.currentTimeMillis()))
+        return Result.success(Unit)
+    }
+
+    suspend fun deletePendingExpense(id: String): Result<Unit> {
+        pendingExpenseDao.deleteById(id)
+        return Result.success(Unit)
+    }
+
+    suspend fun markPendingAsPaidWithoutExpense(id: String): Result<Unit> {
+        val item = pendingExpenseDao.getPendingExpenseById(id)
+            ?: return Result.failure(IllegalArgumentException("Pago pendiente no encontrado."))
+        val updated = item.copy(
+            isPaid = true,
+            paidAtTimestamp = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+        pendingExpenseDao.update(updated)
+        return Result.success(Unit)
+    }
+
+    suspend fun reopenPendingExpense(id: String): Result<Unit> {
+        val item = pendingExpenseDao.getPendingExpenseById(id)
+            ?: return Result.failure(IllegalArgumentException("Pago pendiente no encontrado."))
+        val updated = item.copy(
+            isPaid = false,
+            paidAtTimestamp = null,
+            transactionId = null,
+            updatedAt = System.currentTimeMillis()
+        )
+        pendingExpenseDao.update(updated)
+        return Result.success(Unit)
+    }
+
+    suspend fun payPendingExpense(
+        pendingId: String,
+        accountId: String,
+        exchangeRate: Double,
+        overrideNativeAmount: Double? = null,
+        note: String = "",
+        paymentDateTimestamp: Long = System.currentTimeMillis()
+    ): Result<TransactionEntity> {
+        return db.withTransaction {
+            val pending = pendingExpenseDao.getPendingExpenseById(pendingId)
+                ?: return@withTransaction Result.failure(IllegalArgumentException("Pago pendiente no encontrado."))
+
+            val account = accountDao.getAccountByIdSync(accountId)
+                ?: return@withTransaction Result.failure(IllegalArgumentException("Cuenta de pago no encontrada."))
+
+            val accountCurrency = currencyDao.getCurrencyByIdSync(account.currencyId)
+
+            val nativeAmount = overrideNativeAmount ?: run {
+                val accCurrCode = accountCurrency?.code ?: "USD"
+                val pendCurrCode = pending.currencyCode
+                when {
+                    accCurrCode.equals(pendCurrCode, ignoreCase = true) -> pending.amount
+                    !accCurrCode.equals("USD", ignoreCase = true) && pendCurrCode.equals("USD", ignoreCase = true) ->
+                        pending.amount * exchangeRate
+                    accCurrCode.equals("USD", ignoreCase = true) && !pendCurrCode.equals("USD", ignoreCase = true) && exchangeRate > 0.0 ->
+                        pending.amount / exchangeRate
+                    else -> pending.amount
+                }
+            }
+
+            val finalCategoryId = pending.categoryId ?: run {
+                val expenseCats = categoryDao.getAllCategoriesSync().filter { it.type == "EXPENSE" && it.isDefault }
+                expenseCats.firstOrNull()?.id ?: "CAT_EXP_1"
+            }
+
+            val finalNote = note.ifBlank {
+                if (pending.note.isNotBlank()) "${pending.title}: ${pending.note}" else pending.title
+            }
+
+            val txResult = registerExpense(
+                accountId = accountId,
+                categoryId = finalCategoryId,
+                nativeAmount = nativeAmount,
+                exchangeRate = exchangeRate,
+                note = finalNote,
+                dateTimestamp = paymentDateTimestamp
+            )
+
+            txResult.fold(
+                onSuccess = { tx ->
+                    val updated = pending.copy(
+                        isPaid = true,
+                        paidAtTimestamp = paymentDateTimestamp,
+                        transactionId = tx.id,
+                        accountId = accountId,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    pendingExpenseDao.update(updated)
+                    Result.success(tx)
+                },
+                onFailure = { error ->
+                    Result.failure(error)
+                }
+            )
+        }
+    }
+
     // --- RESPALDO Y RESTAURACIÓN INTEGRAL ---
     suspend fun getAllTransactionsSync(): List<TransactionEntity> {
         return transactionDao.getAllTransactionsSync()
@@ -553,6 +702,7 @@ class BrexaRepository(private val db: BrexaDatabase) {
         val transactions = transactionDao.getAllTransactionsSync()
         val history = exchangeRateHistoryDao.getAllHistorySync()
         val settings = appSettingDao.getAllSettingsSync()
+        val pending = pendingExpenseDao.getAllPendingExpensesSync()
 
         return BackupPayload(
             exportTimestamp = System.currentTimeMillis(),
@@ -561,7 +711,8 @@ class BrexaRepository(private val db: BrexaDatabase) {
             categories = categories,
             transactions = transactions,
             exchangeRateHistory = history,
-            appSettings = settings
+            appSettings = settings,
+            pendingExpenses = pending
         )
     }
 
@@ -574,9 +725,11 @@ class BrexaRepository(private val db: BrexaDatabase) {
                 val transactions = payload.transactions ?: emptyList()
                 val history = payload.exchangeRateHistory ?: emptyList()
                 val settings = payload.appSettings ?: emptyList()
+                val pending = payload.pendingExpenses ?: emptyList()
 
                 // Si el respaldo contiene datos mínimos, limpiamos e insertamos en orden de dependencias
-                if (currencies.isNotEmpty() || accounts.isNotEmpty() || categories.isNotEmpty() || transactions.isNotEmpty()) {
+                if (currencies.isNotEmpty() || accounts.isNotEmpty() || categories.isNotEmpty() || transactions.isNotEmpty() || pending.isNotEmpty()) {
+                    pendingExpenseDao.deleteAllPendingExpensesSync()
                     transactionDao.deleteAllTransactionsSync()
                     exchangeRateHistoryDao.deleteAllHistorySync()
                     accountDao.deleteAllAccountsSync()
@@ -584,9 +737,10 @@ class BrexaRepository(private val db: BrexaDatabase) {
                     currencyDao.deleteAllCurrenciesSync()
 
                     if (currencies.isNotEmpty()) currencyDao.insertAll(currencies)
-                    if (accounts.isNotEmpty()) accountDao.insertAll(accounts)
                     if (categories.isNotEmpty()) categoryDao.insertAll(categories)
+                    if (accounts.isNotEmpty()) accountDao.insertAll(accounts)
                     if (transactions.isNotEmpty()) transactionDao.insertAll(transactions)
+                    if (pending.isNotEmpty()) pendingExpenseDao.insertAll(pending)
                     if (history.isNotEmpty()) exchangeRateHistoryDao.insertAll(history)
                     if (settings.isNotEmpty()) appSettingDao.insertAll(settings)
                 }

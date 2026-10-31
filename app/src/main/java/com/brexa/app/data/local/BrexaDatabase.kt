@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.brexa.app.data.local.dao.*
 import com.brexa.app.data.local.entity.*
@@ -18,9 +19,10 @@ import kotlinx.coroutines.launch
         CategoryEntity::class,
         TransactionEntity::class,
         ExchangeRateHistoryEntity::class,
-        AppSettingEntity::class
+        AppSettingEntity::class,
+        PendingExpenseEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class BrexaDatabase : RoomDatabase() {
@@ -31,10 +33,44 @@ abstract class BrexaDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun exchangeRateHistoryDao(): ExchangeRateHistoryDao
     abstract fun appSettingDao(): AppSettingDao
+    abstract fun pendingExpenseDao(): PendingExpenseDao
 
     companion object {
         @Volatile
         private var INSTANCE: BrexaDatabase? = null
+
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `pending_expenses` (
+                        `id` TEXT NOT NULL,
+                        `title` TEXT NOT NULL,
+                        `amount` REAL NOT NULL,
+                        `currency_code` TEXT NOT NULL,
+                        `due_date_timestamp` INTEGER NOT NULL,
+                        `category_id` TEXT,
+                        `account_id` TEXT,
+                        `note` TEXT NOT NULL DEFAULT '',
+                        `is_paid` INTEGER NOT NULL DEFAULT 0,
+                        `paid_at_timestamp` INTEGER,
+                        `transaction_id` TEXT,
+                        `created_at` INTEGER NOT NULL,
+                        `updated_at` INTEGER NOT NULL,
+                        PRIMARY KEY(`id`),
+                        FOREIGN KEY(`category_id`) REFERENCES `categories`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL,
+                        FOREIGN KEY(`account_id`) REFERENCES `accounts`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL,
+                        FOREIGN KEY(`transaction_id`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE SET NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pending_expenses_due_date_timestamp` ON `pending_expenses` (`due_date_timestamp`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pending_expenses_is_paid` ON `pending_expenses` (`is_paid`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pending_expenses_category_id` ON `pending_expenses` (`category_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pending_expenses_account_id` ON `pending_expenses` (`account_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pending_expenses_transaction_id` ON `pending_expenses` (`transaction_id`)")
+            }
+        }
 
         fun getDatabase(context: Context, scope: CoroutineScope): BrexaDatabase {
             return INSTANCE ?: synchronized(this) {
@@ -43,6 +79,7 @@ abstract class BrexaDatabase : RoomDatabase() {
                     BrexaDatabase::class.java,
                     "brexa_database.db"
                 )
+                    .addMigrations(MIGRATION_1_2)
                     .addCallback(BrexaDatabaseCallback(scope))
                     .build()
                 INSTANCE = instance

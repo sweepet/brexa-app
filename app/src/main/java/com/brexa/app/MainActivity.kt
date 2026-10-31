@@ -142,7 +142,14 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onOpenAccountsManagement = { currentScreen = "ACCOUNTS" },
                                 onOpenAnalytics = { currentScreen = "ANALYTICS" },
-                                onOpenSettings = { currentScreen = "SETTINGS" }
+                                onOpenSettings = { currentScreen = "SETTINGS" },
+                                onOpenPendingExpenses = { currentScreen = "PENDING_EXPENSES" }
+                            )
+                        }
+                        "PENDING_EXPENSES" -> {
+                            PendingExpensesScreen(
+                                viewModel = viewModel,
+                                onBack = { currentScreen = "HOME" }
                             )
                         }
                         "TRANSACTION_FORM" -> {

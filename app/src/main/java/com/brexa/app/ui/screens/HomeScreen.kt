@@ -41,7 +41,8 @@ fun HomeScreen(
     onOpenTransactionForm: (String) -> Unit,
     onOpenAccountsManagement: () -> Unit,
     onOpenAnalytics: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenPendingExpenses: () -> Unit
 ) {
     val totalUsd by viewModel.consolidatedUsdBalance.collectAsState()
     val accounts by viewModel.activeAccounts.collectAsState()
@@ -51,6 +52,10 @@ fun HomeScreen(
     val isIncognito by viewModel.incognitoMode.collectAsState()
     val expenseCats by viewModel.expenseCategories.collectAsState()
     val incomeCats by viewModel.incomeCategories.collectAsState()
+    val activePending by viewModel.activePendingExpenses.collectAsState()
+    val totalPendingUsd by viewModel.totalPendingUsd.collectAsState()
+    val realAvailableUsd by viewModel.realAvailableBalanceUsd.collectAsState()
+    val projections by viewModel.pendingProjections.collectAsState()
     val categoryMap = remember(expenseCats, incomeCats) {
         (expenseCats + incomeCats).associateBy { it.id }
     }
@@ -246,6 +251,113 @@ fun HomeScreen(
                                 ),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        if (totalPendingUsd > 0.0) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(BorderSolid)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "SALDO LIBRE REAL:",
+                                    style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 10.sp)
+                                )
+                                Text(
+                                    text = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(realAvailableUsd)}",
+                                    style = BrexaTypography.labelMedium.copy(
+                                        color = if (realAvailableUsd >= 0.0) IncomeGreen else ExpenseRed,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- 2.1 WIDGET ACCESO A PAGOS PENDIENTES ---
+            item {
+                BrutalistCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    backgroundColor = SurfaceCard,
+                    borderColor = if (projections.overdueCount > 0) ExpenseRed else BorderSolid,
+                    borderWidth = 1.5.dp,
+                    onClick = onOpenPendingExpenses
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "📋 PAGOS PENDIENTES",
+                                style = BrexaTypography.labelMedium.copy(
+                                    color = if (projections.overdueCount > 0) ExpenseRed else TextPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.5.sp
+                                )
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            if (activePending.isNotEmpty()) {
+                                val badgeText = if (projections.overdueCount > 0) {
+                                    "${projections.overdueCount} VENCIDO${if (projections.overdueCount > 1) "S" else ""}"
+                                } else {
+                                    "${activePending.size} POR PAGAR"
+                                }
+                                BrutalistBadge(
+                                    text = badgeText,
+                                    backgroundColor = if (projections.overdueCount > 0) ExpenseRed else BackgroundBase,
+                                    contentColor = if (projections.overdueCount > 0) Color.White else AccentLime,
+                                    borderColor = if (projections.overdueCount > 0) ExpenseRed else AccentLime,
+                                    fontSize = 9.sp
+                                )
+                            } else {
+                                BrutalistBadge(
+                                    text = "AL DÍA ✓",
+                                    backgroundColor = BackgroundBase,
+                                    contentColor = IncomeGreen,
+                                    borderColor = IncomeGreen,
+                                    fontSize = 9.sp
+                                )
+                            }
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (totalPendingUsd > 0.0) {
+                                Text(
+                                    text = if (isIncognito) "•••••••" else "-$baseSymbol${formatter.format(totalPendingUsd)}",
+                                    style = BrexaTypography.labelMedium.copy(
+                                        color = ExpenseRed,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.5.sp
+                                    )
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                            }
+                            Text(
+                                text = "➔",
+                                style = BrexaTypography.labelMedium.copy(
+                                    color = AccentLime,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
                             )
                         }
                     }

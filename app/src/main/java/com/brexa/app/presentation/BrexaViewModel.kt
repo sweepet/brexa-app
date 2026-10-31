@@ -21,6 +21,18 @@ enum class AnalyticsPeriod {
     WEEK, MONTH
 }
 
+data class PendingProjections(
+    val total7DaysUsd: Double,
+    val count7Days: Int,
+    val total15DaysUsd: Double,
+    val count15Days: Int,
+    val totalMonthUsd: Double,
+    val countMonth: Int,
+    val totalAllUsd: Double,
+    val countAll: Int,
+    val overdueCount: Int
+)
+
 class BrexaViewModel(
     private val repository: BrexaRepository,
     private val syncManager: GoogleDriveSyncManager? = null
@@ -81,6 +93,131 @@ class BrexaViewModel(
 
     val incognitoMode: StateFlow<Boolean> = repository.getIncognitoMode()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    // --- GASTOS / PAGOS PENDIENTES ---
+    val allPendingExpenses: StateFlow<List<PendingExpenseEntity>> = repository.getAllPendingExpenses()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val activePendingExpenses: StateFlow<List<PendingExpenseEntity>> = repository.getActivePendingExpenses()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val paidPendingExpenses: StateFlow<List<PendingExpenseEntity>> = repository.getPaidPendingExpenses()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Total de compromisos activos en Moneda Base (USD)
+    val totalPendingUsd: StateFlow<Double> = combine(
+        activePendingExpenses,
+        allCurrencies
+    ) { pendingList, currencies ->
+        val currMap = currencies.associateBy { it.code.uppercase() }
+        pendingList.sumOf { item ->
+            val curr = currMap[item.currencyCode.uppercase()]
+            val rate = curr?.rateToUsd ?: 1.0
+            if (curr?.isBase == true || item.currencyCode.equals("USD", ignoreCase = true)) {
+                item.amount
+            } else if (rate > 0.0) {
+                item.amount / rate
+            } else {
+                item.amount
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    // Saldo realmente libre: Patrimonio total menos compromisos pendientes
+    val realAvailableBalanceUsd: StateFlow<Double> = combine(
+        consolidatedUsdBalance,
+        totalPendingUsd
+    ) { total, pending ->
+        total - pending
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    // Proyecciones por periodo: Próximos 7 días, Próximos 15 días (quincena), Este mes
+    val pendingProjections: StateFlow<PendingProjections> = combine(
+        activePendingExpenses,
+        allCurrencies
+    ) { pendingList, currencies ->
+        val currMap = currencies.associateBy { it.code.uppercase() }
+
+        val cal7Days = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, 7)
+            set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59)
+        }.timeInMillis
+
+        val cal15Days = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_YEAR, 15)
+            set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59)
+        }.timeInMillis
+
+        val calEndOfMonth = Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH))
+            set(Calendar.HOUR_OF_DAY, 23); set(Calendar.MINUTE, 59); set(Calendar.SECOND, 59)
+        }.timeInMillis
+
+        val calTodayStart = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        fun toUsd(item: PendingExpenseEntity): Double {
+            val curr = currMap[item.currencyCode.uppercase()]
+            val rate = curr?.rateToUsd ?: 1.0
+            return if (curr?.isBase == true || item.currencyCode.equals("USD", ignoreCase = true)) {
+                item.amount
+            } else if (rate > 0.0) {
+                item.amount / rate
+            } else {
+                item.amount
+            }
+        }
+
+        var sum7 = 0.0
+        var count7 = 0
+        var sum15 = 0.0
+        var count15 = 0
+        var sumMonth = 0.0
+        var countMonth = 0
+        var sumAll = 0.0
+        var countAll = 0
+        var overdue = 0
+
+        for (item in pendingList) {
+            val usd = toUsd(item)
+            sumAll += usd
+            countAll++
+
+            if (item.dueDateTimestamp < calTodayStart) {
+                overdue++
+            }
+
+            if (item.dueDateTimestamp <= cal7Days) {
+                sum7 += usd
+                count7++
+            }
+            if (item.dueDateTimestamp <= cal15Days) {
+                sum15 += usd
+                count15++
+            }
+            if (item.dueDateTimestamp <= calEndOfMonth) {
+                sumMonth += usd
+                countMonth++
+            }
+        }
+
+        PendingProjections(
+            total7DaysUsd = sum7,
+            count7Days = count7,
+            total15DaysUsd = sum15,
+            count15Days = count15,
+            totalMonthUsd = sumMonth,
+            countMonth = countMonth,
+            totalAllUsd = sumAll,
+            countAll = countAll,
+            overdueCount = overdue
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        PendingProjections(0.0, 0, 0.0, 0, 0.0, 0, 0.0, 0, 0)
+    )
 
     // Filtros de fecha para analítica
     private val _analyticsPeriod = MutableStateFlow(AnalyticsPeriod.MONTH)
@@ -499,6 +636,117 @@ class BrexaViewModel(
                 onSuccess()
             }
                 .onFailure { onError(it.message ?: "Error al eliminar categoría.") }
+        }
+    }
+
+    // --- ACCIONES DE GASTOS / PAGOS PENDIENTES ---
+    fun addPendingExpense(
+        title: String,
+        amount: Double,
+        currencyCode: String,
+        dueDateTimestamp: Long,
+        categoryId: String? = null,
+        accountId: String? = null,
+        note: String = "",
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val result = repository.addPendingExpense(
+                title = title,
+                amount = amount,
+                currencyCode = currencyCode,
+                dueDateTimestamp = dueDateTimestamp,
+                categoryId = categoryId,
+                accountId = accountId,
+                note = note
+            )
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }.onFailure { onError(it.message ?: "Error al registrar pago pendiente.") }
+        }
+    }
+
+    fun updatePendingExpense(
+        item: PendingExpenseEntity,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val result = repository.updatePendingExpense(item)
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }.onFailure { onError(it.message ?: "Error al actualizar pago pendiente.") }
+        }
+    }
+
+    fun deletePendingExpense(
+        id: String,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val result = repository.deletePendingExpense(id)
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }.onFailure { onError(it.message ?: "Error al eliminar pago pendiente.") }
+        }
+    }
+
+    fun markPendingAsPaidWithoutExpense(
+        id: String,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val result = repository.markPendingAsPaidWithoutExpense(id)
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }.onFailure { onError(it.message ?: "Error al marcar como pagado.") }
+        }
+    }
+
+    fun reopenPendingExpense(
+        id: String,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val result = repository.reopenPendingExpense(id)
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }.onFailure { onError(it.message ?: "Error al reabrir pago pendiente.") }
+        }
+    }
+
+    fun payPendingExpense(
+        pendingId: String,
+        accountId: String,
+        exchangeRate: Double,
+        overrideNativeAmount: Double? = null,
+        note: String = "",
+        paymentDateTimestamp: Long = System.currentTimeMillis(),
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val result = repository.payPendingExpense(
+                pendingId = pendingId,
+                accountId = accountId,
+                exchangeRate = exchangeRate,
+                overrideNativeAmount = overrideNativeAmount,
+                note = note,
+                paymentDateTimestamp = paymentDateTimestamp
+            )
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }.onFailure { onError(it.message ?: "Error al registrar pago.") }
         }
     }
 
