@@ -5,7 +5,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -122,15 +124,9 @@ fun HomeScreen(
     val dateFormatter = remember { SimpleDateFormat("dd MMM, HH:mm", Locale.getDefault()) }
     val fullDateFormatter = remember { SimpleDateFormat("dd 'de' MMMM, yyyy - HH:mm", Locale("es", "ES")) }
 
-    // Moneda Base y Monedas Secundarias
+    // Moneda Base
     val baseCode = baseCurrency?.code ?: "USD"
     val baseSymbol = baseCurrency?.symbol ?: "$"
-    val secondaryCurrencies = remember(currencies) { currencies.filter { !it.isBase } }
-    var selectedSecondaryIndex by remember { mutableIntStateOf(0) }
-    val activeSecondaryCurrency = if (secondaryCurrencies.isNotEmpty()) {
-        secondaryCurrencies[selectedSecondaryIndex.coerceIn(0, secondaryCurrencies.lastIndex)]
-    } else null
-    val equivalentSec = if (activeSecondaryCurrency != null) totalUsd * activeSecondaryCurrency.rateToUsd else 0.0
 
     Box(
         modifier = Modifier
@@ -275,73 +271,19 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Columna izquierda: Monto Total y Moneda secundaria
-                            Column(modifier = Modifier.weight(1f)) {
-                                val balanceDisplay = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(totalUsd)}"
-                                Text(
-                                    text = balanceDisplay,
-                                    style = BrexaTypography.displayLarge.copy(
-                                        color = AccentLime,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = if (balanceDisplay.length > 13) 20.sp else if (balanceDisplay.length > 9) 24.sp else 30.sp
-                                    ),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                if (isIncognito) {
-                                    Text(
-                                        text = "≈ •••••••",
-                                        style = BrexaTypography.labelMedium.copy(
-                                            color = AccentPurple,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp
-                                        )
-                                    )
-                                } else if (activeSecondaryCurrency != null) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.clickable(enabled = secondaryCurrencies.size > 1) {
-                                            selectedSecondaryIndex = (selectedSecondaryIndex + 1) % secondaryCurrencies.size
-                                        }
-                                    ) {
-                                        Text(
-                                            text = "≈ ${formatter.format(equivalentSec)} ${activeSecondaryCurrency.code}",
-                                            style = BrexaTypography.labelMedium.copy(
-                                                color = AccentPurple,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 11.sp
-                                            ),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis
-                                        )
-                                        if (secondaryCurrencies.size > 1) {
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = "⇄",
-                                                style = BrexaTypography.labelMedium.copy(
-                                                    color = AccentLime,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 10.sp
-                                                )
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    Text(
-                                        text = "MONEDA PRINCIPAL: ${baseCurrency?.name ?: "Dólar"}",
-                                        style = BrexaTypography.labelMedium.copy(
-                                            color = AccentPurple,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp
-                                        ),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
+                            // Columna izquierda: Monto Total Principal
+                            val balanceDisplay = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(totalUsd)}"
+                            Text(
+                                text = balanceDisplay,
+                                style = BrexaTypography.displayLarge.copy(
+                                    color = AccentLime,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = if (balanceDisplay.length > 13) 22.sp else if (balanceDisplay.length > 9) 26.sp else 30.sp
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
 
                             // Columna derecha: Tasas Oficiales en el espacio disponible
                             if (bcvCurrency != null || copCurrency != null) {
@@ -399,6 +341,94 @@ fun HomeScreen(
                                                 style = BrexaTypography.labelSmall.copy(
                                                     color = ExchangeBlue,
                                                     fontWeight = FontWeight.Bold,
+                                                    fontSize = 9.5.sp
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Desglose Real de Fondos por Divisa (cuánto del total hay en cada moneda registrada)
+                        val currencyBreakdown = remember(accounts, currencies) {
+                            val includedAccounts = accounts.filter { it.includeInTotal }
+                            val grouped = includedAccounts.groupBy { it.currencyId }
+                            currencies.mapNotNull { curr ->
+                                val accs = grouped[curr.id] ?: emptyList()
+                                val nativeSum = accs.sumOf { it.currentBalance }
+                                if (accs.isNotEmpty()) {
+                                    val usdSum = if (curr.isBase) {
+                                        nativeSum
+                                    } else {
+                                        val rate = if (curr.rateToUsd > 0.0) curr.rateToUsd else 1.0
+                                        nativeSum / rate
+                                    }
+                                    Triple(curr, nativeSum, usdSum)
+                                } else null
+                            }
+                        }
+
+                        if (currencyBreakdown.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                currencyBreakdown.forEach { (curr, nativeSum, usdSum) ->
+                                    val isBase = curr.isBase
+                                    val badgeBorderColor = when {
+                                        isBase -> AccentLime
+                                        curr.code.equals("Bs", true) || curr.code.equals("VES", true) -> AccentPurple
+                                        curr.code.equals("COP", true) -> ExchangeBlue
+                                        else -> BorderSolid
+                                    }
+
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .background(BackgroundBase, RectangleShape)
+                                            .border(1.dp, badgeBorderColor, RectangleShape)
+                                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(
+                                            text = "${curr.code}: ",
+                                            style = BrexaTypography.labelSmall.copy(
+                                                color = badgeBorderColor,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 10.sp
+                                            )
+                                        )
+                                        if (isIncognito) {
+                                            Text(
+                                                text = "••••••",
+                                                style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 10.sp)
+                                            )
+                                        } else if (isBase) {
+                                            Text(
+                                                text = "${curr.symbol} ${formatter.format(nativeSum)}",
+                                                style = BrexaTypography.labelSmall.copy(
+                                                    color = TextPrimary,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 10.5.sp
+                                                )
+                                            )
+                                        } else {
+                                            Text(
+                                                text = "${formatter.format(nativeSum)} ${curr.code} ",
+                                                style = BrexaTypography.labelSmall.copy(
+                                                    color = TextPrimary,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 10.5.sp
+                                                )
+                                            )
+                                            Text(
+                                                text = "(≈ $baseSymbol ${formatter.format(usdSum)})",
+                                                style = BrexaTypography.labelSmall.copy(
+                                                    color = TextMuted,
                                                     fontSize = 9.5.sp
                                                 )
                                             )
