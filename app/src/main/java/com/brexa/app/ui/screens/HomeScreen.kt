@@ -266,91 +266,20 @@ fun HomeScreen(
                             currencies.find { it.code.equals("COP", ignoreCase = true) }
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Columna izquierda: Monto Total Principal
-                            val balanceDisplay = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(totalUsd)}"
-                            Text(
-                                text = balanceDisplay,
-                                style = BrexaTypography.displayLarge.copy(
-                                    color = AccentLime,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = if (balanceDisplay.length > 13) 22.sp else if (balanceDisplay.length > 9) 26.sp else 30.sp
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
-                            )
+                        // 1. Monto Total Consolidado (Limpio y destacado a ancho completo)
+                        val balanceDisplay = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(totalUsd)}"
+                        Text(
+                            text = balanceDisplay,
+                            style = BrexaTypography.displayLarge.copy(
+                                color = AccentLime,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = if (balanceDisplay.length > 13) 24.sp else 30.sp
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
 
-                            // Columna derecha: Tasas Oficiales en el espacio disponible
-                            if (bcvCurrency != null || copCurrency != null) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column(
-                                    horizontalAlignment = Alignment.End,
-                                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                                    modifier = Modifier.clickable { onOpenAccountsManagement() }
-                                ) {
-                                    if (bcvCurrency != null) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier
-                                                .background(BackgroundBase, RectangleShape)
-                                                .border(1.dp, BorderSolid, RectangleShape)
-                                                .padding(horizontal = 7.dp, vertical = 3.dp)
-                                        ) {
-                                            Text(
-                                                text = "Tasa BCV: ",
-                                                style = BrexaTypography.labelSmall.copy(
-                                                    color = TextSecondary,
-                                                    fontWeight = FontWeight.Normal,
-                                                    fontSize = 9.sp
-                                                )
-                                            )
-                                            Text(
-                                                text = "${formatter.format(bcvCurrency.rateToUsd)} Bs",
-                                                style = BrexaTypography.labelSmall.copy(
-                                                    color = AccentPurple,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 9.5.sp
-                                                )
-                                            )
-                                        }
-                                    }
-
-                                    if (copCurrency != null) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier
-                                                .background(BackgroundBase, RectangleShape)
-                                                .border(1.dp, BorderSolid, RectangleShape)
-                                                .padding(horizontal = 7.dp, vertical = 3.dp)
-                                        ) {
-                                            Text(
-                                                text = "Tasa COP: ",
-                                                style = BrexaTypography.labelSmall.copy(
-                                                    color = TextSecondary,
-                                                    fontWeight = FontWeight.Normal,
-                                                    fontSize = 9.sp
-                                                )
-                                            )
-                                            Text(
-                                                text = "${formatter.format(copCurrency.rateToUsd)} COP",
-                                                style = BrexaTypography.labelSmall.copy(
-                                                    color = ExchangeBlue,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 9.5.sp
-                                                )
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        // Desglose Real de Fondos por Divisa (cuánto del total hay en cada moneda registrada)
+                        // 2. Desglose Unificado por Moneda (Solo valores convertidos a la moneda principal $)
                         val currencyBreakdown = remember(accounts, currencies) {
                             val includedAccounts = accounts.filter { it.includeInTotal }
                             val grouped = includedAccounts.groupBy { it.currencyId }
@@ -370,70 +299,103 @@ fun HomeScreen(
                         }
 
                         if (currencyBreakdown.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Row(
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .background(BackgroundBase, RectangleShape)
+                                    .border(1.dp, BorderSolid, RectangleShape)
+                                    .padding(horizontal = 12.dp, vertical = 7.dp)
                             ) {
-                                currencyBreakdown.forEach { (curr, nativeSum, usdSum) ->
-                                    val isBase = curr.isBase
-                                    val badgeBorderColor = when {
-                                        isBase -> AccentLime
-                                        curr.code.equals("Bs", true) || curr.code.equals("VES", true) -> AccentPurple
-                                        curr.code.equals("COP", true) -> ExchangeBlue
-                                        else -> BorderSolid
-                                    }
-
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier
-                                            .background(BackgroundBase, RectangleShape)
-                                            .border(1.dp, badgeBorderColor, RectangleShape)
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                    ) {
-                                        Text(
-                                            text = "${curr.code}: ",
-                                            style = BrexaTypography.labelSmall.copy(
-                                                color = badgeBorderColor,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 10.sp
-                                            )
-                                        )
-                                        if (isIncognito) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    currencyBreakdown.forEachIndexed { index, (curr, _, usdSum) ->
+                                        if (index > 0) {
                                             Text(
-                                                text = "••••••",
-                                                style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 10.sp)
+                                                text = "•",
+                                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 11.sp)
                                             )
-                                        } else if (isBase) {
+                                        }
+                                        val labelText = if (curr.isBase) "En Efectivo" else "En ${curr.code}"
+                                        val valueColor = if (curr.isBase) AccentLime else AccentPurple
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
-                                                text = "${curr.symbol} ${formatter.format(nativeSum)}",
+                                                text = "$labelText = ",
                                                 style = BrexaTypography.labelSmall.copy(
-                                                    color = TextPrimary,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 10.5.sp
-                                                )
-                                            )
-                                        } else {
-                                            Text(
-                                                text = "${formatter.format(nativeSum)} ${curr.code} ",
-                                                style = BrexaTypography.labelSmall.copy(
-                                                    color = TextPrimary,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 10.5.sp
+                                                    color = TextSecondary,
+                                                    fontWeight = FontWeight.Normal,
+                                                    fontSize = 11.sp
                                                 )
                                             )
                                             Text(
-                                                text = "(≈ $baseSymbol ${formatter.format(usdSum)})",
+                                                text = if (isIncognito) "••••" else "$baseSymbol ${formatter.format(usdSum)}",
                                                 style = BrexaTypography.labelSmall.copy(
-                                                    color = TextMuted,
-                                                    fontSize = 9.5.sp
+                                                    color = valueColor,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 11.5.sp
                                                 )
                                             )
                                         }
                                     }
+                                }
+                            }
+                        }
+
+                        // 3. Barra Inferior de Tasas Oficiales (Ordenada, simétrica y con acceso directo)
+                        if (bcvCurrency != null || copCurrency != null) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(BorderSolid)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onOpenAccountsManagement() },
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "🏛 OFICIAL:",
+                                        style = BrexaTypography.labelSmall.copy(
+                                            color = TextMuted,
+                                            fontSize = 9.5.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    )
+                                    if (bcvCurrency != null) {
+                                        Text(
+                                            text = "BCV: ${formatter.format(bcvCurrency.rateToUsd)} Bs",
+                                            style = BrexaTypography.labelSmall.copy(
+                                                color = AccentPurple,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 9.5.sp
+                                            )
+                                        )
+                                    }
+                                }
+
+                                if (copCurrency != null) {
+                                    Text(
+                                        text = "TRM: ${formatter.format(copCurrency.rateToUsd)} COP",
+                                        style = BrexaTypography.labelSmall.copy(
+                                            color = ExchangeBlue,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 9.5.sp
+                                        )
+                                    )
                                 }
                             }
                         }
