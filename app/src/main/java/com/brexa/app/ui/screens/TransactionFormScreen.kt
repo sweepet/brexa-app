@@ -286,7 +286,7 @@ fun TransactionFormScreen(
             modifier = Modifier.fillMaxWidth()
         )
 
-        // Si es EXCHANGE: Campo de Monto Recibido
+        // Si es EXCHANGE: Campo de Monto Recibido y Cálculo de Tasa Resultante en Vivo
         if (selectedType == "EXCHANGE") {
             Spacer(modifier = Modifier.height(16.dp))
             val destAcc = accounts.find { it.id == selectedDestinationAccountId }
@@ -301,6 +301,117 @@ fun TransactionFormScreen(
                 borderColor = ExchangeBlue,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            val srcNum = CurrencyFormat.parseNumber(amountText) ?: 0.0
+            val destNum = CurrencyFormat.parseNumber(destinationAmountText) ?: 0.0
+            val srcCurr = accountCurrency
+
+            val isSrcDollar = srcCurr?.isBase == true || srcCurr?.code?.uppercase() in listOf("USD", "USDT", "USDC")
+            val isDestDollar = destCurr?.isBase == true || destCurr?.code?.uppercase() in listOf("USD", "USDT", "USDC")
+
+            val rateInfo = when {
+                srcNum > 0.0 && destNum > 0.0 -> {
+                    when {
+                        isSrcDollar && !isDestDollar -> {
+                            val r = destNum / srcNum
+                            Triple(
+                                "1 ${srcCurr?.code ?: "USD"} = ${CurrencyFormat.formatRate(r)} ${destCurr?.code ?: ""}",
+                                "Tasa resultante de la venta",
+                                "Por cada 1 ${srcCurr?.code ?: "USD"} vendido recibes ${CurrencyFormat.formatRate(r)} ${destCurr?.code ?: ""}"
+                            )
+                        }
+                        !isSrcDollar && isDestDollar -> {
+                            val r = srcNum / destNum
+                            Triple(
+                                "1 ${destCurr?.code ?: "USD"} = ${CurrencyFormat.formatRate(r)} ${srcCurr?.code ?: ""}",
+                                "Tasa resultante de la compra",
+                                "Compraste cada 1 ${destCurr?.code ?: "USD"} a ${CurrencyFormat.formatRate(r)} ${srcCurr?.code ?: ""}"
+                            )
+                        }
+                        srcCurr?.code.equals(destCurr?.code, ignoreCase = true) -> {
+                            Triple(
+                                "Transferencia 1 a 1 (${srcCurr?.code ?: ""})",
+                                "Misma divisa",
+                                "Transferencia directa entre cuentas de igual divisa"
+                            )
+                        }
+                        else -> {
+                            val r = destNum / srcNum
+                            Triple(
+                                "1 ${srcCurr?.code ?: ""} = ${CurrencyFormat.formatRate(r)} ${destCurr?.code ?: ""}",
+                                "Tasa de conversión",
+                                "Conversión entre divisas a tasa efectiva"
+                            )
+                        }
+                    }
+                }
+                else -> null
+            }
+
+            BrutalistCard(
+                modifier = Modifier.fillMaxWidth(),
+                backgroundColor = SurfaceCard,
+                borderColor = if (rateInfo != null) ExchangeBlue else BorderSolid,
+                borderWidth = 1.5.dp
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "TASA DE CAMBIO // OPERACIÓN",
+                            style = BrexaTypography.labelSmall.copy(
+                                color = if (rateInfo != null) ExchangeBlue else TextMuted,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp,
+                                letterSpacing = 0.5.sp
+                            )
+                        )
+                        if (rateInfo != null) {
+                            BrutalistBadge(
+                                text = "CALCULADA EN VIVO ⚡",
+                                backgroundColor = BackgroundBase,
+                                contentColor = AccentLime,
+                                borderColor = AccentLime,
+                                fontSize = 8.sp,
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    if (rateInfo != null) {
+                        Text(
+                            text = rateInfo.first,
+                            style = BrexaTypography.titleLarge.copy(
+                                color = AccentLime,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(3.dp))
+                        Text(
+                            text = rateInfo.third,
+                            style = BrexaTypography.bodySmall.copy(color = TextSecondary, fontSize = 11.sp)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "✓ Esta tasa quedará registrada y guardada para que puedas consultarla cuando quieras.",
+                            style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 10.sp)
+                        )
+                    } else {
+                        Text(
+                            text = "Introduce los dos montos arriba para calcular automáticamente la tasa exacta a la que te pagaron.",
+                            style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 11.sp)
+                        )
+                    }
+                }
+            }
         }
 
         // =========================================================================

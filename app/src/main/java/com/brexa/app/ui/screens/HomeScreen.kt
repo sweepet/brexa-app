@@ -844,6 +844,18 @@ fun HomeScreen(
                                         append(acc?.name ?: "Cuenta")
                                         if (destAcc != null) append(" ➔ ${destAcc.name}")
                                     }
+                                    if (tx.type == "EXCHANGE" && tx.implicitExchangeRate != null && tx.implicitExchangeRate > 0.0) {
+                                        val destCurr = currencies.find { it.id == destAcc?.currencyId }
+                                        val destCurrCode = destCurr?.code ?: ""
+                                        val isSrcDollar = tx.currencyCode.uppercase() in listOf("USD", "USDT", "USDC")
+                                        val isDestDollar = destCurrCode.uppercase() in listOf("USD", "USDT", "USDC")
+                                        val rateSummary = when {
+                                            !isSrcDollar && isDestDollar -> "1 $destCurrCode = ${CurrencyFormat.formatRate(tx.implicitExchangeRate)} ${tx.currencyCode}"
+                                            else -> "1 ${tx.currencyCode} = ${CurrencyFormat.formatRate(tx.implicitExchangeRate)} $destCurrCode"
+                                        }
+                                        withStyle(SpanStyle(color = TextMuted)) { append(" • ") }
+                                        withStyle(SpanStyle(color = ExchangeBlue, fontWeight = FontWeight.Bold)) { append(rateSummary) }
+                                    }
                                     if (cat != null) {
                                         withStyle(SpanStyle(color = TextMuted)) { append(" • ") }
                                         withStyle(SpanStyle(color = AccentLime)) { append(cat.name) }
@@ -889,10 +901,18 @@ fun HomeScreen(
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
+                                val secondaryLine = if (isIncognito) {
+                                    "••••••"
+                                } else if (tx.type == "EXCHANGE" && tx.destinationReceivedAmount != null) {
+                                    val destCurr = currencies.find { it.id == destAcc?.currencyId }
+                                    "➔ ${formatter.format(tx.destinationReceivedAmount)} ${destCurr?.code ?: ""}"
+                                } else {
+                                    "≈ $baseSymbol ${formatter.format(tx.usdEquivalent)} $baseCode"
+                                }
                                 Text(
-                                    text = if (isIncognito) "≈ •••• $baseCode" else "≈ $baseSymbol ${formatter.format(tx.usdEquivalent)} $baseCode",
+                                    text = secondaryLine,
                                     style = BrexaTypography.labelMedium.copy(
-                                        color = AccentLime,
+                                        color = if (tx.type == "EXCHANGE") IncomeGreen else AccentLime,
                                         fontSize = 10.sp
                                     ),
                                     maxLines = 1,
@@ -936,7 +956,7 @@ fun HomeScreen(
         val typeLabel = when {
             tx.type == "EXPENSE" -> "GASTO"
             tx.type == "INCOME" -> "INGRESO"
-            tx.type == "EXCHANGE" -> "TRANSFERENCIA"
+            tx.type == "EXCHANGE" -> "EXCHANGE"
             isAdjustment && adjIsIncrease -> "AJUSTE (+)"
             isAdjustment && !adjIsIncrease -> "AJUSTE (−)"
             else -> tx.type
@@ -994,36 +1014,107 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     // Tarjeta de Cifras
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(BackgroundBase, RectangleShape)
-                            .border(1.5.dp, BorderSolid, RectangleShape)
-                            .padding(14.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "$prefix${formatter.format(tx.nativeAmount)} ${tx.currencyCode}",
-                            style = BrexaTypography.titleLarge.copy(
-                                color = amountColor,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 22.sp
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "≈ $baseSymbol ${formatter.format(tx.usdEquivalent)} $baseCode",
-                            style = BrexaTypography.labelLarge.copy(
-                                color = AccentLime,
-                                fontSize = 13.sp
-                            )
-                        )
-                        if (tx.currencyCode != baseCode) {
-                            Spacer(modifier = Modifier.height(4.dp))
+                    if (tx.type == "EXCHANGE" && tx.destinationReceivedAmount != null) {
+                        val destCurr = currencies.find { it.id == destAcc?.currencyId }
+                        val destCurrCode = destCurr?.code ?: ""
+                        val isSrcDollar = tx.currencyCode.uppercase() in listOf("USD", "USDT", "USDC")
+                        val isDestDollar = destCurrCode.uppercase() in listOf("USD", "USDT", "USDC")
+                        val rateText = if (tx.implicitExchangeRate != null && tx.implicitExchangeRate > 0.0) {
+                            when {
+                                !isSrcDollar && isDestDollar -> "1 $destCurrCode = ${CurrencyFormat.formatRate(tx.implicitExchangeRate)} ${tx.currencyCode}"
+                                else -> "1 ${tx.currencyCode} = ${CurrencyFormat.formatRate(tx.implicitExchangeRate)} $destCurrCode"
+                            }
+                        } else null
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(BackgroundBase, RectangleShape)
+                                .border(1.5.dp, ExchangeBlue, RectangleShape)
+                                .padding(14.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text(text = "ENTREGADO (ORIGEN)", style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 9.sp))
+                                    Text(
+                                        text = "− ${formatter.format(tx.nativeAmount)} ${tx.currencyCode}",
+                                        style = BrexaTypography.titleMedium.copy(color = ExpenseRed, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    )
+                                }
+                                Text(text = "➔", style = BrexaTypography.titleLarge.copy(color = ExchangeBlue, fontSize = 20.sp))
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(text = "RECIBIDO (DESTINO)", style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 9.sp))
+                                    Text(
+                                        text = "+ ${formatter.format(tx.destinationReceivedAmount)} $destCurrCode",
+                                        style = BrexaTypography.titleMedium.copy(color = IncomeGreen, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    )
+                                }
+                            }
+
+                            if (rateText != null) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(SurfaceCard, RectangleShape)
+                                        .border(1.dp, BorderSolid, RectangleShape)
+                                        .padding(vertical = 6.dp, horizontal = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "TASA APLICADA: $rateText",
+                                        style = BrexaTypography.labelMedium.copy(
+                                            color = AccentLime,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.5.sp
+                                        )
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Tasa de cotización: 1 $baseCode = ${CurrencyFormat.formatRate(tx.exchangeRate)} ${tx.currencyCode}",
+                                text = "≈ $baseSymbol ${formatter.format(tx.usdEquivalent)} $baseCode",
                                 style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp)
                             )
+                        }
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(BackgroundBase, RectangleShape)
+                                .border(1.5.dp, BorderSolid, RectangleShape)
+                                .padding(14.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "$prefix${formatter.format(tx.nativeAmount)} ${tx.currencyCode}",
+                                style = BrexaTypography.titleLarge.copy(
+                                    color = amountColor,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 22.sp
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "≈ $baseSymbol ${formatter.format(tx.usdEquivalent)} $baseCode",
+                                style = BrexaTypography.labelLarge.copy(
+                                    color = AccentLime,
+                                    fontSize = 13.sp
+                                )
+                            )
+                            if (tx.currencyCode != baseCode) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Tasa de cotización: 1 $baseCode = ${CurrencyFormat.formatRate(tx.exchangeRate)} ${tx.currencyCode}",
+                                    style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp)
+                                )
+                            }
                         }
                     }
 

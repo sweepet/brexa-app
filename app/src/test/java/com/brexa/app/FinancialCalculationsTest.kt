@@ -41,6 +41,14 @@ class FinancialCalculationsTest {
             .toDouble()
 
         assertEquals(73.50, impliedRate, 0.0001)
+
+        // Caso usuario: Vender 35 USDT y recibir 34.700 Bs
+        val sourceUsdt = 35.0
+        val targetBsReceived = 34700.0
+        val rateUsdtBs = BigDecimal(targetBsReceived)
+            .divide(BigDecimal(sourceUsdt), 4, RoundingMode.HALF_EVEN)
+            .toDouble()
+        assertEquals(991.4286, rateUsdtBs, 0.0001)
     }
 
     @Test

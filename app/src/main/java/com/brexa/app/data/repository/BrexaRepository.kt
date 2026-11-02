@@ -511,20 +511,39 @@ class BrexaRepository(private val db: BrexaDatabase) {
         val sourceCurrency = currencyDao.getCurrencyByIdSync(sourceAccount.currencyId)
         val targetCurrency = currencyDao.getCurrencyByIdSync(targetAccount.currencyId)
 
-        // Tasa real implícita del canje
-        val implicitRate = if (sourceCurrency?.isBase == true) {
-            // Salió Moneda Base, entró Secundaria -> Tasa = Secundaria / Base
-            BigDecimal(targetReceivedAmount).divide(BigDecimal(sourceAmount), 4, RoundingMode.HALF_EVEN).toDouble()
-        } else if (targetCurrency?.isBase == true) {
-            // Salió Secundaria, entró Moneda Base -> Tasa = Secundaria / Base
-            BigDecimal(sourceAmount).divide(BigDecimal(targetReceivedAmount), 4, RoundingMode.HALF_EVEN).toDouble()
-        } else {
-            BigDecimal(targetReceivedAmount).divide(BigDecimal(sourceAmount), 4, RoundingMode.HALF_EVEN).toDouble()
+        val isSrcDollar = sourceCurrency?.isBase == true || sourceCurrency?.code?.uppercase() in listOf("USD", "USDT", "USDC")
+        val isTargetDollar = targetCurrency?.isBase == true || targetCurrency?.code?.uppercase() in listOf("USD", "USDT", "USDC")
+
+        // Tasa real implícita del canje normalizada a estándares de mercado
+        val implicitRate = when {
+            isSrcDollar && !isTargetDollar -> {
+                // Salió dólar/cripto, entró moneda local (ej. 34.700 Bs / 35 USDT = 991,43)
+                BigDecimal(targetReceivedAmount).divide(BigDecimal(sourceAmount), 4, RoundingMode.HALF_EVEN).toDouble()
+            }
+            !isSrcDollar && isTargetDollar -> {
+                // Salió moneda local, entró dólar/cripto (ej. 34.700 Bs / 35 USDT = 991,43)
+                BigDecimal(sourceAmount).divide(BigDecimal(targetReceivedAmount), 4, RoundingMode.HALF_EVEN).toDouble()
+            }
+            else -> {
+                BigDecimal(targetReceivedAmount).divide(BigDecimal(sourceAmount), 4, RoundingMode.HALF_EVEN).toDouble()
+            }
         }
 
-        val usdEquiv = if (sourceCurrency?.isBase == true) {
+        val rateLabel = when {
+            isSrcDollar && !isTargetDollar -> "1 ${sourceCurrency?.code ?: "USD"} = ${String.format(java.util.Locale.US, "%.2f", implicitRate)} ${targetCurrency?.code ?: ""}"
+            !isSrcDollar && isTargetDollar -> "1 ${targetCurrency?.code ?: "USD"} = ${String.format(java.util.Locale.US, "%.2f", implicitRate)} ${sourceCurrency?.code ?: ""}"
+            else -> "1 ${sourceCurrency?.code ?: ""} = ${String.format(java.util.Locale.US, "%.2f", implicitRate)} ${targetCurrency?.code ?: ""}"
+        }
+
+        val finalNote = if (note.trim().isEmpty()) {
+            "Tasa: $rateLabel"
+        } else {
+            note.trim()
+        }
+
+        val usdEquiv = if (isSrcDollar) {
             sourceAmount
-        } else if (targetCurrency?.isBase == true) {
+        } else if (isTargetDollar) {
             targetReceivedAmount
         } else {
             val srcRate = sourceCurrency?.rateToUsd ?: 1.0
@@ -542,7 +561,7 @@ class BrexaRepository(private val db: BrexaDatabase) {
             usdEquivalent = usdEquiv,
             destinationReceivedAmount = targetReceivedAmount,
             implicitExchangeRate = implicitRate,
-            note = note.trim(),
+            note = finalNote,
             dateTimestamp = dateTimestamp
         )
 
