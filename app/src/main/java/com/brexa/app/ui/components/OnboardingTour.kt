@@ -1,6 +1,6 @@
 package com.brexa.app.ui.components
 
-import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,313 +12,202 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brexa.app.ui.theme.*
 
-enum class TourPointerDirection {
-    UP,
-    DOWN,
-    NONE
-}
-
-data class TourStep(
-    val stepIndex: Int,
-    val totalSteps: Int,
-    val targetIndex: Int,
-    val pointerDirection: TourPointerDirection,
-    val badgeText: String,
+data class SpotlightStep(
     val title: String,
-    val description: String,
-    val tip: String,
-    val cardAlignment: Alignment
+    val message: String
 )
 
 @Composable
 fun OnboardingTour(
     currentStepIndex: Int,
+    targetRect: Rect?,
     onStepChange: (Int) -> Unit,
     onFinishTour: () -> Unit
 ) {
     val steps = remember {
         listOf(
-            TourStep(
-                stepIndex = 0,
-                totalSteps = 7,
-                targetIndex = 0,
-                pointerDirection = TourPointerDirection.UP,
-                badgeText = "▲ MIRA LA BARRA SUPERIOR (OJITO Y ENGRANAJE)",
-                title = "TU TERMINAL Y PRIVACIDAD",
-                description = "En la barra superior tienes el control:\n\n• 👁 VISIBLE / OCULTO: Toca el ojito para esconder tus saldos al instante cuando estés en la calle o con personas cerca.\n• 📊 GRÁFICAS: Consulta resúmenes y estadísticas de tus gastos.\n• ⚙ AJUSTES: Conecta tu Google Drive para tener copia de seguridad automática y no perder tus datos.",
-                tip = "💡 Tus datos son 100% privados: se guardan en tu teléfono y en tu propio Google Drive.",
-                cardAlignment = Alignment.TopCenter
+            SpotlightStep(
+                title = "PATRIMONIO TOTAL",
+                message = "Tu saldo total en Dólares y su valor equivalente en vivo en Bolívares (BCV) o Pesos (TRM)."
             ),
-            TourStep(
-                stepIndex = 1,
-                totalSteps = 7,
-                targetIndex = 0,
-                pointerDirection = TourPointerDirection.UP,
-                badgeText = "▲ MIRA LA TARJETA VERDE LIMA",
-                title = "TU DINERO TOTAL CONSOLIDADO",
-                description = "Esta tarjeta suma todo tu dinero de todas tus cuentas convertido a tu moneda principal (por ejemplo, USD $).\n\nAbajo en morado ves el equivalente en tu moneda local (como Bolívares o Euros). Si manejas varias monedas, toca el símbolo ⇄ para alternarlas al momento.",
-                tip = "💡 Ya no necesitas calcular a mano con una calculadora: Brexa hace la conversión en vivo con tu tasa del día.",
-                cardAlignment = Alignment.BottomCenter
+            SpotlightStep(
+                title = "MOVIMIENTOS RÁPIDOS",
+                message = "Anota compras del día a día (− GASTAR), ingresos (+ INGRESAR) o transferencias y cambio de divisas (⇄)."
             ),
-            TourStep(
-                stepIndex = 2,
-                totalSteps = 7,
-                targetIndex = 2,
-                pointerDirection = TourPointerDirection.UP,
-                badgeText = "▲ MIRA LOS BOTONES DE MOVIMIENTOS",
-                title = "REGISTRA GASTOS, INGRESOS Y CAMBIOS",
-                description = "Usa estos 3 botones para tus operaciones rápidas:\n\n• − GASTAR (Rojo): Anota cualquier compra o gasto.\n• + INGRESAR (Verde): Suma sueldos, cobros o ventas.\n• ⇄ TRANSFERIR (Azul): Pasa dinero entre tus cuentas o anota cambios de divisas (por ejemplo: cambiaste 20$ en efectivo a Bolívares en tu banco a la tasa del día).",
-                tip = "💡 Cuando transfieres entre diferentes monedas, Brexa calcula sola la tasa real a la que cambiaste.",
-                cardAlignment = Alignment.BottomCenter
-            ),
-            TourStep(
-                stepIndex = 3,
-                totalSteps = 7,
-                targetIndex = 4,
-                pointerDirection = TourPointerDirection.DOWN,
-                badgeText = "▼ MIRA EL CARRUSEL DE CUENTAS",
-                title = "TUS CUENTAS (¡CREA LAS QUE NECESITES!)",
-                description = "Aquí ves tus cuentas: Efectivo, Bancos, Billeteras digitales o Cripto.\n\nPuedes tener hasta 11 cuentas activas. Tocando 'GESTIONAR ➔' arriba a la derecha puedes CREAR NUEVAS CUENTAS con el nombre, icono y moneda que tú quieras.",
-                tip = "💡 Si algún día el saldo no coincide con tu bolsillo real, entra a la cuenta y usa 'Ajustar saldo' para reconciliarlo en un segundo.",
-                cardAlignment = Alignment.TopCenter
-            ),
-            TourStep(
-                stepIndex = 4,
-                totalSteps = 7,
-                targetIndex = 3,
-                pointerDirection = TourPointerDirection.DOWN,
-                badgeText = "▼ TOCA 'GESTIONAR ➔' PESTAÑA MONEDAS",
-                title = "MONEDAS PREDETERMINADAS Y TASAS",
-                description = "Brexa incluye el Dólar como moneda base, además del Bolívar (BCV) y el Peso Colombiano (TRM) con actualización oficial al momento.\n\nEn 'GESTIONAR ➔ MONEDAS' puedes:\n• Actualizar las tasas oficiales con 1 toque o fijarlas a mano.\n• Crear cualquier otra moneda que uses (Euros, USDT, etc.).",
-                tip = "💡 Si asignas BCV o COP a una de tus cuentas, su valor se recalculará automáticamente con la tasa oficial.",
-                cardAlignment = Alignment.TopCenter
-            ),
-            TourStep(
-                stepIndex = 5,
-                totalSteps = 7,
-                targetIndex = 1,
-                pointerDirection = TourPointerDirection.UP,
-                badgeText = "▲ MIRA LA TARJETA DE PAGOS PENDIENTES",
-                title = "PAGOS PENDIENTES Y SALDO LIBRE REAL",
-                description = "Anota aquí tus deudas, servicios o pagos por hacer con su fecha límite. Brexa te avisa con colores si vencen hoy o en próximos días.\n\nTambién calcula tu 'Saldo Libre Real': el dinero que de verdad te queda libre para gastar después de apartar tus deudas pendientes.",
-                tip = "💡 Al pagar una deuda, tócala y pulsa 'Pagar ahora': se descontará sola de la cuenta que elijas.",
-                cardAlignment = Alignment.BottomCenter
-            ),
-            TourStep(
-                stepIndex = 6,
-                totalSteps = 7,
-                targetIndex = 0,
-                pointerDirection = TourPointerDirection.NONE,
-                badgeText = "⚡ ¡BREXA ESTÁ EN TUS MANOS!",
-                title = "¡TODO LISTO PARA EMPEZAR!",
-                description = "Ya conoces lo esencial para dominar tus finanzas.\n\nCrea tus cuentas, ajusta tus monedas y registra tus primeros movimientos. ¡Verás lo fácil que es tener el control total!\n\nPuedes volver a ver esta guía cuando quieras desde Ajustes (⚙).",
-                tip = "🚀 ¡Vamos a tomar el control de cada centavo!",
-                cardAlignment = Alignment.Center
+            SpotlightStep(
+                title = "CUENTAS Y MONEDAS",
+                message = "Toca en GESTIONAR para crear nuevas cuentas o actualizar las tasas oficiales del día con 1 toque."
             )
         )
     }
 
     val currentStep = steps[currentStepIndex.coerceIn(0, steps.lastIndex)]
+    val density = LocalDensity.current
+    val config = LocalConfiguration.current
+    val screenHeightPx = with(density) { config.screenHeightDp.dp.toPx() }
 
-    // Animación suave de rebote vertical para la flecha indicadora
-    val infiniteTransition = rememberInfiniteTransition(label = "pointerBounce")
-    val bounceOffset by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 6f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 650, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "bounce"
-    )
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 1. RECORTE SPOTLIGHT (HOLE-PUNCH CANVAS)
+        // El fondo oscuro deja ver el elemento real en 100% de brillo con un marco Neón Lima
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { /* Bloquea clics a la pantalla de fondo */ }
+                )
+        ) {
+            val fullScreenPath = Path().apply {
+                addRect(Rect(0f, 0f, size.width, size.height))
+            }
 
-    // Capa de fondo oscurecida (scrim) que no deja pasar clics accidentales a la pantalla inferior
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xE6000000))
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = { /* Bloquea clics a la pantalla de fondo */ }
-            )
-    ) {
-        val topPadding = if (currentStep.cardAlignment == Alignment.TopCenter) 76.dp else 16.dp
-        val bottomPadding = if (currentStep.cardAlignment == Alignment.BottomCenter) 24.dp else 16.dp
+            if (targetRect != null && targetRect.width > 0f && targetRect.height > 0f) {
+                val pad = 4.dp.toPx()
+                val paddedRect = Rect(
+                    left = (targetRect.left - pad).coerceAtLeast(0f),
+                    top = (targetRect.top - pad).coerceAtLeast(0f),
+                    right = (targetRect.right + pad).coerceAtMost(size.width),
+                    bottom = (targetRect.bottom + pad).coerceAtMost(size.height)
+                )
+
+                val holePath = Path().apply {
+                    addRoundRect(RoundRect(paddedRect, CornerRadius(6.dp.toPx(), 6.dp.toPx())))
+                }
+
+                val scrimPath = Path.combine(PathOperation.Difference, fullScreenPath, holePath)
+                drawPath(scrimPath, color = Color(0xD9000000)) // Fondo oscuro 85%
+
+                // Marco Neobrutalista Neón Lima resaltando la zona real
+                drawRoundRect(
+                    color = AccentLime,
+                    topLeft = Offset(paddedRect.left, paddedRect.top),
+                    size = Size(paddedRect.width, paddedRect.height),
+                    cornerRadius = CornerRadius(6.dp.toPx(), 6.dp.toPx()),
+                    style = Stroke(width = 2.5.dp.toPx())
+                )
+            } else {
+                drawPath(fullScreenPath, color = Color(0xD9000000))
+            }
+        }
+
+        // 2. BURBUJA MICRO-TOOLTIP (SOLO 1 FRASE CORTA Y ACCIONES RÁPIDAS)
+        val estimatedBubbleHeightPx = with(density) { 150.dp.toPx() }
+        val isBelow = targetRect == null || (targetRect.bottom + estimatedBubbleHeightPx + with(density) { 24.dp.toPx() } <= screenHeightPx)
+
+        val yOffsetPx = if (targetRect == null) {
+            (screenHeightPx - estimatedBubbleHeightPx) / 2f
+        } else if (isBelow) {
+            targetRect.bottom + with(density) { 12.dp.toPx() }
+        } else {
+            (targetRect.top - estimatedBubbleHeightPx - with(density) { 12.dp.toPx() }).coerceAtLeast(with(density) { 24.dp.toPx() })
+        }
 
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 14.dp, end = 14.dp, top = topPadding, bottom = bottomPadding),
-            contentAlignment = currentStep.cardAlignment
+                .fillMaxWidth()
+                .offset { IntOffset(0, yOffsetPx.toInt()) }
+                .padding(horizontal = 16.dp)
         ) {
             BrutalistCard(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 450.dp),
+                modifier = Modifier.fillMaxWidth(),
                 backgroundColor = SurfaceCard,
                 borderColor = AccentLime,
                 borderWidth = 2.dp,
                 shadowColor = Color.Black,
-                shadowOffset = 5.dp
+                shadowOffset = 4.dp
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .padding(14.dp)
                 ) {
-                    // Fila superior: Indicador de paso + Botón Omitir
+                    // Encabezado compacto: Paso + Título + Omitir
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        BrutalistBadge(
-                            text = "PASO ${currentStep.stepIndex + 1} DE ${steps.size}",
-                            backgroundColor = BackgroundBase,
-                            contentColor = AccentLime,
-                            borderColor = AccentLime,
-                            fontSize = 9.5.sp
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            BrutalistBadge(
+                                text = "${currentStepIndex + 1}/3",
+                                backgroundColor = BackgroundBase,
+                                contentColor = AccentLime,
+                                borderColor = AccentLime,
+                                fontSize = 9.sp,
+                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = currentStep.title,
+                                style = TextStyle(
+                                    fontFamily = SpaceMonoFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.5.sp,
+                                    color = AccentLime
+                                )
+                            )
+                        }
 
                         Text(
-                            text = "OMITIR GUÍA ✕",
+                            text = "OMITIR ✕",
                             style = TextStyle(
                                 fontFamily = SpaceMonoFontFamily,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
+                                fontSize = 10.5.sp,
                                 color = TextSecondary
                             ),
                             modifier = Modifier
                                 .clickable { onFinishTour() }
-                                .padding(vertical = 4.dp, horizontal = 6.dp)
+                                .padding(4.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    // Globo o insignia indicadora con animación de rebote hacia el elemento
-                    if (currentStep.pointerDirection != TourPointerDirection.NONE) {
-                        val yOffset = if (currentStep.pointerDirection == TourPointerDirection.UP) {
-                            (-bounceOffset).dp
-                        } else {
-                            bounceOffset.dp
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .offset(y = yOffset),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            BrutalistBadge(
-                                text = currentStep.badgeText,
-                                backgroundColor = AccentLime,
-                                contentColor = Color.Black,
-                                borderColor = BorderBright,
-                                fontSize = 10.sp,
-                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-                    }
-
-                    // Contenido textual con scroll vertical protegido para pantallas pequeñas o fuentes grandes
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 270.dp)
-                            .verticalScroll(rememberScrollState())
-                    ) {
-                        Text(
-                            text = currentStep.title.uppercase(),
-                            style = TextStyle(
-                                fontFamily = SpaceMonoFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 14.5.sp,
-                                letterSpacing = 0.5.sp,
-                                color = AccentLime
-                            )
+                    // 1 Sola Frase Clara y Directa (Micro-texto)
+                    Text(
+                        text = currentStep.message,
+                        style = BrexaTypography.bodyMedium.copy(
+                            color = TextPrimary,
+                            fontSize = 12.5.sp,
+                            lineHeight = 17.sp
                         )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            text = currentStep.description,
-                            style = BrexaTypography.bodyMedium.copy(
-                                color = TextPrimary,
-                                fontSize = 12.5.sp,
-                                lineHeight = 18.sp
-                            )
-                        )
-
-                        if (currentStep.tip.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(BackgroundBase, RectangleShape)
-                                    .border(1.dp, AccentPurple, RectangleShape)
-                                    .padding(horizontal = 10.dp, vertical = 8.dp)
-                            ) {
-                                Text(
-                                    text = currentStep.tip,
-                                    style = BrexaTypography.labelSmall.copy(
-                                        color = AccentPurple,
-                                        fontSize = 11.sp,
-                                        lineHeight = 15.sp
-                                    )
-                                )
-                            }
-                        }
-                    }
+                    )
 
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // Barra de progreso con puntos (dots)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        steps.indices.forEach { idx ->
-                            Box(
-                                modifier = Modifier
-                                    .padding(horizontal = 3.dp)
-                                    .size(
-                                        width = if (idx == currentStep.stepIndex) 16.dp else 6.dp,
-                                        height = 5.dp
-                                    )
-                                    .background(
-                                        if (idx == currentStep.stepIndex) AccentLime else BorderSolid,
-                                        RectangleShape
-                                    )
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Botones de Navegación Neobrutalistas
+                    // Botones de acción ultra-compactos
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (currentStep.stepIndex > 0) {
+                        if (currentStepIndex > 0) {
                             Box(modifier = Modifier.weight(1f)) {
                                 BrutalistButton(
-                                    text = "← ANTERIOR",
-                                    onClick = { onStepChange(currentStep.stepIndex - 1) },
+                                    text = "← ATRÁS",
+                                    onClick = { onStepChange(currentStepIndex - 1) },
                                     containerColor = SurfaceCardElevated,
                                     contentColor = TextPrimary,
                                     borderColor = BorderSolid,
@@ -327,14 +216,14 @@ fun OnboardingTour(
                             }
                         }
 
-                        Box(modifier = Modifier.weight(if (currentStep.stepIndex > 0) 1.4f else 1f)) {
+                        Box(modifier = Modifier.weight(if (currentStepIndex > 0) 1.3f else 1f)) {
                             BrutalistButton(
-                                text = if (currentStep.stepIndex == steps.lastIndex) "¡EMPEZAR AHORA! ⚡" else "SIGUIENTE ➔",
+                                text = if (currentStepIndex == steps.lastIndex) "¡LISTO! ⚡" else "SIGUIENTE ➔",
                                 onClick = {
-                                    if (currentStep.stepIndex == steps.lastIndex) {
+                                    if (currentStepIndex == steps.lastIndex) {
                                         onFinishTour()
                                     } else {
-                                        onStepChange(currentStep.stepIndex + 1)
+                                        onStepChange(currentStepIndex + 1)
                                     }
                                 },
                                 containerColor = AccentLime,

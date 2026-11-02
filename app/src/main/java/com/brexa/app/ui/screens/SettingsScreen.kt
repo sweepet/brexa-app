@@ -716,7 +716,7 @@ fun SettingsScreen(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 Text(
-                    text = "Vuelve a ver la guía paso a paso para recordar dónde crear cuentas, cómo ajustar las tasas de cambio de tus monedas y cómo registrar compras y transferencias.",
+                    text = "Repasa los 3 puntos clave de Brexa con un spotlight iluminado en tiempo real: patrimonio total, registro rápido y gestión de cuentas.",
                     style = BrexaTypography.bodyMedium.copy(color = TextSecondary)
                 )
 

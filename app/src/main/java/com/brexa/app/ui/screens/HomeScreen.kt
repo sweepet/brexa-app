@@ -14,8 +14,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
@@ -74,6 +77,15 @@ fun HomeScreen(
     var tourStepIndex by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
 
+    var rootLayoutCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var totalCardCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var quickActionsCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var accountsHeaderCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+
+    var totalCardRect by remember { mutableStateOf<Rect?>(null) }
+    var quickActionsRect by remember { mutableStateOf<Rect?>(null) }
+    var accountsHeaderRect by remember { mutableStateOf<Rect?>(null) }
+
     LaunchedEffect(forceStartTour) {
         if (forceStartTour) {
             tourStepIndex = 0
@@ -84,18 +96,23 @@ fun HomeScreen(
     LaunchedEffect(showTour, tourStepIndex) {
         if (showTour) {
             val targetIdx = when (tourStepIndex) {
-                0 -> 0 // Barra Superior / Terminal
-                1 -> 0 // Tarjeta Dinero Total
-                2 -> 2 // Botones Rápidos (− GASTAR, + INGRESAR, ⇄ TRANSFERIR)
-                3 -> 4 // Carrusel de Cuentas
-                4 -> 3 // Header Mis Cuentas / Gestionar
-                5 -> 1 // Widget Pagos Pendientes
+                0 -> 0 // Tarjeta Dinero Total
+                1 -> 2 // Botones Rápidos (− GASTAR, + INGRESAR, ⇄ TRANSFERIR)
+                2 -> 3 // Header Mis Cuentas / Gestionar
                 else -> 0
             }
             try {
                 listState.animateScrollToItem(targetIdx)
             } catch (_: Exception) {}
         }
+    }
+
+    LaunchedEffect(tourStepIndex, listState.firstVisibleItemScrollOffset, listState.firstVisibleItemIndex) {
+        val root = rootLayoutCoordinates ?: return@LaunchedEffect
+        if (!root.isAttached) return@LaunchedEffect
+        totalCardCoordinates?.takeIf { it.isAttached }?.let { totalCardRect = root.localBoundingBoxOf(it) }
+        quickActionsCoordinates?.takeIf { it.isAttached }?.let { quickActionsRect = root.localBoundingBoxOf(it) }
+        accountsHeaderCoordinates?.takeIf { it.isAttached }?.let { accountsHeaderRect = root.localBoundingBoxOf(it) }
     }
 
     var selectedTxDetail by remember { mutableStateOf<TransactionEntity?>(null) }
@@ -115,7 +132,16 @@ fun HomeScreen(
     } else null
     val equivalentSec = if (activeSecondaryCurrency != null) totalUsd * activeSecondaryCurrency.rateToUsd else 0.0
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .onGloballyPositioned { root ->
+                rootLayoutCoordinates = root
+                totalCardCoordinates?.takeIf { it.isAttached }?.let { totalCardRect = root.localBoundingBoxOf(it) }
+                quickActionsCoordinates?.takeIf { it.isAttached }?.let { quickActionsRect = root.localBoundingBoxOf(it) }
+                accountsHeaderCoordinates?.takeIf { it.isAttached }?.let { accountsHeaderRect = root.localBoundingBoxOf(it) }
+            }
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -199,7 +225,16 @@ fun HomeScreen(
             // --- 2. TARJETA PRINCIPAL: PATRIMONIO TOTAL CONSOLIDADO ---
             item {
                 BrutalistCard(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { coords ->
+                            if (coords.isAttached) {
+                                totalCardCoordinates = coords
+                                rootLayoutCoordinates?.takeIf { it.isAttached }?.let { root ->
+                                    totalCardRect = root.localBoundingBoxOf(coords)
+                                }
+                            }
+                        },
                     backgroundColor = SurfaceCard,
                     borderColor = AccentLime,
                     borderWidth = 2.dp,
@@ -407,7 +442,16 @@ fun HomeScreen(
             // --- 3. BOTONES DE ACCIÓN RÁPIDA (100% RESPONSIVE) ---
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { coords ->
+                            if (coords.isAttached) {
+                                quickActionsCoordinates = coords
+                                rootLayoutCoordinates?.takeIf { it.isAttached }?.let { root ->
+                                    quickActionsRect = root.localBoundingBoxOf(coords)
+                                }
+                            }
+                        },
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // Botón Gasto
@@ -484,7 +528,16 @@ fun HomeScreen(
             // --- 4. CARRUSEL DE CUENTAS ---
             item {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .onGloballyPositioned { coords ->
+                            if (coords.isAttached) {
+                                accountsHeaderCoordinates = coords
+                                rootLayoutCoordinates?.takeIf { it.isAttached }?.let { root ->
+                                    accountsHeaderRect = root.localBoundingBoxOf(coords)
+                                }
+                            }
+                        },
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -1076,9 +1129,17 @@ fun HomeScreen(
     }
 
     // --- TOUR GUIADO INTERACTIVO NEOBRUTALISTA ---
+    val activeTargetRect = when (tourStepIndex) {
+        0 -> totalCardRect
+        1 -> quickActionsRect
+        2 -> accountsHeaderRect
+        else -> null
+    }
+
     if (showTour) {
         OnboardingTour(
             currentStepIndex = tourStepIndex,
+            targetRect = activeTargetRect,
             onStepChange = { nextIndex ->
                 tourStepIndex = nextIndex
             },
