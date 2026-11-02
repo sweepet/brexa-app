@@ -395,7 +395,7 @@ fun AccountsCurrenciesScreen(
                                         overflow = TextOverflow.Ellipsis
                                     )
 
-                                    if (curr.code.equals("VES", ignoreCase = true)) {
+                                    if (curr.code.equals("Bs", ignoreCase = true) || curr.code.equals("VES", ignoreCase = true)) {
                                         Spacer(modifier = Modifier.width(6.dp))
                                         BrutalistBadge(
                                             text = "OFICIAL BCV 🏛",
@@ -987,7 +987,7 @@ fun AccountsCurrenciesScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
 
-                    if (curr.code.equals("VES", ignoreCase = true)) {
+                    if (curr.code.equals("Bs", ignoreCase = true) || curr.code.equals("VES", ignoreCase = true)) {
                         BrutalistBadge(
                             text = "🏛 OBTENER TASA BCV DEL DÍA",
                             backgroundColor = SurfaceCardElevated,
@@ -995,7 +995,7 @@ fun AccountsCurrenciesScreen(
                             borderColor = AccentLime,
                             modifier = Modifier.clickable {
                                 viewModel.syncSingleOfficialRate(
-                                    currencyCode = "VES",
+                                    currencyCode = curr.code,
                                     onSuccess = { r ->
                                         newRateText = CurrencyFormat.formatForInput(r)
                                         Toast.makeText(context, "Tasa BCV obtenida: ${formatter.format(r)} Bs", Toast.LENGTH_SHORT).show()

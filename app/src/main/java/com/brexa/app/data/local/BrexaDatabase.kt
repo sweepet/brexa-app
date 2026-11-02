@@ -107,8 +107,14 @@ abstract class BrexaDatabase : RoomDatabase() {
                     db.execSQL("UPDATE accounts SET name = 'Efectivo' WHERE name = 'Efectivo Principal'")
                     db.execSQL("UPDATE currencies SET name = 'Dólar' WHERE name = 'Dólar Estadounidense'")
 
-                    // 1. Asegurar que la moneda oficial BCV (VES) exista como predeterminada sin modificar cuentas
-                    val vesCursor = db.query("SELECT COUNT(*) FROM currencies WHERE code = 'VES'")
+                    // Actualizar código de VES a Bs para reflejar el estándar de uso popular
+                    db.execSQL("UPDATE currencies SET code = 'Bs' WHERE code = 'VES'")
+                    db.execSQL("UPDATE transactions SET currency_code = 'Bs' WHERE currency_code = 'VES'")
+                    db.execSQL("UPDATE exchange_rate_history SET currency_code = 'Bs' WHERE currency_code = 'VES'")
+                    db.execSQL("UPDATE app_settings SET value = 'Bs' WHERE key = 'currency_display' AND value = 'VES'")
+
+                    // 1. Asegurar que la moneda oficial BCV (Bs) exista como predeterminada sin modificar cuentas
+                    val vesCursor = db.query("SELECT COUNT(*) FROM currencies WHERE code IN ('Bs', 'VES')")
                     var vesExists = false
                     if (vesCursor.moveToFirst()) {
                         vesExists = vesCursor.getInt(0) > 0
@@ -120,7 +126,7 @@ abstract class BrexaDatabase : RoomDatabase() {
                         db.execSQL(
                             """
                             INSERT INTO currencies (id, code, name, symbol, rate_to_usd, icon_id, is_base, is_active, sort_order, created_at, updated_at)
-                            VALUES ('CUR_VES', 'VES', 'Bolívar (BCV)', 'Bs', 889.58, 'ic_account_bank', 0, 1, 1, $now, $now)
+                            VALUES ('CUR_VES', 'Bs', 'Bolívar (BCV)', 'Bs', 889.58, 'ic_account_bank', 0, 1, 1, $now, $now)
                             """.trimIndent()
                         )
                     }
@@ -163,7 +169,7 @@ abstract class BrexaDatabase : RoomDatabase() {
             // 2. Moneda Oficial BCV: Bolívar (Predeterminada)
             val vesCurrency = CurrencyEntity(
                 id = "CUR_VES",
-                code = "VES",
+                code = "Bs",
                 name = "Bolívar (BCV)",
                 symbol = "Bs",
                 rateToUsd = 889.58,

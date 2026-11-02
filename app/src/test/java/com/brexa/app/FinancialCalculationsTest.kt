@@ -46,8 +46,14 @@ class FinancialCalculationsTest {
     @Test
     fun testCurrencyCodeSanitization() {
         val codeInput = "  usdt  "
-        val cleanCode = codeInput.trim().uppercase().take(4)
+        val trimmed = codeInput.trim().take(4)
+        val cleanCode = if (trimmed.equals("bs", ignoreCase = true)) "Bs" else trimmed.uppercase()
         assertEquals("USDT", cleanCode)
+
+        val bsInput = "  bs  "
+        val bsTrimmed = bsInput.trim().take(4)
+        val bsCleanCode = if (bsTrimmed.equals("bs", ignoreCase = true)) "Bs" else bsTrimmed.uppercase()
+        assertEquals("Bs", bsCleanCode)
 
         val longCode = "BITCOIN"
         val truncated = longCode.trim().uppercase().take(4)

@@ -49,7 +49,8 @@ class BrexaRepository(private val db: BrexaDatabase) {
     fun getBaseCurrency(): Flow<CurrencyEntity?> = currencyDao.getBaseCurrency()
 
     suspend fun updateBaseCurrency(code: String, name: String, symbol: String): Result<Unit> {
-        val cleanCode = code.trim().uppercase().take(4)
+        val trimmed = code.trim().take(4)
+        val cleanCode = if (trimmed.equals("bs", ignoreCase = true)) "Bs" else trimmed.uppercase()
         if (cleanCode.isEmpty()) {
             return Result.failure(IllegalArgumentException("La sigla de la moneda principal no puede estar vacía."))
         }
@@ -76,7 +77,8 @@ class BrexaRepository(private val db: BrexaDatabase) {
         if (currentCount >= 10) {
             return Result.failure(IllegalStateException("Límite alcanzado: Máximo 10 monedas personalizadas."))
         }
-        val cleanCode = code.trim().uppercase().take(4)
+        val trimmed = code.trim().take(4)
+        val cleanCode = if (trimmed.equals("bs", ignoreCase = true)) "Bs" else trimmed.uppercase()
         if (cleanCode.isEmpty()) {
             return Result.failure(IllegalArgumentException("La sigla de la moneda no puede estar vacía."))
         }
@@ -143,9 +145,9 @@ class BrexaRepository(private val db: BrexaDatabase) {
         val allCurrencies = currencyDao.getAllCurrenciesSync()
         val updatedList = mutableListOf<String>()
 
-        // 1. Actualizar BCV (VES) si se obtuvo
+        // 1. Actualizar BCV (Bs / VES) si se obtuvo
         result.bcvRate?.let { bcvRate ->
-            val vesCurr = allCurrencies.find { it.code.equals("VES", ignoreCase = true) }
+            val vesCurr = allCurrencies.find { it.code.equals("Bs", ignoreCase = true) || it.code.equals("VES", ignoreCase = true) }
             if (vesCurr != null) {
                 updateCurrencyRate(vesCurr.id, bcvRate)
                 updatedList.add("BCV: ${String.format(java.util.Locale.US, "%.2f", bcvRate)} Bs")
@@ -172,11 +174,11 @@ class BrexaRepository(private val db: BrexaDatabase) {
 
     suspend fun syncSingleOfficialRate(currencyCode: String): Result<Double> {
         return when (currencyCode.uppercase()) {
-            "VES", "BCV" -> {
+            "VES", "BCV", "BS" -> {
                 val res = officialRatesManager.fetchBcvRate()
                 res.mapCatching { (rate, _) ->
                     val allCurrencies = currencyDao.getAllCurrenciesSync()
-                    val curr = allCurrencies.find { it.code.equals("VES", ignoreCase = true) }
+                    val curr = allCurrencies.find { it.code.equals("Bs", ignoreCase = true) || it.code.equals("VES", ignoreCase = true) }
                     if (curr != null) {
                         updateCurrencyRate(curr.id, rate)
                     }
