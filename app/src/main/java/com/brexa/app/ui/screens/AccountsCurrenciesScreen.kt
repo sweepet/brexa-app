@@ -1,11 +1,14 @@
 package com.brexa.app.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -13,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -62,11 +66,13 @@ fun AccountsCurrenciesScreen(
     viewModel: BrexaViewModel,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
     val accounts by viewModel.activeAccounts.collectAsState()
     val currencies by viewModel.allCurrencies.collectAsState()
     val baseCurrency by viewModel.baseCurrency.collectAsState()
     val expenseCategories by viewModel.expenseCategories.collectAsState()
     val incomeCategories by viewModel.incomeCategories.collectAsState()
+    val isSyncingRates by viewModel.isSyncingOfficialRates.collectAsState()
 
     var activeTab by remember { mutableStateOf("ACCOUNTS") } // "ACCOUNTS", "CURRENCIES", "CATEGORIES"
     var activeCategoryType by remember { mutableStateOf("EXPENSE") } // "EXPENSE", "INCOME"
@@ -285,14 +291,42 @@ fun AccountsCurrenciesScreen(
 
             "CURRENCIES" -> {
                 // TAB MONEDAS
-                BrutalistButton(
-                    text = "+ CREAR NUEVA MONEDA",
-                    onClick = { showCreateCurrencyDialog = true },
-                    containerColor = AccentPurple,
-                    contentColor = Color.Black,
-                    enabled = currencies.size < 11,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        BrutalistButton(
+                            text = "+ CREAR MONEDA",
+                            onClick = { showCreateCurrencyDialog = true },
+                            containerColor = AccentPurple,
+                            contentColor = Color.Black,
+                            enabled = currencies.size < 11,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    Box(modifier = Modifier.weight(1.2f)) {
+                        BrutalistButton(
+                            text = if (isSyncingRates) "CONSULTANDO..." else "🏛 TASA BCV / TRM ⟳",
+                            onClick = {
+                                viewModel.syncOfficialRates(
+                                    onSuccess = { summary ->
+                                        Toast.makeText(context, "✅ Tasas actualizadas: $summary", Toast.LENGTH_LONG).show()
+                                    },
+                                    onError = { err ->
+                                        Toast.makeText(context, "⚠️ $err", Toast.LENGTH_LONG).show()
+                                    }
+                                )
+                            },
+                            containerColor = SurfaceCardElevated,
+                            contentColor = AccentLime,
+                            borderColor = AccentLime,
+                            enabled = !isSyncingRates,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -314,7 +348,10 @@ fun AccountsCurrenciesScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                                    ) {
                                         BrutalistBadge(
                                             text = curr.code,
                                             backgroundColor = BackgroundBase,
@@ -326,9 +363,27 @@ fun AccountsCurrenciesScreen(
                                             text = curr.name.uppercase(),
                                             style = BrexaTypography.labelLarge.copy(color = TextPrimary),
                                             maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f, fill = false)
+                                            overflow = TextOverflow.Ellipsis
                                         )
+                                        if (curr.code.equals("VES", ignoreCase = true)) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            BrutalistBadge(
+                                                text = "BCV OFICIAL 🏛",
+                                                backgroundColor = BackgroundBase,
+                                                contentColor = AccentLime,
+                                                borderColor = AccentLime,
+                                                fontSize = 8.5.sp
+                                            )
+                                        } else if (curr.code.equals("COP", ignoreCase = true)) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            BrutalistBadge(
+                                                text = "TRM OFICIAL 🏛",
+                                                backgroundColor = BackgroundBase,
+                                                contentColor = ExchangeBlue,
+                                                borderColor = ExchangeBlue,
+                                                fontSize = 8.5.sp
+                                            )
+                                        }
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
                                     val baseCode = baseCurrency?.code ?: "USD"
@@ -356,6 +411,43 @@ fun AccountsCurrenciesScreen(
                                             modifier = Modifier.clickable { showEditBaseCurrencyDialog = true }
                                         )
                                     } else {
+                                        if (curr.code.equals("VES", ignoreCase = true)) {
+                                            BrutalistBadge(
+                                                text = "⟳ BCV",
+                                                backgroundColor = BackgroundBase,
+                                                contentColor = AccentLime,
+                                                borderColor = AccentLime,
+                                                modifier = Modifier.clickable {
+                                                    viewModel.syncSingleOfficialRate(
+                                                        currencyCode = "VES",
+                                                        onSuccess = { r ->
+                                                            Toast.makeText(context, "✅ BCV actualizado: ${formatter.format(r)} Bs", Toast.LENGTH_SHORT).show()
+                                                        },
+                                                        onError = { e ->
+                                                            Toast.makeText(context, "⚠️ $e", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    )
+                                                }
+                                            )
+                                        } else if (curr.code.equals("COP", ignoreCase = true)) {
+                                            BrutalistBadge(
+                                                text = "⟳ TRM",
+                                                backgroundColor = BackgroundBase,
+                                                contentColor = ExchangeBlue,
+                                                borderColor = ExchangeBlue,
+                                                modifier = Modifier.clickable {
+                                                    viewModel.syncSingleOfficialRate(
+                                                        currencyCode = "COP",
+                                                        onSuccess = { r ->
+                                                            Toast.makeText(context, "✅ TRM actualizada: ${formatter.format(r)} $", Toast.LENGTH_SHORT).show()
+                                                        },
+                                                        onError = { e ->
+                                                            Toast.makeText(context, "⚠️ $e", Toast.LENGTH_SHORT).show()
+                                                        }
+                                                    )
+                                                }
+                                            )
+                                        }
                                         BrutalistBadge(
                                             text = "TASA ✎",
                                             backgroundColor = BackgroundBase,
@@ -532,7 +624,10 @@ fun AccountsCurrenciesScreen(
                     )
 
                     Text(text = "MONEDA", style = BrexaTypography.labelMedium.copy(color = TextSecondary))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                    ) {
                         currencies.forEach { c ->
                             val isSel = c.id == selectedCurrId
                             BrutalistBadge(
@@ -643,7 +738,10 @@ fun AccountsCurrenciesScreen(
                     )
 
                     Text(text = "MONEDA ASOCIADA", style = BrexaTypography.labelMedium.copy(color = TextSecondary))
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                    ) {
                         currencies.forEach { c ->
                             val isSel = c.id == editCurrId
                             BrutalistBadge(
@@ -937,6 +1035,46 @@ fun AccountsCurrenciesScreen(
                         label = "1 $baseCode = [ X ] ${curr.code}",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
+
+                    if (curr.code.equals("VES", ignoreCase = true)) {
+                        BrutalistBadge(
+                            text = "🏛 OBTENER TASA BCV DEL DÍA",
+                            backgroundColor = SurfaceCardElevated,
+                            contentColor = AccentLime,
+                            borderColor = AccentLime,
+                            modifier = Modifier.clickable {
+                                viewModel.syncSingleOfficialRate(
+                                    currencyCode = "VES",
+                                    onSuccess = { r ->
+                                        newRateText = CurrencyFormat.formatForInput(r)
+                                        Toast.makeText(context, "Tasa BCV obtenida: ${formatter.format(r)} Bs", Toast.LENGTH_SHORT).show()
+                                    },
+                                    onError = { e ->
+                                        dialogError = e
+                                    }
+                                )
+                            }
+                        )
+                    } else if (curr.code.equals("COP", ignoreCase = true)) {
+                        BrutalistBadge(
+                            text = "🏛 OBTENER TRM OFICIAL DEL DÍA",
+                            backgroundColor = SurfaceCardElevated,
+                            contentColor = ExchangeBlue,
+                            borderColor = ExchangeBlue,
+                            modifier = Modifier.clickable {
+                                viewModel.syncSingleOfficialRate(
+                                    currencyCode = "COP",
+                                    onSuccess = { r ->
+                                        newRateText = CurrencyFormat.formatForInput(r)
+                                        Toast.makeText(context, "Tasa TRM obtenida: ${formatter.format(r)} $", Toast.LENGTH_SHORT).show()
+                                    },
+                                    onError = { e ->
+                                        dialogError = e
+                                    }
+                                )
+                            }
+                        )
+                    }
                     if (dialogError != null) {
                         Text(text = "⚠️ $dialogError", style = BrexaTypography.labelMedium.copy(color = ExpenseRed))
                     }

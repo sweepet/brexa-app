@@ -96,9 +96,9 @@ fun OnboardingTour(
                 targetIndex = 3,
                 pointerDirection = TourPointerDirection.DOWN,
                 badgeText = "▼ TOCA 'GESTIONAR ➔' PESTAÑA MONEDAS",
-                title = "CREA MONEDAS Y AJUSTA LA TASA DEL DÍA",
-                description = "En Brexa mandas tú sobre tus divisas. Entrando a 'GESTIONAR ➔' en la pestaña 'MONEDAS' podrás:\n\n• Crear cualquier moneda que uses (Bolívares, Euros, Pesos, USDT, etc.).\n• Ajustar la tasa del día en cualquier momento cuando suba o baje el mercado.\n\nAl cambiar la tasa, todo tu dinero se recalcula automáticamente.",
-                tip = "💡 Mantén la tasa al día para saber exactamente cuánto valen tus ahorros en tiempo real.",
+                title = "MONEDAS PREDETERMINADAS Y TASAS",
+                description = "Brexa incluye el Dólar como moneda base, además del Bolívar (BCV) y el Peso Colombiano (TRM) con actualización oficial al momento.\n\nEn 'GESTIONAR ➔ MONEDAS' puedes:\n• Actualizar las tasas oficiales con 1 toque o fijarlas a mano.\n• Crear cualquier otra moneda que uses (Euros, USDT, etc.).",
+                tip = "💡 Si asignas BCV o COP a una de tus cuentas, su valor se recalculará automáticamente con la tasa oficial.",
                 cardAlignment = Alignment.TopCenter
             ),
             TourStep(

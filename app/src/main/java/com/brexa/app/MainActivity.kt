@@ -109,6 +109,9 @@ class MainActivity : ComponentActivity() {
                             availableUpdate = update
                         }
                     }
+
+                    // Sincronización silenciosa al momento de tasas oficiales (BCV & TRM)
+                    viewModel.syncOfficialRates()
                 }
 
                 Surface(

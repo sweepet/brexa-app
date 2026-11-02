@@ -70,6 +70,43 @@ class BrexaViewModel(
     }
 
     // --- ESTADO REACTIVO ---
+    private val _isSyncingOfficialRates = MutableStateFlow(false)
+    val isSyncingOfficialRates: StateFlow<Boolean> = _isSyncingOfficialRates.asStateFlow()
+
+    fun syncOfficialRates(
+        onSuccess: (String) -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        if (_isSyncingOfficialRates.value) return
+        _isSyncingOfficialRates.value = true
+        viewModelScope.launch {
+            val result = repository.syncOfficialRates()
+            _isSyncingOfficialRates.value = false
+            result.onSuccess { summary ->
+                triggerAutoBackup()
+                onSuccess(summary)
+            }.onFailure { err ->
+                onError(err.message ?: "Error al actualizar tasas oficiales.")
+            }
+        }
+    }
+
+    fun syncSingleOfficialRate(
+        currencyCode: String,
+        onSuccess: (Double) -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val result = repository.syncSingleOfficialRate(currencyCode)
+            result.onSuccess { rate ->
+                triggerAutoBackup()
+                onSuccess(rate)
+            }.onFailure { err ->
+                onError(err.message ?: "Error al consultar tasa.")
+            }
+        }
+    }
+
     val consolidatedUsdBalance: StateFlow<Double> = repository.calculateConsolidatedUsdBalance()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 

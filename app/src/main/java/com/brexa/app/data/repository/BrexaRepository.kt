@@ -3,6 +3,7 @@ package com.brexa.app.data.repository
 import androidx.room.withTransaction
 import com.brexa.app.data.local.BrexaDatabase
 import com.brexa.app.data.local.entity.*
+import com.brexa.app.data.rates.OfficialRatesManager
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -132,6 +133,69 @@ class BrexaRepository(private val db: BrexaDatabase) {
         }
         currencyDao.deleteCurrency(currency)
         return Result.success(Unit)
+    }
+
+    // --- TASAS OFICIALES AUTOMATIZADAS (BCV & TRM) ---
+    private val officialRatesManager = OfficialRatesManager()
+
+    suspend fun syncOfficialRates(): Result<String> {
+        val result = officialRatesManager.fetchAllOfficialRates()
+        val allCurrencies = currencyDao.getAllCurrenciesSync()
+        val updatedList = mutableListOf<String>()
+
+        // 1. Actualizar BCV (VES) si se obtuvo
+        result.bcvRate?.let { bcvRate ->
+            val vesCurr = allCurrencies.find { it.code.equals("VES", ignoreCase = true) }
+            if (vesCurr != null) {
+                updateCurrencyRate(vesCurr.id, bcvRate)
+                updatedList.add("BCV: ${String.format(java.util.Locale.US, "%.2f", bcvRate)} Bs")
+            }
+        }
+
+        // 2. Actualizar TRM (COP) si se obtuvo
+        result.copRate?.let { copRate ->
+            val copCurr = allCurrencies.find { it.code.equals("COP", ignoreCase = true) }
+            if (copCurr != null) {
+                updateCurrencyRate(copCurr.id, copRate)
+                updatedList.add("TRM: ${String.format(java.util.Locale.US, "%.2f", copRate)} $")
+            }
+        }
+
+        return if (updatedList.isNotEmpty()) {
+            Result.success(updatedList.joinToString(" • "))
+        } else if (result.errorMessage != null) {
+            Result.failure(Exception(result.errorMessage))
+        } else {
+            Result.success("Tasas oficiales al día.")
+        }
+    }
+
+    suspend fun syncSingleOfficialRate(currencyCode: String): Result<Double> {
+        return when (currencyCode.uppercase()) {
+            "VES", "BCV" -> {
+                val res = officialRatesManager.fetchBcvRate()
+                res.mapCatching { (rate, _) ->
+                    val allCurrencies = currencyDao.getAllCurrenciesSync()
+                    val curr = allCurrencies.find { it.code.equals("VES", ignoreCase = true) }
+                    if (curr != null) {
+                        updateCurrencyRate(curr.id, rate)
+                    }
+                    rate
+                }
+            }
+            "COP" -> {
+                val res = officialRatesManager.fetchCopTrmRate()
+                res.mapCatching { (rate, _) ->
+                    val allCurrencies = currencyDao.getAllCurrenciesSync()
+                    val curr = allCurrencies.find { it.code.equals("COP", ignoreCase = true) }
+                    if (curr != null) {
+                        updateCurrencyRate(curr.id, rate)
+                    }
+                    rate
+                }
+            }
+            else -> Result.failure(IllegalArgumentException("Esta moneda no tiene tasa oficial vinculada."))
+        }
     }
 
     // --- CUENTAS ---

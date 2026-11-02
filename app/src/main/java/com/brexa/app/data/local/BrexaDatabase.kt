@@ -105,16 +105,53 @@ abstract class BrexaDatabase : RoomDatabase() {
             scope.launch(Dispatchers.IO) {
                 try {
                     db.execSQL("UPDATE accounts SET name = 'Efectivo' WHERE name = 'Efectivo Principal'")
+                    db.execSQL("UPDATE currencies SET name = 'Dólar' WHERE name = 'Dólar Estadounidense'")
+
+                    // 1. Asegurar que la moneda oficial BCV (VES) exista como predeterminada sin modificar cuentas
+                    val vesCursor = db.query("SELECT COUNT(*) FROM currencies WHERE code = 'VES'")
+                    var vesExists = false
+                    if (vesCursor.moveToFirst()) {
+                        vesExists = vesCursor.getInt(0) > 0
+                    }
+                    vesCursor.close()
+
+                    if (!vesExists) {
+                        val now = System.currentTimeMillis()
+                        db.execSQL(
+                            """
+                            INSERT INTO currencies (id, code, name, symbol, rate_to_usd, icon_id, is_base, is_active, sort_order, created_at, updated_at)
+                            VALUES ('CUR_VES', 'VES', 'Bolívar (BCV)', 'Bs', 889.58, 'ic_account_bank', 0, 1, 1, $now, $now)
+                            """.trimIndent()
+                        )
+                    }
+
+                    // 2. Asegurar que la moneda oficial TRM (COP) exista como predeterminada sin modificar cuentas
+                    val copCursor = db.query("SELECT COUNT(*) FROM currencies WHERE code = 'COP'")
+                    var copExists = false
+                    if (copCursor.moveToFirst()) {
+                        copExists = copCursor.getInt(0) > 0
+                    }
+                    copCursor.close()
+
+                    if (!copExists) {
+                        val now = System.currentTimeMillis()
+                        db.execSQL(
+                            """
+                            INSERT INTO currencies (id, code, name, symbol, rate_to_usd, icon_id, is_base, is_active, sort_order, created_at, updated_at)
+                            VALUES ('CUR_COP', 'COP', 'Peso Colombiano (TRM)', '$', 3182.99, 'ic_account_cash', 0, 1, 2, $now, $now)
+                            """.trimIndent()
+                        )
+                    }
                 } catch (_: Exception) { }
             }
         }
 
         private suspend fun populateInitialData(db: BrexaDatabase) {
-            // 1. Moneda Base Principal (Preconfigurada como USD, pero 100% editable por el usuario)
+            // 1. Moneda Base Principal: Dólar (Preconfigurada como USD, 100% editable)
             val baseCurrency = CurrencyEntity(
                 id = "CUR_BASE",
                 code = "USD",
-                name = "Dólar Estadounidense",
+                name = "Dólar",
                 symbol = "$",
                 rateToUsd = 1.0,
                 iconId = "ic_account_cash",
@@ -122,9 +159,36 @@ abstract class BrexaDatabase : RoomDatabase() {
                 isActive = true,
                 sortOrder = 0
             )
-            db.currencyDao().insertCurrency(baseCurrency)
 
-            // 2. Cuenta Predeterminada vinculada a la Moneda Base
+            // 2. Moneda Oficial BCV: Bolívar (Predeterminada)
+            val vesCurrency = CurrencyEntity(
+                id = "CUR_VES",
+                code = "VES",
+                name = "Bolívar (BCV)",
+                symbol = "Bs",
+                rateToUsd = 889.58,
+                iconId = "ic_account_bank",
+                isBase = false,
+                isActive = true,
+                sortOrder = 1
+            )
+
+            // 3. Moneda Oficial TRM: Peso Colombiano (Predeterminada)
+            val copCurrency = CurrencyEntity(
+                id = "CUR_COP",
+                code = "COP",
+                name = "Peso Colombiano (TRM)",
+                symbol = "$",
+                rateToUsd = 3182.99,
+                iconId = "ic_account_cash",
+                isBase = false,
+                isActive = true,
+                sortOrder = 2
+            )
+
+            db.currencyDao().insertAll(listOf(baseCurrency, vesCurrency, copCurrency))
+
+            // 4. Cuenta Predeterminada vinculada a la Moneda Base
             val defaultAccount = AccountEntity(
                 id = "ACC_DEFAULT",
                 name = "Efectivo",
