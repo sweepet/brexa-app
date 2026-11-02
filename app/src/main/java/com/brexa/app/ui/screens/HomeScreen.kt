@@ -263,70 +263,149 @@ fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        // Monto gigante en Lima Neón
-                        val balanceDisplay = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(totalUsd)}"
-                        Text(
-                            text = balanceDisplay,
-                            style = BrexaTypography.displayLarge.copy(
-                                color = AccentLime,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = if (balanceDisplay.length > 13) 24.sp else 30.sp
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        val bcvCurrency = remember(currencies) {
+                            currencies.find { it.code.equals("Bs", ignoreCase = true) || it.code.equals("VES", ignoreCase = true) }
+                        }
+                        val copCurrency = remember(currencies) {
+                            currencies.find { it.code.equals("COP", ignoreCase = true) }
+                        }
 
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        if (isIncognito) {
-                            Text(
-                                text = "≈ •••••••",
-                                style = BrexaTypography.labelMedium.copy(
-                                    color = AccentPurple,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                )
-                            )
-                        } else if (activeSecondaryCurrency != null) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.clickable(enabled = secondaryCurrencies.size > 1) {
-                                    selectedSecondaryIndex = (selectedSecondaryIndex + 1) % secondaryCurrencies.size
-                                }
-                            ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Columna izquierda: Monto Total y Moneda secundaria
+                            Column(modifier = Modifier.weight(1f)) {
+                                val balanceDisplay = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(totalUsd)}"
                                 Text(
-                                    text = "≈ ${formatter.format(equivalentSec)} ${activeSecondaryCurrency.code}",
-                                    style = BrexaTypography.labelMedium.copy(
-                                        color = AccentPurple,
+                                    text = balanceDisplay,
+                                    style = BrexaTypography.displayLarge.copy(
+                                        color = AccentLime,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp
+                                        fontSize = if (balanceDisplay.length > 13) 20.sp else if (balanceDisplay.length > 9) 24.sp else 30.sp
                                     ),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                if (secondaryCurrencies.size > 1) {
-                                    Spacer(modifier = Modifier.width(6.dp))
+
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                if (isIncognito) {
                                     Text(
-                                        text = "⇄",
+                                        text = "≈ •••••••",
                                         style = BrexaTypography.labelMedium.copy(
-                                            color = AccentLime,
+                                            color = AccentPurple,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 10.sp
+                                            fontSize = 11.sp
                                         )
+                                    )
+                                } else if (activeSecondaryCurrency != null) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.clickable(enabled = secondaryCurrencies.size > 1) {
+                                            selectedSecondaryIndex = (selectedSecondaryIndex + 1) % secondaryCurrencies.size
+                                        }
+                                    ) {
+                                        Text(
+                                            text = "≈ ${formatter.format(equivalentSec)} ${activeSecondaryCurrency.code}",
+                                            style = BrexaTypography.labelMedium.copy(
+                                                color = AccentPurple,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 11.sp
+                                            ),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        if (secondaryCurrencies.size > 1) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = "⇄",
+                                                style = BrexaTypography.labelMedium.copy(
+                                                    color = AccentLime,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 10.sp
+                                                )
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    Text(
+                                        text = "MONEDA PRINCIPAL: ${baseCurrency?.name ?: "Dólar"}",
+                                        style = BrexaTypography.labelMedium.copy(
+                                            color = AccentPurple,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
-                        } else {
-                            Text(
-                                text = "MONEDA PRINCIPAL: ${baseCurrency?.name ?: "Dólar"}",
-                                style = BrexaTypography.labelMedium.copy(
-                                    color = AccentPurple,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+
+                            // Columna derecha: Tasas Oficiales en el espacio disponible
+                            if (bcvCurrency != null || copCurrency != null) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column(
+                                    horizontalAlignment = Alignment.End,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.clickable { onOpenAccountsManagement() }
+                                ) {
+                                    if (bcvCurrency != null) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .background(BackgroundBase, RectangleShape)
+                                                .border(1.dp, BorderSolid, RectangleShape)
+                                                .padding(horizontal = 7.dp, vertical = 3.dp)
+                                        ) {
+                                            Text(
+                                                text = "Tasa BCV: ",
+                                                style = BrexaTypography.labelSmall.copy(
+                                                    color = TextSecondary,
+                                                    fontWeight = FontWeight.Normal,
+                                                    fontSize = 9.sp
+                                                )
+                                            )
+                                            Text(
+                                                text = "${formatter.format(bcvCurrency.rateToUsd)} Bs",
+                                                style = BrexaTypography.labelSmall.copy(
+                                                    color = AccentPurple,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 9.5.sp
+                                                )
+                                            )
+                                        }
+                                    }
+
+                                    if (copCurrency != null) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .background(BackgroundBase, RectangleShape)
+                                                .border(1.dp, BorderSolid, RectangleShape)
+                                                .padding(horizontal = 7.dp, vertical = 3.dp)
+                                        ) {
+                                            Text(
+                                                text = "Tasa COP: ",
+                                                style = BrexaTypography.labelSmall.copy(
+                                                    color = TextSecondary,
+                                                    fontWeight = FontWeight.Normal,
+                                                    fontSize = 9.sp
+                                                )
+                                            )
+                                            Text(
+                                                text = "${formatter.format(copCurrency.rateToUsd)} COP",
+                                                style = BrexaTypography.labelSmall.copy(
+                                                    color = ExchangeBlue,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 9.5.sp
+                                                )
+                                            )
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         if (totalPendingUsd > 0.0) {
