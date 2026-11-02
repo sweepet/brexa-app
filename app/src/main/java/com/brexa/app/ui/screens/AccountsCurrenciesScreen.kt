@@ -291,42 +291,14 @@ fun AccountsCurrenciesScreen(
 
             "CURRENCIES" -> {
                 // TAB MONEDAS
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(modifier = Modifier.weight(1f)) {
-                        BrutalistButton(
-                            text = "+ CREAR MONEDA",
-                            onClick = { showCreateCurrencyDialog = true },
-                            containerColor = AccentPurple,
-                            contentColor = Color.Black,
-                            enabled = currencies.size < 11,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    Box(modifier = Modifier.weight(1.2f)) {
-                        BrutalistButton(
-                            text = if (isSyncingRates) "CONSULTANDO..." else "🏛 TASA BCV / TRM ⟳",
-                            onClick = {
-                                viewModel.syncOfficialRates(
-                                    onSuccess = { summary ->
-                                        Toast.makeText(context, "✅ Tasas actualizadas: $summary", Toast.LENGTH_LONG).show()
-                                    },
-                                    onError = { err ->
-                                        Toast.makeText(context, "⚠️ $err", Toast.LENGTH_LONG).show()
-                                    }
-                                )
-                            },
-                            containerColor = SurfaceCardElevated,
-                            contentColor = AccentLime,
-                            borderColor = AccentLime,
-                            enabled = !isSyncingRates,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                }
+                BrutalistButton(
+                    text = "+ CREAR NUEVA MONEDA",
+                    onClick = { showCreateCurrencyDialog = true },
+                    containerColor = AccentPurple,
+                    contentColor = Color.Black,
+                    enabled = currencies.size < 11,
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 Spacer(modifier = Modifier.height(14.dp))
 
@@ -340,17 +312,16 @@ fun AccountsCurrenciesScreen(
                             backgroundColor = SurfaceCard,
                             borderColor = if (curr.isBase) AccentLime else BorderSolid
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                // Fila 1: Moneda (Sigla + Nombre) a la izquierda, Botones a la derecha
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.horizontalScroll(rememberScrollState())
+                                        modifier = Modifier.weight(1f, fill = false)
                                     ) {
                                         BrutalistBadge(
                                             text = curr.code,
@@ -365,102 +336,82 @@ fun AccountsCurrenciesScreen(
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
-                                        if (curr.code.equals("VES", ignoreCase = true)) {
-                                            Spacer(modifier = Modifier.width(6.dp))
+                                    }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
+
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        if (curr.isBase) {
                                             BrutalistBadge(
-                                                text = "BCV OFICIAL 🏛",
+                                                text = "EDITAR ✎",
                                                 backgroundColor = BackgroundBase,
                                                 contentColor = AccentLime,
                                                 borderColor = AccentLime,
-                                                fontSize = 8.5.sp
+                                                modifier = Modifier.clickable { showEditBaseCurrencyDialog = true }
                                             )
-                                        } else if (curr.code.equals("COP", ignoreCase = true)) {
-                                            Spacer(modifier = Modifier.width(6.dp))
+                                        } else {
                                             BrutalistBadge(
-                                                text = "TRM OFICIAL 🏛",
+                                                text = "TASA ✎",
                                                 backgroundColor = BackgroundBase,
-                                                contentColor = ExchangeBlue,
-                                                borderColor = ExchangeBlue,
-                                                fontSize = 8.5.sp
+                                                contentColor = AccentPurple,
+                                                borderColor = AccentPurple,
+                                                modifier = Modifier.clickable { editingRateCurrency = curr }
+                                            )
+                                            BrutalistBadge(
+                                                text = "BORRAR ✕",
+                                                backgroundColor = BackgroundBase,
+                                                contentColor = ExpenseRed,
+                                                borderColor = ExpenseRed,
+                                                modifier = Modifier.clickable { deletingCurrency = curr }
                                             )
                                         }
                                     }
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                }
+
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                // Fila 2: Tasa simplificada que nunca se corta + Insignia Oficial
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
                                     val baseCode = baseCurrency?.code ?: "USD"
+                                    val rateString = if (curr.isBase) {
+                                        "MONEDA BASE DE REFERENCIA"
+                                    } else {
+                                        "1 $baseCode = ${formatter.format(curr.rateToUsd)} ${curr.code}"
+                                    }
+
                                     Text(
-                                        text = if (curr.isBase) "1 $baseCode = 1,00 $baseCode (MONEDA BASE ANCLA)" else "1 $baseCode = ${formatter.format(curr.rateToUsd)} ${curr.code}",
+                                        text = rateString,
                                         style = BrexaTypography.labelMedium.copy(
                                             color = if (curr.isBase) AccentLime else TextSecondary,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp
+                                            fontSize = 11.5.sp
                                         ),
+                                        modifier = Modifier.weight(1f, fill = false),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
-                                }
 
-                                Spacer(modifier = Modifier.width(8.dp))
-
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    if (curr.isBase) {
+                                    if (curr.code.equals("VES", ignoreCase = true)) {
+                                        Spacer(modifier = Modifier.width(6.dp))
                                         BrutalistBadge(
-                                            text = "EDITAR ✎",
+                                            text = "OFICIAL BCV 🏛",
                                             backgroundColor = BackgroundBase,
                                             contentColor = AccentLime,
                                             borderColor = AccentLime,
-                                            modifier = Modifier.clickable { showEditBaseCurrencyDialog = true }
+                                            fontSize = 8.5.sp
                                         )
-                                    } else {
-                                        if (curr.code.equals("VES", ignoreCase = true)) {
-                                            BrutalistBadge(
-                                                text = "⟳ BCV",
-                                                backgroundColor = BackgroundBase,
-                                                contentColor = AccentLime,
-                                                borderColor = AccentLime,
-                                                modifier = Modifier.clickable {
-                                                    viewModel.syncSingleOfficialRate(
-                                                        currencyCode = "VES",
-                                                        onSuccess = { r ->
-                                                            Toast.makeText(context, "✅ BCV actualizado: ${formatter.format(r)} Bs", Toast.LENGTH_SHORT).show()
-                                                        },
-                                                        onError = { e ->
-                                                            Toast.makeText(context, "⚠️ $e", Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    )
-                                                }
-                                            )
-                                        } else if (curr.code.equals("COP", ignoreCase = true)) {
-                                            BrutalistBadge(
-                                                text = "⟳ TRM",
-                                                backgroundColor = BackgroundBase,
-                                                contentColor = ExchangeBlue,
-                                                borderColor = ExchangeBlue,
-                                                modifier = Modifier.clickable {
-                                                    viewModel.syncSingleOfficialRate(
-                                                        currencyCode = "COP",
-                                                        onSuccess = { r ->
-                                                            Toast.makeText(context, "✅ TRM actualizada: ${formatter.format(r)} $", Toast.LENGTH_SHORT).show()
-                                                        },
-                                                        onError = { e ->
-                                                            Toast.makeText(context, "⚠️ $e", Toast.LENGTH_SHORT).show()
-                                                        }
-                                                    )
-                                                }
-                                            )
-                                        }
+                                    } else if (curr.code.equals("COP", ignoreCase = true)) {
+                                        Spacer(modifier = Modifier.width(6.dp))
                                         BrutalistBadge(
-                                            text = "TASA ✎",
+                                            text = "OFICIAL TRM 🏛",
                                             backgroundColor = BackgroundBase,
-                                            contentColor = AccentPurple,
-                                            borderColor = AccentPurple,
-                                            modifier = Modifier.clickable { editingRateCurrency = curr }
-                                        )
-                                        BrutalistBadge(
-                                            text = "BORRAR ✕",
-                                            backgroundColor = BackgroundBase,
-                                            contentColor = ExpenseRed,
-                                            borderColor = ExpenseRed,
-                                            modifier = Modifier.clickable { deletingCurrency = curr }
+                                            contentColor = ExchangeBlue,
+                                            borderColor = ExchangeBlue,
+                                            fontSize = 8.5.sp
                                         )
                                     }
                                 }
