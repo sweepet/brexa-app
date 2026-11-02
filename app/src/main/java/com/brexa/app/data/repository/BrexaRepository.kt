@@ -179,7 +179,11 @@ class BrexaRepository(private val db: BrexaDatabase) {
             .divide(BigDecimal(rate), 2, RoundingMode.HALF_EVEN)
             .toDouble()
 
-        // Registro de auditoría
+        val isIncrease = diff >= 0
+        val sign = if (isIncrease) "+" else "−"
+        val actionText = if (isIncrease) "se sumó al saldo" else "se restó del saldo"
+
+        // Registro de auditoría con indicador explícito de aumento (+) o reducción (-)
         val tx = TransactionEntity(
             id = UUID.randomUUID().toString(),
             type = "BALANCE_ADJUSTMENT",
@@ -188,10 +192,44 @@ class BrexaRepository(private val db: BrexaDatabase) {
             currencyCode = currency?.code ?: "USD",
             exchangeRate = rate,
             usdEquivalent = diffUsd,
-            note = "$reason: saldo ajustado a $newBalance"
+            destinationReceivedAmount = if (isIncrease) 1.0 else -1.0,
+            note = "$reason ($sign): $actionText (saldo fijado en $newBalance ${currency?.code ?: ""})".trim()
         )
         transactionDao.insertTransaction(tx)
         return Result.success(Unit)
+    }
+
+    suspend fun toggleAdjustmentSign(transactionId: String): Result<TransactionEntity> {
+        val tx = transactionDao.getTransactionByIdSync(transactionId)
+            ?: return Result.failure(IllegalArgumentException("Movimiento no encontrado."))
+        if (tx.type != "BALANCE_ADJUSTMENT") {
+            return Result.failure(IllegalStateException("Solo se puede cambiar el signo a ajustes de saldo."))
+        }
+
+        val currentIsIncrease = if (tx.destinationReceivedAmount != null) {
+            tx.destinationReceivedAmount > 0
+        } else {
+            !tx.note.contains("(-)") && !tx.note.contains("(−)") && !tx.note.contains("rest") && !tx.note.contains("bajó")
+        }
+
+        val newIsIncrease = !currentIsIncrease
+        val newSign = if (newIsIncrease) "+" else "−"
+        val oldSign = if (currentIsIncrease) "+" else "−"
+
+        var updatedNote = tx.note
+        if (updatedNote.contains("($oldSign)")) {
+            updatedNote = updatedNote.replace("($oldSign)", "($newSign)")
+        } else {
+            updatedNote = "$updatedNote ($newSign)"
+        }
+
+        val updatedTx = tx.copy(
+            destinationReceivedAmount = if (newIsIncrease) 1.0 else -1.0,
+            note = updatedNote,
+            updatedAt = System.currentTimeMillis()
+        )
+        transactionDao.updateTransaction(updatedTx)
+        return Result.success(updatedTx)
     }
 
     suspend fun archiveAccount(accountId: String): Result<Unit> {

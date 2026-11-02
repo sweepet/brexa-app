@@ -491,6 +491,20 @@ class BrexaViewModel(
         }
     }
 
+    fun toggleAdjustmentSign(
+        transactionId: String,
+        onSuccess: (TransactionEntity) -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val result = repository.toggleAdjustmentSign(transactionId)
+            result.onSuccess { updatedTx ->
+                triggerAutoBackup()
+                onSuccess(updatedTx)
+            }.onFailure { onError(it.message ?: "Error al cambiar signo del ajuste.") }
+        }
+    }
+
     fun toggleIncludeInTotal(accountId: String, currentVal: Boolean) {
         viewModelScope.launch {
             repository.toggleIncludeInTotal(accountId, !currentVal)

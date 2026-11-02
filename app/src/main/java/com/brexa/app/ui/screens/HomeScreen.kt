@@ -598,18 +598,32 @@ fun HomeScreen(
                     val destAcc = tx.destinationAccountId?.let { id -> accounts.find { it.id == id } }
                     val cat = tx.categoryId?.let { categoryMap[it] }
 
-                    val badgeColor = when (tx.type) {
-                        "EXPENSE" -> ExpenseRed
-                        "INCOME" -> IncomeGreen
-                        "EXCHANGE" -> ExchangeBlue
+                    val isAdjustment = tx.type == "BALANCE_ADJUSTMENT"
+                    val adjIsIncrease = if (isAdjustment) {
+                        if (tx.destinationReceivedAmount != null) {
+                            tx.destinationReceivedAmount > 0
+                        } else if (tx.note.contains("(-)") || tx.note.contains("(−)") || tx.note.contains("se restó") || tx.note.contains("bajó")) {
+                            false
+                        } else {
+                            true
+                        }
+                    } else false
+
+                    val badgeColor = when {
+                        tx.type == "EXPENSE" -> ExpenseRed
+                        tx.type == "INCOME" -> IncomeGreen
+                        tx.type == "EXCHANGE" -> ExchangeBlue
+                        isAdjustment && adjIsIncrease -> IncomeGreen
+                        isAdjustment && !adjIsIncrease -> ExpenseRed
                         else -> AccentPurple
                     }
 
-                    val typeLabel = when (tx.type) {
-                        "EXPENSE" -> "GASTO"
-                        "INCOME" -> "INGRESO"
-                        "EXCHANGE" -> "CAMBIO"
-                        "BALANCE_ADJUSTMENT" -> "AJUSTE"
+                    val typeLabel = when {
+                        tx.type == "EXPENSE" -> "GASTO"
+                        tx.type == "INCOME" -> "INGRESO"
+                        tx.type == "EXCHANGE" -> "CAMBIO"
+                        isAdjustment && adjIsIncrease -> "AJUSTE (+)"
+                        isAdjustment && !adjIsIncrease -> "AJUSTE (−)"
                         else -> tx.type
                     }
 
@@ -679,11 +693,25 @@ fun HomeScreen(
 
                             // Derecha: Cifras bimonetarias
                             Column(horizontalAlignment = Alignment.End, modifier = Modifier.wrapContentWidth()) {
-                                val prefix = if (tx.type == "EXPENSE") "− " else if (tx.type == "INCOME") "+ " else "⇄ "
+                                val prefix = when {
+                                    tx.type == "EXPENSE" -> "− "
+                                    tx.type == "INCOME" -> "+ "
+                                    tx.type == "EXCHANGE" -> "⇄ "
+                                    isAdjustment && adjIsIncrease -> "+ "
+                                    isAdjustment && !adjIsIncrease -> "− "
+                                    else -> ""
+                                }
+                                val amountColor = when {
+                                    tx.type == "EXPENSE" -> ExpenseRed
+                                    tx.type == "INCOME" -> IncomeGreen
+                                    isAdjustment && adjIsIncrease -> IncomeGreen
+                                    isAdjustment && !adjIsIncrease -> ExpenseRed
+                                    else -> TextPrimary
+                                }
                                 Text(
                                     text = if (isIncognito) "••••••" else "$prefix${formatter.format(tx.nativeAmount)} ${tx.currencyCode}",
                                     style = BrexaTypography.labelLarge.copy(
-                                        color = if (tx.type == "EXPENSE") ExpenseRed else if (tx.type == "INCOME") IncomeGreen else TextPrimary,
+                                        color = amountColor,
                                         fontWeight = FontWeight.Bold
                                     ),
                                     maxLines = 1,
@@ -713,22 +741,51 @@ fun HomeScreen(
         val destAcc = tx.destinationAccountId?.let { id -> accounts.find { it.id == id } }
         val cat = tx.categoryId?.let { categoryMap[it] }
 
-        val badgeColor = when (tx.type) {
-            "EXPENSE" -> ExpenseRed
-            "INCOME" -> IncomeGreen
-            "EXCHANGE" -> ExchangeBlue
+        val isAdjustment = tx.type == "BALANCE_ADJUSTMENT"
+        val adjIsIncrease = if (isAdjustment) {
+            if (tx.destinationReceivedAmount != null) {
+                tx.destinationReceivedAmount > 0
+            } else if (tx.note.contains("(-)") || tx.note.contains("(−)") || tx.note.contains("se restó") || tx.note.contains("bajó")) {
+                false
+            } else {
+                true
+            }
+        } else false
+
+        val badgeColor = when {
+            tx.type == "EXPENSE" -> ExpenseRed
+            tx.type == "INCOME" -> IncomeGreen
+            tx.type == "EXCHANGE" -> ExchangeBlue
+            isAdjustment && adjIsIncrease -> IncomeGreen
+            isAdjustment && !adjIsIncrease -> ExpenseRed
             else -> AccentPurple
         }
 
-        val typeLabel = when (tx.type) {
-            "EXPENSE" -> "GASTO"
-            "INCOME" -> "INGRESO"
-            "EXCHANGE" -> "TRANSFERENCIA"
-            "BALANCE_ADJUSTMENT" -> "AJUSTE DE SALDO"
+        val typeLabel = when {
+            tx.type == "EXPENSE" -> "GASTO"
+            tx.type == "INCOME" -> "INGRESO"
+            tx.type == "EXCHANGE" -> "TRANSFERENCIA"
+            isAdjustment && adjIsIncrease -> "AJUSTE (+)"
+            isAdjustment && !adjIsIncrease -> "AJUSTE (−)"
             else -> tx.type
         }
 
-        val prefix = if (tx.type == "EXPENSE") "− " else if (tx.type == "INCOME") "+ " else "⇄ "
+        val prefix = when {
+            tx.type == "EXPENSE" -> "− "
+            tx.type == "INCOME" -> "+ "
+            tx.type == "EXCHANGE" -> "⇄ "
+            isAdjustment && adjIsIncrease -> "+ "
+            isAdjustment && !adjIsIncrease -> "− "
+            else -> ""
+        }
+
+        val amountColor = when {
+            tx.type == "EXPENSE" -> ExpenseRed
+            tx.type == "INCOME" -> IncomeGreen
+            isAdjustment && adjIsIncrease -> IncomeGreen
+            isAdjustment && !adjIsIncrease -> ExpenseRed
+            else -> TextPrimary
+        }
 
         AlertDialog(
             onDismissRequest = {
@@ -745,8 +802,10 @@ fun HomeScreen(
                 ) {
                     Text(
                         text = "DETALLE DE MOVIMIENTO",
-                        style = BrexaTypography.titleLarge.copy(color = AccentLime, fontSize = 15.sp)
+                        style = BrexaTypography.titleLarge.copy(color = AccentLime, fontSize = 14.sp),
+                        modifier = Modifier.weight(1f, fill = false)
                     )
+                    Spacer(modifier = Modifier.width(6.dp))
                     BrutalistBadge(
                         text = typeLabel,
                         backgroundColor = BackgroundBase,
@@ -774,7 +833,7 @@ fun HomeScreen(
                         Text(
                             text = "$prefix${formatter.format(tx.nativeAmount)} ${tx.currencyCode}",
                             style = BrexaTypography.titleLarge.copy(
-                                color = badgeColor,
+                                color = amountColor,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 22.sp
                             )
@@ -793,6 +852,57 @@ fun HomeScreen(
                                 text = "Tasa de cotización: 1 $baseCode = ${CurrencyFormat.formatRate(tx.exchangeRate)} ${tx.currencyCode}",
                                 style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp)
                             )
+                        }
+                    }
+
+                    // Indicador y botón interactivo para Ajustes de Saldo
+                    if (isAdjustment) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(BackgroundBase, RectangleShape)
+                                .border(1.dp, BorderSolid, RectangleShape)
+                                .padding(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = if (adjIsIncrease) "✓ ESTE MONTO SE SUMÓ AL SALDO" else "− ESTE MONTO SE RESTÓ DEL SALDO",
+                                        style = BrexaTypography.labelSmall.copy(
+                                            color = if (adjIsIncrease) IncomeGreen else ExpenseRed,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
+                                        )
+                                    )
+                                    Text(
+                                        text = if (adjIsIncrease) "Toca si en realidad querías restar (−)" else "Toca si en realidad querías sumar (+)",
+                                        style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 9.5.sp)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(8.dp))
+
+                                BrutalistBadge(
+                                    text = if (adjIsIncrease) "CAMBIAR A (−)" else "CAMBIAR A (+)",
+                                    backgroundColor = BackgroundBase,
+                                    contentColor = AccentLime,
+                                    borderColor = AccentLime,
+                                    fontSize = 8.5.sp,
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                    modifier = Modifier.clickable {
+                                        viewModel.toggleAdjustmentSign(
+                                            transactionId = tx.id,
+                                            onSuccess = { updated ->
+                                                selectedTxDetail = updated
+                                            }
+                                        )
+                                    }
+                                )
+                            }
                         }
                     }
 

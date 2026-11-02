@@ -1073,6 +1073,42 @@ fun AccountsCurrenciesScreen(
                         label = "SALDO EXACTO ACTUAL",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
+
+                    val curr = currencies.find { it.id == acc.currencyId }
+                    val currentVal = acc.currentBalance
+                    val targetVal = CurrencyFormat.parseNumber(newBalText) ?: currentVal
+                    val diff = targetVal - currentVal
+
+                    if (newBalText.isNotBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(BackgroundBase, RectangleShape)
+                                .border(1.dp, BorderSolid, RectangleShape)
+                                .padding(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (diff >= 0) "DIFERENCIA (SE SUMARÁ):" else "DIFERENCIA (SE RESTARÁ):",
+                                    style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 10.sp)
+                                )
+                                val diffSign = if (diff >= 0) "+ " else "− "
+                                Text(
+                                    text = "$diffSign${CurrencyFormat.standardFormatter.format(Math.abs(diff))} ${curr?.code ?: ""}",
+                                    style = BrexaTypography.labelMedium.copy(
+                                        color = if (diff >= 0) IncomeGreen else ExpenseRed,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                )
+                            }
+                        }
+                    }
+
                     if (dialogError != null) {
                         Text(text = "⚠️ $dialogError", style = BrexaTypography.labelMedium.copy(color = ExpenseRed))
                     }
