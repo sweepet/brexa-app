@@ -47,7 +47,8 @@ import java.util.Locale
 @Composable
 fun SettingsScreen(
     viewModel: BrexaViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onRestartTour: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -674,6 +675,61 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // SECCIÓN: GUÍA Y APRENDIZAJE INTERACTIVO
+        Text(
+            text = "GUÍA Y APRENDIZAJE",
+            style = BrexaTypography.labelLarge.copy(color = AccentLime),
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+
+        BrutalistCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = SurfaceCard,
+            borderColor = BorderSolid
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "RECORRIDO GUIADO // TOUR",
+                        style = BrexaTypography.labelLarge.copy(color = TextPrimary),
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    BrutalistBadge(
+                        text = "INTERACTIVO",
+                        backgroundColor = BackgroundBase,
+                        contentColor = AccentLime,
+                        borderColor = AccentLime,
+                        fontSize = 8.5.sp
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Vuelve a ver la guía paso a paso para recordar dónde crear cuentas, cómo ajustar las tasas de cambio de tus monedas y cómo registrar compras y transferencias.",
+                    style = BrexaTypography.bodyMedium.copy(color = TextSecondary)
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                BrutalistButton(
+                    text = "🎓 VER GUÍA DE LA APP",
+                    onClick = { onRestartTour() },
+                    containerColor = SurfaceCardElevated,
+                    contentColor = AccentLime,
+                    borderColor = AccentLime,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
 

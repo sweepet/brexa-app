@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(if (isUserSignedIn || hasChosenMode) "HOME" else "AUTH")
                 }
                 var transactionTypeToOpen by remember { mutableStateOf("EXPENSE") }
+                var shouldForceTour by remember { mutableStateOf(false) }
 
                 var availableUpdate by remember { mutableStateOf<UpdateInfo?>(null) }
                 var isDownloadingUpdate by remember { mutableStateOf(false) }
@@ -143,7 +144,9 @@ class MainActivity : ComponentActivity() {
                                 onOpenAccountsManagement = { currentScreen = "ACCOUNTS" },
                                 onOpenAnalytics = { currentScreen = "ANALYTICS" },
                                 onOpenSettings = { currentScreen = "SETTINGS" },
-                                onOpenPendingExpenses = { currentScreen = "PENDING_EXPENSES" }
+                                onOpenPendingExpenses = { currentScreen = "PENDING_EXPENSES" },
+                                forceStartTour = shouldForceTour,
+                                onTourDismissed = { shouldForceTour = false }
                             )
                         }
                         "PENDING_EXPENSES" -> {
@@ -174,7 +177,12 @@ class MainActivity : ComponentActivity() {
                         "SETTINGS" -> {
                             SettingsScreen(
                                 viewModel = viewModel,
-                                onBack = { currentScreen = "HOME" }
+                                onBack = { currentScreen = "HOME" },
+                                onRestartTour = {
+                                    prefs.edit().putBoolean("has_seen_onboarding_tour", false).apply()
+                                    shouldForceTour = true
+                                    currentScreen = "HOME"
+                                }
                             )
                         }
                     }

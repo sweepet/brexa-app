@@ -1,5 +1,6 @@
 package com.brexa.app.ui.screens
 
+import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,12 +9,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -29,6 +32,7 @@ import com.brexa.app.data.local.entity.TransactionEntity
 import com.brexa.app.presentation.BrexaViewModel
 import com.brexa.app.ui.components.BrutalistBadge
 import com.brexa.app.ui.components.BrutalistCard
+import com.brexa.app.ui.components.OnboardingTour
 import com.brexa.app.ui.theme.*
 import com.brexa.app.ui.util.CurrencyFormat
 import java.text.SimpleDateFormat
@@ -42,7 +46,9 @@ fun HomeScreen(
     onOpenAccountsManagement: () -> Unit,
     onOpenAnalytics: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenPendingExpenses: () -> Unit
+    onOpenPendingExpenses: () -> Unit,
+    forceStartTour: Boolean = false,
+    onTourDismissed: () -> Unit = {}
 ) {
     val totalUsd by viewModel.consolidatedUsdBalance.collectAsState()
     val accounts by viewModel.activeAccounts.collectAsState()
@@ -58,6 +64,38 @@ fun HomeScreen(
     val projections by viewModel.pendingProjections.collectAsState()
     val categoryMap = remember(expenseCats, incomeCats) {
         (expenseCats + incomeCats).associateBy { it.id }
+    }
+
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("brexa_prefs", Context.MODE_PRIVATE) }
+    var showTour by remember {
+        mutableStateOf(forceStartTour || !prefs.getBoolean("has_seen_onboarding_tour", false))
+    }
+    var tourStepIndex by remember { mutableIntStateOf(0) }
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(forceStartTour) {
+        if (forceStartTour) {
+            tourStepIndex = 0
+            showTour = true
+        }
+    }
+
+    LaunchedEffect(showTour, tourStepIndex) {
+        if (showTour) {
+            val targetIdx = when (tourStepIndex) {
+                0 -> 0 // Barra Superior / Terminal
+                1 -> 0 // Tarjeta Dinero Total
+                2 -> 2 // Botones Rápidos (− GASTAR, + INGRESAR, ⇄ TRANSFERIR)
+                3 -> 4 // Carrusel de Cuentas
+                4 -> 3 // Header Mis Cuentas / Gestionar
+                5 -> 1 // Widget Pagos Pendientes
+                else -> 0
+            }
+            try {
+                listState.animateScrollToItem(targetIdx)
+            } catch (_: Exception) {}
+        }
     }
 
     var selectedTxDetail by remember { mutableStateOf<TransactionEntity?>(null) }
@@ -77,85 +115,87 @@ fun HomeScreen(
     } else null
     val equivalentSec = if (activeSecondaryCurrency != null) totalUsd * activeSecondaryCurrency.rateToUsd else 0.0
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BackgroundBase)
-    ) {
-        // --- 1. BARRA SUPERIOR TERMINAL (100% RESPONSIVE) ---
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(SurfaceCard)
-                .border(width = 1.dp, color = BorderSolid)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                modifier = Modifier.weight(1f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .background(BackgroundBase, RectangleShape)
-                        .border(1.5.dp, AccentLime, RectangleShape)
-                        .padding(4.dp)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.logo_brexa),
-                        contentDescription = "Brexa",
-                        modifier = Modifier.fillMaxSize()
-                    )
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "BREXA // TERMINAL",
-                    style = BrexaTypography.labelLarge.copy(color = AccentLime, fontSize = 12.sp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(6.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                // Botón Incógnito
-                BrutalistBadge(
-                    text = if (isIncognito) "👁 OCULTO" else "👁 VISIBLE",
-                    backgroundColor = if (isIncognito) ExpenseRed else BackgroundBase,
-                    contentColor = if (isIncognito) Color.Black else TextPrimary,
-                    borderColor = if (isIncognito) ExpenseRed else BorderSolid,
-                    modifier = Modifier.clickable { viewModel.toggleIncognito() }
-                )
-                // Botón Analytics
-                BrutalistBadge(
-                    text = "📊",
-                    backgroundColor = BackgroundBase,
-                    contentColor = TextPrimary,
-                    borderColor = BorderSolid,
-                    modifier = Modifier.clickable { onOpenAnalytics() }
-                )
-                // Botón Ajustes
-                BrutalistBadge(
-                    text = "⚙",
-                    backgroundColor = BackgroundBase,
-                    contentColor = TextPrimary,
-                    borderColor = BorderSolid,
-                    modifier = Modifier.clickable { onOpenSettings() }
-                )
-            }
-        }
-
-        LazyColumn(
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(vertical = 16.dp)
+                .background(BackgroundBase)
         ) {
+            // --- 1. BARRA SUPERIOR TERMINAL (100% RESPONSIVE) ---
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(SurfaceCard)
+                    .border(width = 1.dp, color = BorderSolid)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(34.dp)
+                            .background(BackgroundBase, RectangleShape)
+                            .border(1.5.dp, AccentLime, RectangleShape)
+                            .padding(4.dp)
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.logo_brexa),
+                            contentDescription = "Brexa",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "BREXA // TERMINAL",
+                        style = BrexaTypography.labelLarge.copy(color = AccentLime, fontSize = 12.sp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(6.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    // Botón Incógnito
+                    BrutalistBadge(
+                        text = if (isIncognito) "👁 OCULTO" else "👁 VISIBLE",
+                        backgroundColor = if (isIncognito) ExpenseRed else BackgroundBase,
+                        contentColor = if (isIncognito) Color.Black else TextPrimary,
+                        borderColor = if (isIncognito) ExpenseRed else BorderSolid,
+                        modifier = Modifier.clickable { viewModel.toggleIncognito() }
+                    )
+                    // Botón Analytics
+                    BrutalistBadge(
+                        text = "📊",
+                        backgroundColor = BackgroundBase,
+                        contentColor = TextPrimary,
+                        borderColor = BorderSolid,
+                        modifier = Modifier.clickable { onOpenAnalytics() }
+                    )
+                    // Botón Ajustes
+                    BrutalistBadge(
+                        text = "⚙",
+                        backgroundColor = BackgroundBase,
+                        contentColor = TextPrimary,
+                        borderColor = BorderSolid,
+                        modifier = Modifier.clickable { onOpenSettings() }
+                    )
+                }
+            }
+
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(vertical = 16.dp)
+            ) {
             // --- 2. TARJETA PRINCIPAL: PATRIMONIO TOTAL CONSOLIDADO ---
             item {
                 BrutalistCard(
@@ -1034,4 +1074,20 @@ fun HomeScreen(
             }
         )
     }
+
+    // --- TOUR GUIADO INTERACTIVO NEOBRUTALISTA ---
+    if (showTour) {
+        OnboardingTour(
+            currentStepIndex = tourStepIndex,
+            onStepChange = { nextIndex ->
+                tourStepIndex = nextIndex
+            },
+            onFinishTour = {
+                prefs.edit().putBoolean("has_seen_onboarding_tour", true).apply()
+                showTour = false
+                onTourDismissed()
+            }
+        )
+    }
+}
 }
