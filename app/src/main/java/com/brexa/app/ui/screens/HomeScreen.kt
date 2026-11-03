@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brexa.app.R
 import com.brexa.app.data.local.entity.AccountEntity
+import com.brexa.app.data.local.entity.CurrencyEntity
 import com.brexa.app.data.local.entity.TransactionEntity
 import com.brexa.app.presentation.BrexaViewModel
 import com.brexa.app.ui.components.BrutalistBadge
@@ -130,6 +132,29 @@ fun HomeScreen(
     // Moneda Base
     val baseCode = baseCurrency?.code ?: "USD"
     val baseSymbol = baseCurrency?.symbol ?: "$"
+
+    // Desglose de patrimonio por moneda (ordenado: moneda base primero, luego mayor saldo a menor)
+    val currencyBreakdown = remember(accounts, currencies) {
+        val includedAccounts = accounts.filter { it.includeInTotal }
+        val grouped = includedAccounts.groupBy { it.currencyId }
+        currencies.mapNotNull { curr ->
+            val accs = grouped[curr.id] ?: emptyList()
+            val nativeSum = accs.sumOf { it.currentBalance }
+            if (accs.isNotEmpty()) {
+                val usdSum = if (curr.isBase) {
+                    nativeSum
+                } else {
+                    val rate = if (curr.rateToUsd > 0.0) curr.rateToUsd else 1.0
+                    nativeSum / rate
+                }
+                Triple(curr, nativeSum, usdSum)
+            } else null
+        }.sortedWith(
+            compareByDescending<Triple<CurrencyEntity, Double, Double>> { it.first.isBase }
+                .thenByDescending { it.third }
+        )
+    }
+    var showBreakdownModal by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -282,25 +307,7 @@ fun HomeScreen(
                             overflow = TextOverflow.Ellipsis
                         )
 
-                        // 2. Desglose Unificado por Moneda (Solo valores convertidos a la moneda principal $)
-                        val currencyBreakdown = remember(accounts, currencies) {
-                            val includedAccounts = accounts.filter { it.includeInTotal }
-                            val grouped = includedAccounts.groupBy { it.currencyId }
-                            currencies.mapNotNull { curr ->
-                                val accs = grouped[curr.id] ?: emptyList()
-                                val nativeSum = accs.sumOf { it.currentBalance }
-                                if (accs.isNotEmpty()) {
-                                    val usdSum = if (curr.isBase) {
-                                        nativeSum
-                                    } else {
-                                        val rate = if (curr.rateToUsd > 0.0) curr.rateToUsd else 1.0
-                                        nativeSum / rate
-                                    }
-                                    Triple(curr, nativeSum, usdSum)
-                                } else null
-                            }
-                        }
-
+                        // 2. Desglose Unificado por Moneda (Anti-Rupturas: Top 2 en tarjeta + Modal de Patrimonio al tocar)
                         if (currencyBreakdown.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             Box(
@@ -308,42 +315,62 @@ fun HomeScreen(
                                     .fillMaxWidth()
                                     .background(BackgroundBase, RectangleShape)
                                     .border(1.dp, BorderSolid, RectangleShape)
-                                    .padding(horizontal = 12.dp, vertical = 7.dp)
+                                    .clickable { showBreakdownModal = true }
+                                    .padding(horizontal = 10.dp, vertical = 7.dp)
                             ) {
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
+                                    modifier = Modifier.fillMaxWidth(),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    currencyBreakdown.forEachIndexed { index, (curr, _, usdSum) ->
-                                        if (index > 0) {
-                                            Text(
-                                                text = "•",
-                                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 11.sp)
-                                            )
-                                        }
-                                        val labelText = if (curr.isBase) "En Efectivo" else "En ${curr.code}"
-                                        val valueColor = if (curr.isBase) AccentLime else AccentPurple
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Text(
-                                                text = "$labelText = ",
-                                                style = BrexaTypography.labelSmall.copy(
-                                                    color = TextSecondary,
-                                                    fontWeight = FontWeight.Normal,
-                                                    fontSize = 11.sp
+                                    // Fila de las Top 2 monedas
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    ) {
+                                        val visibleCurrencies = currencyBreakdown.take(2)
+                                        visibleCurrencies.forEachIndexed { index, (curr, _, usdSum) ->
+                                            if (index > 0) {
+                                                Text(
+                                                    text = "•",
+                                                    style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 11.sp)
                                                 )
-                                            )
-                                            Text(
-                                                text = if (isIncognito) "••••" else "$baseSymbol ${formatter.format(usdSum)}",
-                                                style = BrexaTypography.labelSmall.copy(
-                                                    color = valueColor,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 11.5.sp
+                                            }
+                                            val labelText = if (curr.isBase) "En Efectivo" else "En ${curr.code}"
+                                            val valueColor = if (curr.isBase) AccentLime else AccentPurple
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = "$labelText = ",
+                                                    style = BrexaTypography.labelSmall.copy(
+                                                        color = TextSecondary,
+                                                        fontWeight = FontWeight.Normal,
+                                                        fontSize = 11.sp
+                                                    )
                                                 )
-                                            )
+                                                Text(
+                                                    text = if (isIncognito) "••••" else "$baseSymbol ${formatter.format(usdSum)}",
+                                                    style = BrexaTypography.labelSmall.copy(
+                                                        color = valueColor,
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 11.5.sp
+                                                    )
+                                                )
+                                            }
                                         }
+                                    }
+
+                                    // Si hay más de 2 monedas, mostrar insignia Neobrutalista "+X MÁS ▾"
+                                    if (currencyBreakdown.size > 2) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        BrutalistBadge(
+                                            text = "+${currencyBreakdown.size - 2} MÁS ▾",
+                                            backgroundColor = SurfaceCardElevated,
+                                            contentColor = AccentLime,
+                                            borderColor = AccentLime,
+                                            fontSize = 9.sp,
+                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                        )
                                     }
                                 }
                             }
@@ -1313,6 +1340,150 @@ fun HomeScreen(
                         selectedTxDetail = null
                         showConfirmDeleteTx = false
                     }
+                )
+            }
+        )
+    }
+
+    // Modal Neobrutalista de Distribución de Patrimonio (Anti-Rupturas)
+    if (showBreakdownModal) {
+        AlertDialog(
+            onDismissRequest = { showBreakdownModal = false },
+            shape = RectangleShape,
+            containerColor = SurfaceCard,
+            tonalElevation = 0.dp,
+            modifier = Modifier.border(2.dp, BorderSolid, RectangleShape),
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "DISTRIBUCIÓN PATRIMONIAL",
+                            style = BrexaTypography.titleLarge.copy(color = AccentLime, fontSize = 15.sp)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "TOTAL: $baseSymbol ${formatter.format(totalUsd)} $baseCode",
+                            style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 10.5.sp)
+                        )
+                    }
+                    Text(
+                        text = "✕",
+                        style = BrexaTypography.titleMedium.copy(color = TextMuted),
+                        modifier = Modifier
+                            .clickable { showBreakdownModal = false }
+                            .padding(4.dp)
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Desglose consolidado de tus fondos por cada moneda activa:",
+                        style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 11.sp)
+                    )
+
+                    currencyBreakdown.forEach { (curr, nativeSum, usdSum) ->
+                        val percentage = if (totalUsd > 0.0) (usdSum / totalUsd) * 100.0 else 0.0
+                        val barColor = if (curr.isBase) AccentLime else AccentPurple
+
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(BackgroundBase, RectangleShape)
+                                .border(1.dp, BorderSolid, RectangleShape)
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.weight(1f, fill = false)
+                                ) {
+                                    BrutalistBadge(
+                                        text = curr.code,
+                                        backgroundColor = SurfaceCard,
+                                        contentColor = barColor,
+                                        borderColor = barColor,
+                                        fontSize = 10.sp
+                                    )
+                                    Column {
+                                        Text(
+                                            text = if (curr.isBase) "Efectivo / Base" else curr.name,
+                                            style = BrexaTypography.labelMedium.copy(
+                                                color = TextPrimary,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 12.sp
+                                            ),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = if (isIncognito) "••••••" else "Saldo: ${formatter.format(nativeSum)} ${curr.code}",
+                                            style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 10.sp),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text(
+                                        text = if (isIncognito) "••••" else "$baseSymbol ${formatter.format(usdSum)}",
+                                        style = BrexaTypography.labelLarge.copy(
+                                            color = barColor,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
+                                    )
+                                    Text(
+                                        text = String.format(Locale.US, "%.1f%%", percentage),
+                                        style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 9.5.sp)
+                                    )
+                                }
+                            }
+
+                            // Barra visual de porcentaje de patrimonio
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(4.dp)
+                                    .background(SurfaceCardElevated, RectangleShape)
+                            ) {
+                                val progress = (percentage / 100.0).toFloat().coerceIn(0f, 1f)
+                                if (progress > 0f) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(progress)
+                                            .fillMaxHeight()
+                                            .background(barColor, RectangleShape)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                BrutalistButton(
+                    text = "ENTENDIDO",
+                    onClick = { showBreakdownModal = false },
+                    containerColor = AccentLime,
+                    contentColor = TextOnLime,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         )
