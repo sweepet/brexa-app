@@ -1,6 +1,7 @@
 package com.brexa.app.ui.screens
 
 import android.app.DatePickerDialog
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,15 +19,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.brexa.app.R
 import com.brexa.app.data.local.entity.AccountEntity
+import com.brexa.app.data.local.entity.CurrencyEntity
 import com.brexa.app.data.local.entity.PendingExpenseEntity
 import com.brexa.app.presentation.BrexaViewModel
 import com.brexa.app.ui.components.BrutalistBadge
@@ -35,8 +35,6 @@ import com.brexa.app.ui.components.BrutalistCard
 import com.brexa.app.ui.components.BrutalistTextField
 import com.brexa.app.ui.theme.*
 import com.brexa.app.ui.util.CurrencyFormat
-import java.math.BigDecimal
-import java.math.RoundingMode
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -111,7 +109,8 @@ fun PendingExpensesScreen(
     viewModel: BrexaViewModel,
     onBack: () -> Unit
 ) {
-    val context = LocalContext.current
+    BackHandler(onBack = onBack)
+
     val activePending by viewModel.activePendingExpenses.collectAsState()
     val paidPending by viewModel.paidPendingExpenses.collectAsState()
     val totalPendingUsd by viewModel.totalPendingUsd.collectAsState()
@@ -129,21 +128,58 @@ fun PendingExpensesScreen(
     val formatter = remember { CurrencyFormat.standardFormatter }
     val dateFormatter = remember { SimpleDateFormat("dd MMM, yyyy", Locale("es", "ES")) }
 
-    // Moneda secundaria para equivalencias
-    val secondaryCurrencies = remember(currencies) { currencies.filter { !it.isBase } }
-    val primarySecondary = secondaryCurrencies.firstOrNull()
-
-    // Filtros de visualización
-    // "TODOS", "7_DIAS", "15_DIAS", "ESTE_MES", "PAGADOS"
-    var selectedFilter by remember { mutableStateOf("TODOS") }
+    // Separación en dos funciones: Gastos Variables vs Gastos Fijos
+    var selectedSection by remember { mutableStateOf("VARIABLES") } // "VARIABLES" o "FIJOS"
+    var selectedVarFilter by remember { mutableStateOf("TODOS") } // "TODOS", "7_DIAS", "15_DIAS", "ESTE_MES"
+    var selectedFixedFilter by remember { mutableStateOf("TODOS") } // "TODOS", "MONTHLY", "BIWEEKLY", "WEEKLY"
 
     // Modales
     var showCreateModal by remember { mutableStateOf(false) }
+    var itemToEdit by remember { mutableStateOf<PendingExpenseEntity?>(null) }
     var itemToPay by remember { mutableStateOf<PendingExpenseEntity?>(null) }
     var itemToDelete by remember { mutableStateOf<PendingExpenseEntity?>(null) }
 
-    // Filtrar lista según pestaña seleccionada
-    val now = System.currentTimeMillis()
+    // Listas separadas
+    val variableExpenses = remember(activePending) {
+        activePending.filter { it.expenseType != "FIXED" }
+    }
+    val fixedExpenses = remember(activePending) {
+        activePending.filter { it.expenseType == "FIXED" }
+    }
+
+    // Cálculos de montos consolidados
+    val currMap = remember(currencies) { currencies.associateBy { it.code.uppercase() } }
+
+    val totalVariablesUsd = remember(variableExpenses, currMap) {
+        variableExpenses.sumOf { item ->
+            val curr = currMap[item.currencyCode.uppercase()]
+            val rate = curr?.rateToUsd ?: 1.0
+            if (curr?.isBase == true || item.currencyCode.equals("USD", ignoreCase = true)) {
+                item.amount
+            } else if (rate > 0.0) {
+                item.amount / rate
+            } else item.amount
+        }
+    }
+
+    val totalFixedMonthlyUsd = remember(fixedExpenses, currMap) {
+        fixedExpenses.sumOf { item ->
+            val curr = currMap[item.currencyCode.uppercase()]
+            val rate = curr?.rateToUsd ?: 1.0
+            val baseAmt = if (curr?.isBase == true || item.currencyCode.equals("USD", ignoreCase = true)) {
+                item.amount
+            } else if (rate > 0.0) {
+                item.amount / rate
+            } else item.amount
+            when (item.recurrencePeriod) {
+                "WEEKLY" -> baseAmt * 4.33
+                "BIWEEKLY" -> baseAmt * 2.0
+                else -> baseAmt
+            }
+        }
+    }
+
+    // Filtros de fecha para Variables
     val cal7Days = remember {
         Calendar.getInstance().apply {
             add(Calendar.DAY_OF_YEAR, 7)
@@ -163,12 +199,22 @@ fun PendingExpensesScreen(
         }.timeInMillis
     }
 
-    val displayedItems = when (selectedFilter) {
-        "7_DIAS" -> activePending.filter { it.dueDateTimestamp <= cal7Days }
-        "15_DIAS" -> activePending.filter { it.dueDateTimestamp <= cal15Days }
-        "ESTE_MES" -> activePending.filter { it.dueDateTimestamp <= calEndOfMonth }
-        "PAGADOS" -> paidPending
-        else -> activePending
+    val displayedVariableItems = remember(variableExpenses, selectedVarFilter, cal7Days, cal15Days, calEndOfMonth) {
+        when (selectedVarFilter) {
+            "7_DIAS" -> variableExpenses.filter { it.dueDateTimestamp <= cal7Days }
+            "15_DIAS" -> variableExpenses.filter { it.dueDateTimestamp <= cal15Days }
+            "ESTE_MES" -> variableExpenses.filter { it.dueDateTimestamp <= calEndOfMonth }
+            else -> variableExpenses
+        }
+    }
+
+    val displayedFixedItems = remember(fixedExpenses, selectedFixedFilter) {
+        when (selectedFixedFilter) {
+            "MONTHLY" -> fixedExpenses.filter { it.recurrencePeriod == "MONTHLY" || it.recurrencePeriod == null }
+            "BIWEEKLY" -> fixedExpenses.filter { it.recurrencePeriod == "BIWEEKLY" }
+            "WEEKLY" -> fixedExpenses.filter { it.recurrencePeriod == "WEEKLY" }
+            else -> fixedExpenses
+        }
     }
 
     Column(
@@ -192,7 +238,7 @@ fun PendingExpensesScreen(
                     style = BrexaTypography.titleLarge.copy(color = AccentLime, fontSize = 16.sp)
                 )
                 Text(
-                    text = "DINERO QUE DEBES O PAGARÁS PRONTO",
+                    text = "COMPROMISOS VARIABLES Y RECURRENTES",
                     style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 9.5.sp)
                 )
             }
@@ -207,22 +253,88 @@ fun PendingExpensesScreen(
             )
         }
 
+        // --- 2. SELECTOR DE SECCIÓN (VARIABLES VS FIJOS) ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            val isVar = selectedSection == "VARIABLES"
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(if (isVar) AccentLime else SurfaceCard, RectangleShape)
+                    .border(2.dp, if (isVar) AccentLime else BorderSolid, RectangleShape)
+                    .clickable { selectedSection = "VARIABLES" }
+                    .padding(vertical = 10.dp, horizontal = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "⚡ VARIABLES (${variableExpenses.size})",
+                        style = BrexaTypography.labelMedium.copy(
+                            color = if (isVar) Color.Black else TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.5.sp
+                        )
+                    )
+                    Text(
+                        text = "Puntuales • Se borran al pagar",
+                        style = BrexaTypography.labelSmall.copy(
+                            color = if (isVar) Color.Black.copy(alpha = 0.8f) else TextMuted,
+                            fontSize = 8.5.sp
+                        )
+                    )
+                }
+            }
+
+            val isFixed = selectedSection == "FIJOS"
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(if (isFixed) AccentPurple else SurfaceCard, RectangleShape)
+                    .border(2.dp, if (isFixed) AccentPurple else BorderSolid, RectangleShape)
+                    .clickable { selectedSection = "FIJOS" }
+                    .padding(vertical = 10.dp, horizontal = 8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "🔄 FIJOS (${fixedExpenses.size})",
+                        style = BrexaTypography.labelMedium.copy(
+                            color = if (isFixed) Color.White else TextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.5.sp
+                        )
+                    )
+                    Text(
+                        text = "Recurrentes • Mes / Quincena",
+                        style = BrexaTypography.labelSmall.copy(
+                            color = if (isFixed) Color.White.copy(alpha = 0.8f) else TextMuted,
+                            fontSize = 8.5.sp
+                        )
+                    )
+                }
+            }
+        }
+
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
-            contentPadding = PaddingValues(top = 16.dp, bottom = 24.dp)
+            contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp)
         ) {
-            // --- 2. TARJETA RESUMEN FINANCIERO Y SALDO LIBRE REAL ---
+            // --- 3. TARJETA RESUMEN DINÁMICA ---
             item {
                 BrutalistCard(
                     modifier = Modifier.fillMaxWidth(),
                     backgroundColor = SurfaceCard,
-                    borderColor = if (projections.overdueCount > 0) ExpenseRed else AccentLime,
+                    borderColor = if (selectedSection == "VARIABLES") (if (projections.overdueCount > 0) ExpenseRed else AccentLime) else AccentPurple,
                     borderWidth = 2.dp,
-                    shadowColor = if (projections.overdueCount > 0) ExpenseRed else AccentLime,
+                    shadowColor = if (selectedSection == "VARIABLES") (if (projections.overdueCount > 0) ExpenseRed else AccentLime) else AccentPurple,
                     shadowOffset = 4.dp
                 ) {
                     Column(modifier = Modifier.padding(18.dp)) {
@@ -232,53 +344,51 @@ fun PendingExpensesScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = "TOTAL POR PAGAR",
+                                text = if (selectedSection == "VARIABLES") "TOTAL VARIABLES POR PAGAR" else "TOTAL FIJOS ESTIMADO / MES",
                                 style = BrexaTypography.labelMedium.copy(
                                     color = TextSecondary,
                                     letterSpacing = 1.sp
                                 )
                             )
 
-                            if (projections.overdueCount > 0) {
-                                BrutalistBadge(
-                                    text = "🔴 ${projections.overdueCount} VENCIDO${if (projections.overdueCount > 1) "S" else ""}",
-                                    backgroundColor = ExpenseRed,
-                                    contentColor = Color.White,
-                                    borderColor = ExpenseRed
-                                )
+                            if (selectedSection == "VARIABLES") {
+                                if (projections.overdueCount > 0) {
+                                    BrutalistBadge(
+                                        text = "🔴 ${projections.overdueCount} VENCIDO${if (projections.overdueCount > 1) "S" else ""}",
+                                        backgroundColor = ExpenseRed,
+                                        contentColor = Color.White,
+                                        borderColor = ExpenseRed
+                                    )
+                                } else {
+                                    BrutalistBadge(
+                                        text = "${variableExpenses.size} PENDIENTE${if (variableExpenses.size != 1) "S" else ""}",
+                                        backgroundColor = BackgroundBase,
+                                        contentColor = AccentLime,
+                                        borderColor = AccentLime
+                                    )
+                                }
                             } else {
                                 BrutalistBadge(
-                                    text = "${activePending.size} PENDIENTE${if (activePending.size != 1) "S" else ""}",
+                                    text = "${fixedExpenses.size} PROGRAMADO${if (fixedExpenses.size != 1) "S" else ""}",
                                     backgroundColor = BackgroundBase,
-                                    contentColor = AccentLime,
-                                    borderColor = AccentLime
+                                    contentColor = AccentPurple,
+                                    borderColor = AccentPurple
                                 )
                             }
                         }
 
                         Spacer(modifier = Modifier.height(6.dp))
 
-                        val pendingDisplay = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(totalPendingUsd)}"
+                        val activeSumUsd = if (selectedSection == "VARIABLES") totalVariablesUsd else totalFixedMonthlyUsd
+                        val displayAmount = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(activeSumUsd)}"
                         Text(
-                            text = pendingDisplay,
+                            text = displayAmount,
                             style = BrexaTypography.displayLarge.copy(
-                                color = if (totalPendingUsd > 0.0) ExpenseRed else AccentLime,
+                                color = if (selectedSection == "VARIABLES") (if (totalVariablesUsd > 0.0) ExpenseRed else AccentLime) else AccentPurple,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 28.sp
                             )
                         )
-
-                        if (!isIncognito && primarySecondary != null && totalPendingUsd > 0.0) {
-                            val eqSec = totalPendingUsd * primarySecondary.rateToUsd
-                            Text(
-                                text = "≈ ${formatter.format(eqSec)} ${primarySecondary.code}",
-                                style = BrexaTypography.labelMedium.copy(
-                                    color = AccentPurple,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.5.sp
-                                )
-                            )
-                        }
 
                         Spacer(modifier = Modifier.height(14.dp))
                         Box(
@@ -289,99 +399,113 @@ fun PendingExpensesScreen(
                         )
                         Spacer(modifier = Modifier.height(12.dp))
 
-                        // Saldo Realmente Libre (Diseño 100% adaptable a cualquier pantalla móvil sin recortes)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "SALDO LIBRE REAL",
-                                style = BrexaTypography.labelSmall.copy(
-                                    color = AccentLime,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.5.sp,
-                                    letterSpacing = 0.5.sp
+                        if (selectedSection == "VARIABLES") {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "SALDO LIBRE REAL",
+                                    style = BrexaTypography.labelSmall.copy(
+                                        color = AccentLime,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.5.sp,
+                                        letterSpacing = 0.5.sp
+                                    )
                                 )
-                            )
 
-                            val realDisplay = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(realAvailableUsd)}"
-                            Text(
-                                text = realDisplay,
-                                style = BrexaTypography.titleLarge.copy(
-                                    color = if (realAvailableUsd >= 0.0) IncomeGreen else ExpenseRed,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 17.sp
+                                val realDisplay = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(realAvailableUsd)}"
+                                Text(
+                                    text = realDisplay,
+                                    style = BrexaTypography.titleLarge.copy(
+                                        color = if (realAvailableUsd >= 0.0) IncomeGreen else ExpenseRed,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 17.sp
+                                    )
                                 )
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Dinero en cuentas totalmente libre para gastar ($baseSymbol${formatter.format(totalUsd)})",
+                                style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 10.5.sp)
                             )
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // Explicación en ancho completo: nunca se recorta y fluye de forma natural en cualquier pantalla
-                        val pendingExplanation = if (isIncognito) {
-                            "Dinero en cuentas menos compromisos pendientes"
-                        } else if (totalPendingUsd > 0.0) {
-                            "Dinero en cuentas ($baseSymbol${formatter.format(totalUsd)}) menos compromisos ($baseSymbol${formatter.format(totalPendingUsd)})"
                         } else {
-                            "Dinero en cuentas totalmente libre para gastar ($baseSymbol${formatter.format(totalUsd)})"
+                            Text(
+                                text = "💡 Compromisos periódicos recurrentes (internet, alquiler, servicios, suscripciones). Al registrar su pago, el gasto se anota en el historial y su fecha avanza automáticamente.",
+                                style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 10.5.sp, lineHeight = 14.sp)
+                            )
                         }
-
-                        Text(
-                            text = pendingExplanation,
-                            style = BrexaTypography.bodySmall.copy(
-                                color = TextMuted,
-                                fontSize = 10.5.sp,
-                                lineHeight = 14.sp
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
                     }
                 }
             }
 
-            // --- 3. PESTAÑAS DE HORIZONTE TEMPORAL (FILTROS) ---
+            // --- 4. SUB-FILTROS DE VISUALIZACIÓN ---
             item {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    val tabs = listOf(
-                        Triple("TODOS", "TODOS (${projections.countAll})", projections.totalAllUsd),
-                        Triple("7_DIAS", "PRÓX. 7 DÍAS (${projections.count7Days})", projections.total7DaysUsd),
-                        Triple("15_DIAS", "QUINCENA (${projections.count15Days})", projections.total15DaysUsd),
-                        Triple("ESTE_MES", "ESTE MES (${projections.countMonth})", projections.totalMonthUsd),
-                        Triple("PAGADOS", "PAGADOS (${paidPending.size})", 0.0)
-                    )
-
-                    items(tabs) { (key, label, _) ->
-                        val isSelected = selectedFilter == key
-                        Box(
-                            modifier = Modifier
-                                .background(if (isSelected) AccentLime else SurfaceCard, RectangleShape)
-                                .border(
-                                    width = 1.5.dp,
-                                    color = if (isSelected) AccentLime else BorderSolid,
-                                    shape = RectangleShape
+                    if (selectedSection == "VARIABLES") {
+                        val varTabs = listOf(
+                            Pair("TODOS", "TODOS (${variableExpenses.size})"),
+                            Pair("7_DIAS", "PRÓX. 7 DÍAS"),
+                            Pair("15_DIAS", "QUINCENA"),
+                            Pair("ESTE_MES", "ESTE MES")
+                        )
+                        items(varTabs) { (key, label) ->
+                            val isSel = selectedVarFilter == key
+                            Box(
+                                modifier = Modifier
+                                    .background(if (isSel) AccentLime else SurfaceCard, RectangleShape)
+                                    .border(1.5.dp, if (isSel) AccentLime else BorderSolid, RectangleShape)
+                                    .clickable { selectedVarFilter = key }
+                                    .padding(horizontal = 12.dp, vertical = 7.dp)
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = BrexaTypography.labelMedium.copy(
+                                        color = if (isSel) Color.Black else TextSecondary,
+                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 10.5.sp
+                                    )
                                 )
-                                .clickable { selectedFilter = key }
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = label,
-                                style = BrexaTypography.labelMedium.copy(
-                                    color = if (isSelected) Color.Black else TextSecondary,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                    fontSize = 10.5.sp
+                            }
+                        }
+                    } else {
+                        val fixedTabs = listOf(
+                            Pair("TODOS", "TODOS (${fixedExpenses.size})"),
+                            Pair("MONTHLY", "MENSUALES"),
+                            Pair("BIWEEKLY", "QUINCENALES"),
+                            Pair("WEEKLY", "SEMANALES")
+                        )
+                        items(fixedTabs) { (key, label) ->
+                            val isSel = selectedFixedFilter == key
+                            Box(
+                                modifier = Modifier
+                                    .background(if (isSel) AccentPurple else SurfaceCard, RectangleShape)
+                                    .border(1.5.dp, if (isSel) AccentPurple else BorderSolid, RectangleShape)
+                                    .clickable { selectedFixedFilter = key }
+                                    .padding(horizontal = 12.dp, vertical = 7.dp)
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = BrexaTypography.labelMedium.copy(
+                                        color = if (isSel) Color.White else TextSecondary,
+                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Medium,
+                                        fontSize = 10.5.sp
+                                    )
                                 )
-                            )
+                            }
                         }
                     }
                 }
             }
 
-            // --- 4. LISTA DE COMPROMISOS / PAGOS ---
-            if (displayedItems.isEmpty()) {
+            // --- 5. LISTA DE COMPROMISOS ---
+            val activeList = if (selectedSection == "VARIABLES") displayedVariableItems else displayedFixedItems
+
+            if (activeList.isEmpty()) {
                 item {
                     BrutalistCard(
                         modifier = Modifier.fillMaxWidth(),
@@ -396,15 +520,15 @@ fun PendingExpensesScreen(
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Text(
-                                text = if (selectedFilter == "PAGADOS") "NO HAY PAGOS REGISTRADOS" else "¡ESTÁS AL DÍA!",
-                                style = BrexaTypography.titleLarge.copy(color = AccentLime, fontSize = 16.sp),
+                                text = if (selectedSection == "VARIABLES") "¡SIN GASTOS VARIABLES PENDIENTES!" else "¡SIN GASTOS FIJOS REGISTRADOS!",
+                                style = BrexaTypography.titleLarge.copy(color = if (selectedSection == "VARIABLES") AccentLime else AccentPurple, fontSize = 16.sp),
                                 textAlign = TextAlign.Center
                             )
                             Text(
-                                text = if (selectedFilter == "PAGADOS")
-                                    "Cuando pagues un compromiso pendiente, aparecerá aquí como comprobante."
+                                text = if (selectedSection == "VARIABLES")
+                                    "No tienes compromisos puntuales anotados. Usa el botón de abajo para anotar uno y se descontará cuando lo pagues."
                                 else
-                                    "No tienes compromisos anotados para este periodo. Si tienes una deuda, servicio o gasto próximo, anótalo con el botón de abajo.",
+                                    "Guarda tus pagos fijos como internet, alquiler, condominio o suscripciones con su fecha de cobro recurrente.",
                                 style = BrexaTypography.bodyMedium.copy(color = TextSecondary, fontSize = 12.sp, lineHeight = 16.sp),
                                 textAlign = TextAlign.Center
                             )
@@ -412,7 +536,7 @@ fun PendingExpensesScreen(
                     }
                 }
             } else {
-                items(displayedItems, key = { it.id }) { item ->
+                items(activeList, key = { it.id }) { item ->
                     val status = calculateDueStatus(item.dueDateTimestamp)
                     val curr = currencies.find { it.code.equals(item.currencyCode, ignoreCase = true) }
                     val rate = curr?.rateToUsd ?: 1.0
@@ -422,14 +546,15 @@ fun PendingExpensesScreen(
                     val category = expenseCategories.find { it.id == item.categoryId }
                     val account = accounts.find { it.id == item.accountId }
 
+                    val isFixedItem = item.expenseType == "FIXED"
+
                     BrutalistCard(
                         modifier = Modifier.fillMaxWidth(),
-                        backgroundColor = if (item.isPaid) BackgroundBase else SurfaceCard,
+                        backgroundColor = SurfaceCard,
                         borderColor = when {
-                            item.isPaid -> BorderSolid
                             status.isOverdue -> ExpenseRed
                             status.isDueToday -> AccentLime
-                            status.isDueSoon -> AccentLime
+                            isFixedItem -> AccentPurple
                             else -> BorderSolid
                         },
                         borderWidth = if (status.isOverdue || status.isDueToday) 2.dp else 1.5.dp
@@ -439,20 +564,24 @@ fun PendingExpensesScreen(
                                 .fillMaxWidth()
                                 .padding(14.dp)
                         ) {
-                            // Cabecera de la tarjeta: Estado de urgencia y fecha
+                            // Cabecera: Tipo / Frecuencia y Vencimiento
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                if (item.isPaid) {
-                                    val paidDateStr = item.paidAtTimestamp?.let { dateFormatter.format(Date(it)) } ?: "PAGADO"
+                                if (isFixedItem) {
+                                    val freqLabel = when (item.recurrencePeriod) {
+                                        "WEEKLY" -> "SEMANAL"
+                                        "BIWEEKLY" -> "CADA 15 DÍAS"
+                                        else -> "TODOS LOS ${item.recurrenceDay ?: 1} DE CADA MES"
+                                    }
                                     BrutalistBadge(
-                                        text = "✓ PAGADO ($paidDateStr)",
+                                        text = freqLabel,
                                         backgroundColor = BackgroundBase,
-                                        contentColor = IncomeGreen,
-                                        borderColor = IncomeGreen,
-                                        fontSize = 9.sp
+                                        contentColor = AccentPurple,
+                                        borderColor = AccentPurple,
+                                        fontSize = 8.5.sp
                                     )
                                 } else {
                                     val badgeBg = when {
@@ -466,31 +595,24 @@ fun PendingExpensesScreen(
                                         status.isDueSoon -> AccentLime
                                         else -> TextSecondary
                                     }
-                                    val badgeBorder = when {
-                                        status.isOverdue -> ExpenseRed
-                                        status.isDueToday -> AccentLime
-                                        status.isDueSoon -> AccentLime
-                                        else -> BorderSolid
-                                    }
-
                                     BrutalistBadge(
                                         text = status.label,
                                         backgroundColor = badgeBg,
                                         contentColor = badgeContent,
-                                        borderColor = badgeBorder,
-                                        fontSize = 9.sp
+                                        borderColor = if (status.isOverdue) ExpenseRed else BorderSolid,
+                                        fontSize = 8.5.sp
                                     )
                                 }
 
                                 Text(
-                                    text = dateFormatter.format(Date(item.dueDateTimestamp)),
+                                    text = if (isFixedItem) "Próximo: ${dateFormatter.format(Date(item.dueDateTimestamp))}" else dateFormatter.format(Date(item.dueDateTimestamp)),
                                     style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 9.5.sp)
                                 )
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
 
-                            // Concepto / Título
+                            // Concepto / Monto
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -499,7 +621,7 @@ fun PendingExpensesScreen(
                                 Text(
                                     text = item.title,
                                     style = BrexaTypography.titleLarge.copy(
-                                        color = if (item.isPaid) TextSecondary else TextPrimary,
+                                        color = TextPrimary,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 15.sp
                                     ),
@@ -510,12 +632,11 @@ fun PendingExpensesScreen(
 
                                 Spacer(modifier = Modifier.width(10.dp))
 
-                                // Monto nativo en grande
                                 Column(horizontalAlignment = Alignment.End) {
                                     Text(
                                         text = "${formatter.format(item.amount)} ${item.currencyCode}",
                                         style = BrexaTypography.titleLarge.copy(
-                                            color = if (item.isPaid) TextSecondary else if (status.isOverdue) ExpenseRed else AccentLime,
+                                            color = if (status.isOverdue) ExpenseRed else AccentLime,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 16.sp
                                         )
@@ -533,7 +654,7 @@ fun PendingExpensesScreen(
                                 }
                             }
 
-                            // Detalles opcionales: Categoría, Cuenta y Nota
+                            // Detalles: Categoría, Cuenta sugerida y Nota
                             if (category != null || account != null || item.note.isNotBlank()) {
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Row(
@@ -552,7 +673,7 @@ fun PendingExpensesScreen(
                                     }
                                     if (account != null) {
                                         BrutalistBadge(
-                                            text = account.name,
+                                            text = "💳 ${account.name}",
                                             backgroundColor = BackgroundBase,
                                             contentColor = AccentLime,
                                             borderColor = BorderSolid,
@@ -562,7 +683,7 @@ fun PendingExpensesScreen(
                                     if (item.note.isNotBlank()) {
                                         Text(
                                             text = "• ${item.note}",
-                                            style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 10.5.sp),
+                                            style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 10.sp),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.weight(1f)
@@ -573,50 +694,42 @@ fun PendingExpensesScreen(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            // Botones de acción
+                            // Botones de Acción
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                if (!item.isPaid) {
-                                    // Botón Pagar Ahora (Acción Principal con 1 Clic)
-                                    Box(
-                                        modifier = Modifier
-                                            .background(AccentLime, RectangleShape)
-                                            .border(1.5.dp, BorderBright, RectangleShape)
-                                            .clickable { itemToPay = item }
-                                            .padding(horizontal = 14.dp, vertical = 7.dp)
-                                    ) {
-                                        Text(
-                                            text = "PAGAR AHORA ➔",
-                                            style = BrexaTypography.labelMedium.copy(
-                                                color = Color.Black,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 11.sp
-                                            )
+                                // 1. Botón Pagar / Registrar Pago
+                                Box(
+                                    modifier = Modifier
+                                        .background(if (isFixedItem) AccentPurple else AccentLime, RectangleShape)
+                                        .border(1.5.dp, BorderBright, RectangleShape)
+                                        .clickable { itemToPay = item }
+                                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                                ) {
+                                    Text(
+                                        text = if (isFixedItem) "✓ REGISTRAR PAGO ➔" else "✓ PAGAR AHORA ➔",
+                                        style = BrexaTypography.labelMedium.copy(
+                                            color = if (isFixedItem) Color.White else Color.Black,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
                                         )
-                                    }
-                                } else {
-                                    // Botón Reabrir (para desmarcar)
-                                    Box(
-                                        modifier = Modifier
-                                            .background(BackgroundBase, RectangleShape)
-                                            .border(1.dp, BorderSolid, RectangleShape)
-                                            .clickable { viewModel.reopenPendingExpense(item.id) }
-                                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                                    ) {
-                                        Text(
-                                            text = "↺ REABRIR PAGO",
-                                            style = BrexaTypography.labelSmall.copy(
-                                                color = TextSecondary,
-                                                fontSize = 9.5.sp
-                                            )
-                                        )
-                                    }
+                                    )
                                 }
 
+                                // 2. Botón Editar y Botón Eliminar
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    BrutalistBadge(
+                                        text = "✎ EDITAR",
+                                        backgroundColor = BackgroundBase,
+                                        contentColor = AccentLime,
+                                        borderColor = BorderSolid,
+                                        fontSize = 9.sp,
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 5.dp),
+                                        modifier = Modifier.clickable { itemToEdit = item }
+                                    )
+
                                     BrutalistBadge(
                                         text = "🗑 ELIMINAR",
                                         backgroundColor = BackgroundBase,
@@ -634,7 +747,7 @@ fun PendingExpensesScreen(
             }
         }
 
-        // --- 5. BOTÓN FIJO INFERIOR: + NUEVO PAGO PENDIENTE ---
+        // --- 6. BOTÓN FIJO INFERIOR ---
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -642,21 +755,28 @@ fun PendingExpensesScreen(
                 .border(width = 1.dp, color = BorderSolid)
                 .padding(16.dp)
         ) {
+            val btnColor = if (selectedSection == "VARIABLES") AccentLime else AccentPurple
+            val btnText = if (selectedSection == "VARIABLES") "+ ANOTAR GASTO VARIABLE" else "+ CREAR GASTO FIJO RECURRENTE"
+            val btnTextColor = if (selectedSection == "VARIABLES") Color.Black else Color.White
+
             BrutalistButton(
-                text = "+ ANOTAR PAGO PENDIENTE",
-                onClick = { showCreateModal = true },
-                containerColor = AccentLime,
-                contentColor = Color.Black,
-                shadowColor = Color(0xFF000000),
+                text = btnText,
+                onClick = {
+                    itemToEdit = null
+                    showCreateModal = true
+                },
+                containerColor = btnColor,
+                contentColor = btnTextColor,
+                borderColor = btnColor,
                 modifier = Modifier.fillMaxWidth()
             )
         }
     }
 
-    // --- MODAL: REGISTRAR / PAGAR COMPROMISO ---
+    // --- MODAL DE CONFIRMACIÓN DE PAGO (CONFIRMAR CUENTA, MONEDA, MONTO REAL Y FECHA) ---
     if (itemToPay != null) {
         val pending = itemToPay!!
-        PayPendingDialog(
+        PayPendingConfirmDialog(
             pending = pending,
             accounts = accounts,
             currencies = currencies,
@@ -673,34 +793,64 @@ fun PendingExpensesScreen(
                     onSuccess = { itemToPay = null }
                 )
             },
-            onMarkPaidWithoutDeduct = {
-                viewModel.markPendingAsPaidWithoutExpense(
-                    id = pending.id,
-                    onSuccess = { itemToPay = null }
-                )
+            onAdvanceWithoutDeduct = {
+                viewModel.markPendingAsPaidWithoutExpense(pending.id)
+                itemToPay = null
             }
         )
     }
 
-    // --- MODAL: NUEVO PAGO PENDIENTE ---
-    if (showCreateModal) {
-        CreatePendingExpenseDialog(
+    // --- MODAL: CREAR / EDITAR GASTO PENDIENTE (VARIABLE O FIJO) ---
+    if (showCreateModal || itemToEdit != null) {
+        CreateOrEditPendingExpenseDialog(
+            initialItem = itemToEdit,
+            defaultExpenseType = if (itemToEdit != null) itemToEdit!!.expenseType else selectedSection,
             accounts = accounts,
             currencies = currencies,
             baseCurrency = baseCurrency,
             categories = expenseCategories,
-            onDismiss = { showCreateModal = false },
-            onSave = { title, amount, currCode, dueTs, catId, accId, note ->
-                viewModel.addPendingExpense(
-                    title = title,
-                    amount = amount,
-                    currencyCode = currCode,
-                    dueDateTimestamp = dueTs,
-                    categoryId = catId,
-                    accountId = accId,
-                    note = note,
-                    onSuccess = { showCreateModal = false }
-                )
+            onDismiss = {
+                showCreateModal = false
+                itemToEdit = null
+            },
+            onSave = { title, amount, currencyCode, dueDateTimestamp, categoryId, accountId, note, expenseType, recurrencePeriod, recurrenceDay ->
+                if (itemToEdit != null) {
+                    val updated = itemToEdit!!.copy(
+                        title = title,
+                        amount = amount,
+                        currencyCode = currencyCode,
+                        dueDateTimestamp = dueDateTimestamp,
+                        categoryId = categoryId,
+                        accountId = accountId,
+                        note = note,
+                        expenseType = expenseType,
+                        recurrencePeriod = recurrencePeriod,
+                        recurrenceDay = recurrenceDay
+                    )
+                    viewModel.updatePendingExpense(
+                        item = updated,
+                        onSuccess = {
+                            itemToEdit = null
+                            showCreateModal = false
+                        }
+                    )
+                } else {
+                    viewModel.addPendingExpense(
+                        title = title,
+                        amount = amount,
+                        currencyCode = currencyCode,
+                        dueDateTimestamp = dueDateTimestamp,
+                        categoryId = categoryId,
+                        accountId = accountId,
+                        note = note,
+                        expenseType = expenseType,
+                        recurrencePeriod = recurrencePeriod,
+                        recurrenceDay = recurrenceDay,
+                        onSuccess = {
+                            showCreateModal = false
+                        }
+                    )
+                }
             }
         )
     }
@@ -714,7 +864,7 @@ fun PendingExpensesScreen(
             containerColor = SurfaceCard,
             title = {
                 Text(
-                    text = "ELIMINAR PAGO PENDIENTE",
+                    text = if (target.expenseType == "FIXED") "ELIMINAR GASTO FIJO" else "ELIMINAR GASTO VARIABLE",
                     style = BrexaTypography.titleLarge.copy(color = ExpenseRed)
                 )
             },
@@ -750,17 +900,18 @@ fun PendingExpensesScreen(
 }
 
 /**
- * Modal Neobrutalista para Registrar el Pago en 1 Clic con Selección de Cuenta
+ * Modal Neobrutalista de Confirmación de Pago.
+ * Permite confirmar / cambiar la cuenta, moneda, monto real y fecha antes de registrar la operación.
  */
 @Composable
-fun PayPendingDialog(
+fun PayPendingConfirmDialog(
     pending: PendingExpenseEntity,
     accounts: List<AccountEntity>,
-    currencies: List<com.brexa.app.data.local.entity.CurrencyEntity>,
-    baseCurrency: com.brexa.app.data.local.entity.CurrencyEntity?,
+    currencies: List<CurrencyEntity>,
+    baseCurrency: CurrencyEntity?,
     onDismiss: () -> Unit,
-    onConfirmPay: (accountId: String, rate: Double, overrideNativeAmount: Double?, note: String, dateTimestamp: Long) -> Unit,
-    onMarkPaidWithoutDeduct: () -> Unit
+    onConfirmPay: (accountId: String, rate: Double, overrideNativeAmount: Double, note: String, dateTimestamp: Long) -> Unit,
+    onAdvanceWithoutDeduct: () -> Unit
 ) {
     val context = LocalContext.current
     var selectedAccountId by remember {
@@ -769,25 +920,46 @@ fun PayPendingDialog(
     val selectedAccount = accounts.find { it.id == selectedAccountId } ?: accounts.firstOrNull()
     val accountCurrency = currencies.find { it.id == selectedAccount?.currencyId }
 
-    // Tasa editable si aplica
-    val isForeignCurrency = accountCurrency?.isBase == false
-    var rateText by remember(selectedAccount) {
-        val defaultRate = accountCurrency?.rateToUsd ?: 1.0
+    // Moneda con la que se paga (por defecto la de la cuenta o la estipulada)
+    var selectedPaymentCurrencyCode by remember(selectedAccount) {
+        mutableStateOf(accountCurrency?.code ?: pending.currencyCode)
+    }
+
+    // Monto real pagado (editable)
+    var amountText by remember(pending, selectedPaymentCurrencyCode) {
+        val currObj = currencies.find { it.code.equals(selectedPaymentCurrencyCode, ignoreCase = true) }
+        val pendCurrObj = currencies.find { it.code.equals(pending.currencyCode, ignoreCase = true) }
+        val initialAmount = when {
+            selectedPaymentCurrencyCode.equals(pending.currencyCode, ignoreCase = true) -> pending.amount
+            selectedPaymentCurrencyCode.equals("USD", ignoreCase = true) && pendCurrObj != null && pendCurrObj.rateToUsd > 0.0 ->
+                pending.amount / pendCurrObj.rateToUsd
+            !selectedPaymentCurrencyCode.equals("USD", ignoreCase = true) && currObj != null && pending.currencyCode.equals("USD", ignoreCase = true) ->
+                pending.amount * currObj.rateToUsd
+            else -> pending.amount
+        }
+        mutableStateOf(CurrencyFormat.formatForInput(initialAmount))
+    }
+    val parsedAmount = CurrencyFormat.parseNumber(amountText) ?: pending.amount
+
+    // Tasa si aplica
+    val selectedPaymentCurr = currencies.find { it.code.equals(selectedPaymentCurrencyCode, ignoreCase = true) }
+    val isForeignCurrency = selectedPaymentCurr?.isBase == false
+    var rateText by remember(selectedPaymentCurrencyCode) {
+        val defaultRate = selectedPaymentCurr?.rateToUsd ?: 1.0
         mutableStateOf(CurrencyFormat.formatForInput(defaultRate))
     }
     val rateNum = CurrencyFormat.parseNumber(rateText) ?: 1.0
 
-    // Cálculo del débito estimado
+    // Cálculo del dinero que saldrá de la cuenta seleccionada
     val accCurrCode = accountCurrency?.code ?: "USD"
-    val pendCurrCode = pending.currencyCode
-    val calculatedNativeAmount = remember(selectedAccount, rateNum, pending) {
+    val calculatedDeduction = remember(selectedAccount, selectedPaymentCurrencyCode, parsedAmount, rateNum) {
         when {
-            accCurrCode.equals(pendCurrCode, ignoreCase = true) -> pending.amount
-            !accCurrCode.equals("USD", ignoreCase = true) && pendCurrCode.equals("USD", ignoreCase = true) ->
-                pending.amount * rateNum
-            accCurrCode.equals("USD", ignoreCase = true) && !pendCurrCode.equals("USD", ignoreCase = true) && rateNum > 0.0 ->
-                pending.amount / rateNum
-            else -> pending.amount
+            accCurrCode.equals(selectedPaymentCurrencyCode, ignoreCase = true) -> parsedAmount
+            accCurrCode.equals("USD", ignoreCase = true) && !selectedPaymentCurrencyCode.equals("USD", ignoreCase = true) && rateNum > 0.0 ->
+                parsedAmount / rateNum
+            !accCurrCode.equals("USD", ignoreCase = true) && selectedPaymentCurrencyCode.equals("USD", ignoreCase = true) ->
+                parsedAmount * rateNum
+            else -> parsedAmount
         }
     }
 
@@ -803,11 +975,11 @@ fun PayPendingDialog(
         title = {
             Column {
                 Text(
-                    text = "REGISTRAR PAGO",
-                    style = BrexaTypography.titleLarge.copy(color = AccentLime)
+                    text = "CONFIRMAR PAGO",
+                    style = BrexaTypography.titleLarge.copy(color = AccentLime, fontSize = 16.sp)
                 )
                 Text(
-                    text = "${pending.title} • ${formatter.format(pending.amount)} ${pending.currencyCode}",
+                    text = "${pending.title} • Estipulado: ${formatter.format(pending.amount)} ${pending.currencyCode}",
                     style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 10.sp)
                 )
             }
@@ -817,90 +989,141 @@ fun PayPendingDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Selector de Cuenta
-                Text(
-                    text = "¿CON CUÁL CUENTA PAGAS?",
-                    style = BrexaTypography.labelSmall.copy(color = TextSecondary, letterSpacing = 0.5.sp)
-                )
+                // 1. Selector de Cuenta Utilizada
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "¿CON CUÁL CUENTA PAGASTE?",
+                        style = BrexaTypography.labelSmall.copy(color = TextSecondary, letterSpacing = 0.5.sp)
+                    )
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(accounts) { acc ->
+                            val isSel = acc.id == selectedAccountId
+                            val accCurr = currencies.find { it.id == acc.currencyId }
+                            Box(
+                                modifier = Modifier
+                                    .background(if (isSel) SurfaceCardElevated else BackgroundBase, RectangleShape)
+                                    .border(
+                                        width = 1.5.dp,
+                                        color = if (isSel) AccentLime else BorderSolid,
+                                        shape = RectangleShape
+                                    )
+                                    .clickable { selectedAccountId = acc.id }
+                                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                            ) {
+                                Column {
+                                    Text(
+                                        text = acc.name,
+                                        style = BrexaTypography.labelMedium.copy(
+                                            color = if (isSel) AccentLime else TextPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
+                                        )
+                                    )
+                                    Text(
+                                        text = "${formatter.format(acc.currentBalance)} ${accCurr?.code ?: ""}",
+                                        style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 9.sp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
 
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    items(accounts) { acc ->
-                        val isSel = acc.id == selectedAccountId
-                        val accCurr = currencies.find { it.id == acc.currencyId }
-                        Box(
-                            modifier = Modifier
-                                .background(if (isSel) SurfaceCardElevated else BackgroundBase, RectangleShape)
-                                .border(
-                                    width = 1.5.dp,
-                                    color = if (isSel) AccentLime else BorderSolid,
-                                    shape = RectangleShape
-                                )
-                                .clickable { selectedAccountId = acc.id }
-                                .padding(horizontal = 10.dp, vertical = 8.dp)
-                        ) {
-                            Column {
+                // 2. Selector de Moneda de Pago
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "¿EN QUÉ MONEDA SE PAGÓ?",
+                        style = BrexaTypography.labelSmall.copy(color = TextSecondary, letterSpacing = 0.5.sp)
+                    )
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(currencies) { curr ->
+                            val isSel = curr.code.equals(selectedPaymentCurrencyCode, ignoreCase = true)
+                            Box(
+                                modifier = Modifier
+                                    .background(if (isSel) AccentLime else BackgroundBase, RectangleShape)
+                                    .border(1.5.dp, if (isSel) AccentLime else BorderSolid, RectangleShape)
+                                    .clickable { selectedPaymentCurrencyCode = curr.code }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
                                 Text(
-                                    text = acc.name,
+                                    text = curr.code,
                                     style = BrexaTypography.labelMedium.copy(
-                                        color = if (isSel) AccentLime else TextPrimary,
+                                        color = if (isSel) Color.Black else TextPrimary,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 11.sp
                                     )
-                                )
-                                Text(
-                                    text = "${formatter.format(acc.currentBalance)} ${accCurr?.code ?: ""}",
-                                    style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 9.sp)
                                 )
                             }
                         }
                     }
                 }
 
-                // Tasa si la cuenta es en moneda secundaria (ej. Bolívares)
+                // 3. Monto Real Pagado (Editable)
+                BrutalistTextField(
+                    value = amountText,
+                    onValueChange = { amountText = it },
+                    label = "MONTO REAL PAGADO",
+                    suffix = selectedPaymentCurrencyCode,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
+
+                // 4. Tasa si aplica
                 if (isForeignCurrency) {
                     BrutalistTextField(
                         value = rateText,
                         onValueChange = { rateText = it },
                         label = "TASA APLICADA (1 USD =)",
-                        suffix = accCurrCode,
+                        suffix = selectedPaymentCurrencyCode,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
                     )
                 }
 
-                // Tarjeta con resumen del dinero que saldrá de la cuenta
+                // 5. Tarjeta Resumen de Salida de Dinero
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(BackgroundBase, RectangleShape)
                         .border(1.dp, BorderSolid, RectangleShape)
-                        .padding(12.dp)
+                        .padding(10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "SE DESCONTARÁ:",
-                            style = BrexaTypography.labelSmall.copy(color = TextSecondary)
-                        )
-                        Text(
-                            text = "- ${formatter.format(calculatedNativeAmount)} $accCurrCode",
-                            style = BrexaTypography.titleLarge.copy(
-                                color = ExpenseRed,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp
+                        Column {
+                            Text(
+                                text = "SE DESCONTARÁ DE:",
+                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 9.sp)
                             )
-                        )
+                            Text(
+                                text = selectedAccount?.name ?: "Cuenta",
+                                style = BrexaTypography.labelMedium.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
+                            )
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text(
+                                text = "MONTO FINAL:",
+                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 9.sp)
+                            )
+                            Text(
+                                text = "- ${formatter.format(calculatedDeduction)} $accCurrCode",
+                                style = BrexaTypography.titleLarge.copy(
+                                    color = ExpenseRed,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            )
+                        }
                     }
                 }
 
-                // Selector de Fecha
+                // 6. Selector de Fecha
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -938,38 +1161,46 @@ fun PayPendingDialog(
                     )
                 }
 
-                // Nota / Concepto
+                // 7. Concepto en Historial
                 BrutalistTextField(
                     value = noteText,
                     onValueChange = { noteText = it },
-                    label = "CONCEPTO O NOTA",
-                    placeholder = "ej. Pago de servicio..."
+                    label = "CONCEPTO EN HISTORIAL DE GASTOS",
+                    placeholder = "ej. Pago de internet..."
+                )
+
+                // 8. Información de destino
+                val hint = if (pending.expenseType == "FIXED")
+                    "🔄 Al confirmar, se registrará el gasto y su próximo vencimiento avanzará al siguiente ciclo."
+                else
+                    "✓ Al confirmar, se registrará el gasto y se borrará de tus pagos pendientes."
+                Text(
+                    text = hint,
+                    style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 10.sp)
                 )
 
                 if (errorMessage != null) {
                     Text(
-                        text = "⚠️ $errorMessage",
-                        style = BrexaTypography.labelSmall.copy(color = ExpenseRed)
+                        text = errorMessage!!,
+                        style = BrexaTypography.bodySmall.copy(color = ExpenseRed)
                     )
                 }
 
-                // Opción rápida: solo marcar como pagado sin debitar cuenta
+                // Opción para avanzar sin descontar saldo
                 Text(
-                    text = "• Solo marcar como pagado sin descontar saldo",
+                    text = "• ¿Pagado por un tercero? Avanzar sin descontar saldo",
                     style = BrexaTypography.labelSmall.copy(
                         color = AccentPurple,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 10.5.sp
+                        fontSize = 10.sp
                     ),
-                    modifier = Modifier.clickable {
-                        onMarkPaidWithoutDeduct()
-                    }
+                    modifier = Modifier.clickable { onAdvanceWithoutDeduct() }
                 )
             }
         },
         confirmButton = {
             BrutalistBadge(
-                text = "✓ CONFIRMAR PAGO",
+                text = "✓ CONFIRMAR PAGO ➔",
                 backgroundColor = AccentLime,
                 contentColor = Color.Black,
                 borderColor = AccentLime,
@@ -980,6 +1211,10 @@ fun PayPendingDialog(
                         errorMessage = "Selecciona una cuenta de pago."
                         return@clickable
                     }
+                    if (parsedAmount <= 0.0) {
+                        errorMessage = "El monto debe ser mayor a cero."
+                        return@clickable
+                    }
                     if (rateNum <= 0.0) {
                         errorMessage = "La tasa debe ser mayor a 0."
                         return@clickable
@@ -987,7 +1222,7 @@ fun PayPendingDialog(
                     onConfirmPay(
                         selectedAccount.id,
                         rateNum,
-                        calculatedNativeAmount,
+                        calculatedDeduction,
                         noteText,
                         paymentDateTimestamp
                     )
@@ -1009,32 +1244,57 @@ fun PayPendingDialog(
 }
 
 /**
- * Modal Neobrutalista para Añadir un Nuevo Pago Pendiente
+ * Modal Neobrutalista para Crear o Editar un Compromiso (Gasto Variable o Gasto Fijo Recurrente).
  */
 @Composable
-fun CreatePendingExpenseDialog(
+fun CreateOrEditPendingExpenseDialog(
+    initialItem: PendingExpenseEntity? = null,
+    defaultExpenseType: String = "VARIABLE",
     accounts: List<AccountEntity>,
-    currencies: List<com.brexa.app.data.local.entity.CurrencyEntity>,
-    baseCurrency: com.brexa.app.data.local.entity.CurrencyEntity?,
+    currencies: List<CurrencyEntity>,
+    baseCurrency: CurrencyEntity?,
     categories: List<com.brexa.app.data.local.entity.CategoryEntity>,
     onDismiss: () -> Unit,
-    onSave: (title: String, amount: Double, currencyCode: String, dueDateTimestamp: Long, categoryId: String?, accountId: String?, note: String) -> Unit
+    onSave: (
+        title: String,
+        amount: Double,
+        currencyCode: String,
+        dueDateTimestamp: Long,
+        categoryId: String?,
+        accountId: String?,
+        note: String,
+        expenseType: String,
+        recurrencePeriod: String?,
+        recurrenceDay: Int?
+    ) -> Unit
 ) {
     val context = LocalContext.current
-    var title by remember { mutableStateOf("") }
-    var amountText by remember { mutableStateOf("") }
-    var selectedCurrencyCode by remember {
-        mutableStateOf(baseCurrency?.code ?: "USD")
+    var expenseType by remember {
+        mutableStateOf(initialItem?.expenseType ?: if (defaultExpenseType == "FIJOS") "FIXED" else "VARIABLE")
     }
-    var selectedCategoryId by remember { mutableStateOf<String?>(null) }
-    var selectedAccountId by remember { mutableStateOf<String?>(null) }
-    var note by remember { mutableStateOf("") }
+    var recurrencePeriod by remember {
+        mutableStateOf(initialItem?.recurrencePeriod ?: "MONTHLY") // "MONTHLY", "BIWEEKLY", "WEEKLY"
+    }
+    var recurrenceDay by remember {
+        mutableIntStateOf(initialItem?.recurrenceDay ?: 1) // 1 al 31
+    }
+
+    var title by remember { mutableStateOf(initialItem?.title ?: "") }
+    var amountText by remember {
+        mutableStateOf(if (initialItem != null) CurrencyFormat.formatForInput(initialItem.amount) else "")
+    }
+    var selectedCurrencyCode by remember {
+        mutableStateOf(initialItem?.currencyCode ?: baseCurrency?.code ?: "USD")
+    }
+    var selectedCategoryId by remember { mutableStateOf(initialItem?.categoryId) }
+    var selectedAccountId by remember { mutableStateOf(initialItem?.accountId) }
+    var note by remember { mutableStateOf(initialItem?.note ?: "") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // Fecha de vencimiento (por defecto hoy + 3 días)
+    // Fecha de vencimiento
     var dueTimestamp by remember {
         mutableLongStateOf(
-            Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 3) }.timeInMillis
+            initialItem?.dueDateTimestamp ?: Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 3) }.timeInMillis
         )
     }
 
@@ -1046,8 +1306,8 @@ fun CreatePendingExpenseDialog(
         containerColor = SurfaceCard,
         title = {
             Text(
-                text = "NUEVO PAGO PENDIENTE",
-                style = BrexaTypography.titleLarge.copy(color = AccentLime)
+                text = if (initialItem != null) "EDITAR PAGO" else if (expenseType == "FIXED") "NUEVO GASTO FIJO" else "NUEVO GASTO VARIABLE",
+                style = BrexaTypography.titleLarge.copy(color = if (expenseType == "FIXED") AccentPurple else AccentLime)
             )
         },
         text = {
@@ -1057,12 +1317,167 @@ fun CreatePendingExpenseDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Concepto
+                // Selector de Tipo de Gasto (solo al crear)
+                if (initialItem == null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val isVar = expenseType == "VARIABLE"
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(if (isVar) AccentLime else BackgroundBase, RectangleShape)
+                                .border(1.5.dp, if (isVar) AccentLime else BorderSolid, RectangleShape)
+                                .clickable { expenseType = "VARIABLE" }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "⚡ VARIABLE",
+                                style = BrexaTypography.labelMedium.copy(
+                                    color = if (isVar) Color.Black else TextPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                )
+                            )
+                        }
+
+                        val isFix = expenseType == "FIXED"
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(if (isFix) AccentPurple else BackgroundBase, RectangleShape)
+                                .border(1.5.dp, if (isFix) AccentPurple else BorderSolid, RectangleShape)
+                                .clickable { expenseType = "FIXED" }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "🔄 FIJO (RECURRENTE)",
+                                style = BrexaTypography.labelMedium.copy(
+                                    color = if (isFix) Color.White else TextPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // Si es Gasto Fijo: Configurar Frecuencia y Día de cobro
+                if (expenseType == "FIXED") {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = "FRECUENCIA DEL GASTO FIJO",
+                            style = BrexaTypography.labelSmall.copy(color = TextSecondary, letterSpacing = 0.5.sp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            val periods = listOf(
+                                Pair("MONTHLY", "MENSUAL"),
+                                Pair("BIWEEKLY", "QUINCENAL"),
+                                Pair("WEEKLY", "SEMANAL")
+                            )
+                            periods.forEach { (pKey, pLabel) ->
+                                val isSel = recurrencePeriod == pKey
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .background(if (isSel) AccentPurple else BackgroundBase, RectangleShape)
+                                        .border(1.5.dp, if (isSel) AccentPurple else BorderSolid, RectangleShape)
+                                        .clickable { recurrencePeriod = pKey }
+                                        .padding(vertical = 7.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = pLabel,
+                                        style = BrexaTypography.labelSmall.copy(
+                                            color = if (isSel) Color.White else TextSecondary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 9.5.sp
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
+                        // Si es mensual: Día del mes (ej. Todos los 1 de cada mes)
+                        if (recurrencePeriod == "MONTHLY") {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "¿QUÉ DÍA DE CADA MES SE PAGA? (1 al 31)",
+                                style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 10.sp)
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .background(BackgroundBase, RectangleShape)
+                                        .border(1.dp, BorderSolid, RectangleShape)
+                                        .clickable { if (recurrenceDay > 1) recurrenceDay-- }
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text(text = "−", style = BrexaTypography.titleLarge.copy(color = AccentLime))
+                                }
+
+                                Text(
+                                    text = "TODOS LOS $recurrenceDay DE CADA MES",
+                                    style = BrexaTypography.labelMedium.copy(color = AccentLime, fontWeight = FontWeight.Bold)
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .background(BackgroundBase, RectangleShape)
+                                        .border(1.dp, BorderSolid, RectangleShape)
+                                        .clickable { if (recurrenceDay < 31) recurrenceDay++ }
+                                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Text(text = "+", style = BrexaTypography.titleLarge.copy(color = AccentLime))
+                                }
+                            }
+
+                            // Chips rápidos de días populares
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                val popularDays = listOf(1, 5, 15, 20, 25, 30)
+                                popularDays.forEach { d ->
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .background(if (recurrenceDay == d) AccentPurple else BackgroundBase, RectangleShape)
+                                            .border(1.dp, if (recurrenceDay == d) AccentPurple else BorderSolid, RectangleShape)
+                                            .clickable { recurrenceDay = d }
+                                            .padding(vertical = 4.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "DÍA $d",
+                                            style = BrexaTypography.labelSmall.copy(
+                                                color = if (recurrenceDay == d) Color.White else TextSecondary,
+                                                fontSize = 9.sp
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Concepto / Título
                 BrutalistTextField(
                     value = title,
                     onValueChange = { title = it },
                     label = "¿QUÉ TIENES QUE PAGAR?",
-                    placeholder = "ej. Alquiler, Internet, Tarjeta, Condominio..."
+                    placeholder = if (expenseType == "FIXED") "ej. Pago internet, Alquiler, Netflix..." else "ej. Reparación moto, Compra repuesto..."
                 )
 
                 // Monto y Moneda
@@ -1073,7 +1488,7 @@ fun CreatePendingExpenseDialog(
                     BrutalistTextField(
                         value = amountText,
                         onValueChange = { amountText = it },
-                        label = "MONTO",
+                        label = "MONTO ESTIPULADO",
                         placeholder = "0.00",
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         modifier = Modifier.weight(1f)
@@ -1109,10 +1524,10 @@ fun CreatePendingExpenseDialog(
                     }
                 }
 
-                // Selector de Fecha de Vencimiento
+                // Selector de Fecha de Vencimiento / Primer cobro
                 Column {
                     Text(
-                        text = "¿CUÁNDO DEBES PAGARLO?",
+                        text = if (expenseType == "FIXED") "PRÓXIMO VENCIMIENTO" else "¿CUÁNDO DEBES PAGARLO?",
                         style = BrexaTypography.labelSmall.copy(color = TextSecondary, letterSpacing = 0.5.sp),
                         modifier = Modifier.padding(bottom = 6.dp)
                     )
@@ -1167,40 +1582,40 @@ fun CreatePendingExpenseDialog(
                             )
                         }
                     }
+                }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Accesos rápidos de fecha
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        val quickDays = listOf(
-                            Pair("HOY", 0),
-                            Pair("MAÑANA", 1),
-                            Pair("7 DÍAS", 7),
-                            Pair("15 DÍAS", 15)
+                // Cuenta Sugerida de Pago (Opcional)
+                if (accounts.isNotEmpty()) {
+                    Column {
+                        Text(
+                            text = "CUENTA SUGERIDA (OPCIONAL)",
+                            style = BrexaTypography.labelSmall.copy(color = TextSecondary, letterSpacing = 0.5.sp),
+                            modifier = Modifier.padding(bottom = 6.dp)
                         )
-                        quickDays.forEach { (lbl, days) ->
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .background(BackgroundBase, RectangleShape)
-                                    .border(1.dp, BorderSolid, RectangleShape)
-                                    .clickable {
-                                        dueTimestamp = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, days) }.timeInMillis
-                                    }
-                                    .padding(vertical = 6.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = lbl,
-                                    style = BrexaTypography.labelSmall.copy(
-                                        color = TextSecondary,
-                                        fontSize = 9.sp,
-                                        fontWeight = FontWeight.Bold
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(accounts) { acc ->
+                                val isSel = acc.id == selectedAccountId
+                                Box(
+                                    modifier = Modifier
+                                        .background(if (isSel) SurfaceCardElevated else BackgroundBase, RectangleShape)
+                                        .border(
+                                            width = 1.dp,
+                                            color = if (isSel) AccentLime else BorderSolid,
+                                            shape = RectangleShape
+                                        )
+                                        .clickable {
+                                            selectedAccountId = if (isSel) null else acc.id
+                                        }
+                                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                                ) {
+                                    Text(
+                                        text = acc.name,
+                                        style = BrexaTypography.labelSmall.copy(
+                                            color = if (isSel) AccentLime else TextSecondary,
+                                            fontSize = 9.5.sp
+                                        )
                                     )
-                                )
+                                }
                             }
                         }
                     }
@@ -1248,44 +1663,48 @@ fun CreatePendingExpenseDialog(
                     value = note,
                     onValueChange = { note = it },
                     label = "NOTA O DETALLES (OPCIONAL)",
-                    placeholder = "ej. Número de contrato, referencia..."
+                    placeholder = "ej. Número de contrato, referencia de factura..."
                 )
 
                 if (errorMessage != null) {
                     Text(
-                        text = "⚠️ $errorMessage",
-                        style = BrexaTypography.labelSmall.copy(color = ExpenseRed)
+                        text = errorMessage!!,
+                        style = BrexaTypography.bodySmall.copy(color = ExpenseRed)
                     )
                 }
             }
         },
         confirmButton = {
             BrutalistBadge(
-                text = "GUARDAR PAGO",
-                backgroundColor = AccentLime,
-                contentColor = Color.Black,
-                borderColor = AccentLime,
+                text = if (initialItem != null) "✓ ACTUALIZAR" else "✓ GUARDAR",
+                backgroundColor = if (expenseType == "FIXED") AccentPurple else AccentLime,
+                contentColor = if (expenseType == "FIXED") Color.White else Color.Black,
+                borderColor = if (expenseType == "FIXED") AccentPurple else AccentLime,
                 fontSize = 11.sp,
                 contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                 modifier = Modifier.clickable {
                     val cleanTitle = title.trim()
                     if (cleanTitle.isEmpty()) {
-                        errorMessage = "Escribe qué vas a pagar."
+                        errorMessage = "Ingresa el concepto del pago."
                         return@clickable
                     }
-                    val amountVal = CurrencyFormat.parseNumber(amountText) ?: 0.0
-                    if (amountVal <= 0.0) {
-                        errorMessage = "Ingresa un monto válido mayor a 0."
+                    val amount = CurrencyFormat.parseNumber(amountText)
+                    if (amount == null || amount <= 0.0) {
+                        errorMessage = "Ingresa un monto válido mayor a cero."
                         return@clickable
                     }
+
                     onSave(
                         cleanTitle,
-                        amountVal,
+                        amount,
                         selectedCurrencyCode,
                         dueTimestamp,
                         selectedCategoryId,
                         selectedAccountId,
-                        note.trim()
+                        note,
+                        expenseType,
+                        if (expenseType == "FIXED") recurrencePeriod else null,
+                        if (expenseType == "FIXED" && recurrencePeriod == "MONTHLY") recurrenceDay else null
                     )
                 }
             )
@@ -1297,7 +1716,7 @@ fun CreatePendingExpenseDialog(
                 contentColor = TextSecondary,
                 borderColor = BorderSolid,
                 fontSize = 11.sp,
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                 modifier = Modifier.clickable { onDismiss() }
             )
         }

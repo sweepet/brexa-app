@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.util.Calendar
 import java.util.UUID
 
 data class BackupPayload(
@@ -674,6 +675,41 @@ class BrexaRepository(private val db: BrexaDatabase) {
     fun getActivePendingExpenses(): Flow<List<PendingExpenseEntity>> = pendingExpenseDao.getActivePendingExpenses()
     fun getPaidPendingExpenses(): Flow<List<PendingExpenseEntity>> = pendingExpenseDao.getPaidPendingExpenses()
 
+    fun calculateNextDueDate(
+        currentDueDate: Long,
+        recurrencePeriod: String?,
+        recurrenceDay: Int?
+    ): Long {
+        val cal = Calendar.getInstance().apply { timeInMillis = currentDueDate }
+        when (recurrencePeriod) {
+            "WEEKLY" -> {
+                cal.add(Calendar.WEEK_OF_YEAR, 1)
+            }
+            "BIWEEKLY" -> {
+                cal.add(Calendar.DAY_OF_YEAR, 14)
+            }
+            "MONTHLY" -> {
+                cal.add(Calendar.MONTH, 1)
+                if (recurrenceDay != null && recurrenceDay in 1..31) {
+                    val maxDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                    cal.set(Calendar.DAY_OF_MONTH, minOf(recurrenceDay, maxDay))
+                }
+            }
+            else -> {
+                cal.add(Calendar.MONTH, 1)
+            }
+        }
+        val now = System.currentTimeMillis()
+        while (cal.timeInMillis < now) {
+            when (recurrencePeriod) {
+                "WEEKLY" -> cal.add(Calendar.WEEK_OF_YEAR, 1)
+                "BIWEEKLY" -> cal.add(Calendar.DAY_OF_YEAR, 14)
+                else -> cal.add(Calendar.MONTH, 1)
+            }
+        }
+        return cal.timeInMillis
+    }
+
     suspend fun addPendingExpense(
         title: String,
         amount: Double,
@@ -681,7 +717,10 @@ class BrexaRepository(private val db: BrexaDatabase) {
         dueDateTimestamp: Long,
         categoryId: String? = null,
         accountId: String? = null,
-        note: String = ""
+        note: String = "",
+        expenseType: String = "VARIABLE",
+        recurrencePeriod: String? = null,
+        recurrenceDay: Int? = null
     ): Result<PendingExpenseEntity> {
         val cleanTitle = title.trim()
         if (cleanTitle.isEmpty()) {
@@ -701,6 +740,9 @@ class BrexaRepository(private val db: BrexaDatabase) {
             accountId = accountId,
             note = note.trim(),
             isPaid = false,
+            expenseType = expenseType,
+            recurrencePeriod = recurrencePeriod,
+            recurrenceDay = recurrenceDay,
             createdAt = System.currentTimeMillis(),
             updatedAt = System.currentTimeMillis()
         )
@@ -727,12 +769,23 @@ class BrexaRepository(private val db: BrexaDatabase) {
     suspend fun markPendingAsPaidWithoutExpense(id: String): Result<Unit> {
         val item = pendingExpenseDao.getPendingExpenseById(id)
             ?: return Result.failure(IllegalArgumentException("Pago pendiente no encontrado."))
-        val updated = item.copy(
-            isPaid = true,
-            paidAtTimestamp = System.currentTimeMillis(),
-            updatedAt = System.currentTimeMillis()
-        )
-        pendingExpenseDao.update(updated)
+        if (item.expenseType == "FIXED") {
+            val nextDueDate = calculateNextDueDate(
+                currentDueDate = item.dueDateTimestamp,
+                recurrencePeriod = item.recurrencePeriod,
+                recurrenceDay = item.recurrenceDay
+            )
+            val updated = item.copy(
+                dueDateTimestamp = nextDueDate,
+                isPaid = false,
+                paidAtTimestamp = System.currentTimeMillis(),
+                updatedAt = System.currentTimeMillis()
+            )
+            pendingExpenseDao.update(updated)
+        } else {
+            // Gasto variable completado: se elimina de la sección de pendientes
+            pendingExpenseDao.deleteById(id)
+        }
         return Result.success(Unit)
     }
 
@@ -799,14 +852,26 @@ class BrexaRepository(private val db: BrexaDatabase) {
 
             txResult.fold(
                 onSuccess = { tx ->
-                    val updated = pending.copy(
-                        isPaid = true,
-                        paidAtTimestamp = paymentDateTimestamp,
-                        transactionId = tx.id,
-                        accountId = accountId,
-                        updatedAt = System.currentTimeMillis()
-                    )
-                    pendingExpenseDao.update(updated)
+                    if (pending.expenseType == "FIXED") {
+                        val nextDueDate = calculateNextDueDate(
+                            currentDueDate = pending.dueDateTimestamp,
+                            recurrencePeriod = pending.recurrencePeriod,
+                            recurrenceDay = pending.recurrenceDay
+                        )
+                        val updated = pending.copy(
+                            dueDateTimestamp = nextDueDate,
+                            isPaid = false,
+                            paidAtTimestamp = paymentDateTimestamp,
+                            transactionId = tx.id,
+                            accountId = accountId,
+                            updatedAt = System.currentTimeMillis()
+                        )
+                        pendingExpenseDao.update(updated)
+                    } else {
+                        // Gasto variable: se borra de la sección de pendientes
+                        // y queda guardado en el historial correspondiente (gastos)
+                        pendingExpenseDao.deleteById(pending.id)
+                    }
                     Result.success(tx)
                 },
                 onFailure = { error ->

@@ -22,7 +22,7 @@ import kotlinx.coroutines.launch
         AppSettingEntity::class,
         PendingExpenseEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class BrexaDatabase : RoomDatabase() {
@@ -72,6 +72,15 @@ abstract class BrexaDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `pending_expenses` ADD COLUMN `expense_type` TEXT NOT NULL DEFAULT 'VARIABLE'")
+                db.execSQL("ALTER TABLE `pending_expenses` ADD COLUMN `recurrence_period` TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE `pending_expenses` ADD COLUMN `recurrence_day` INTEGER DEFAULT NULL")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_pending_expenses_expense_type` ON `pending_expenses` (`expense_type`)")
+            }
+        }
+
         fun getDatabase(context: Context, scope: CoroutineScope): BrexaDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -79,7 +88,7 @@ abstract class BrexaDatabase : RoomDatabase() {
                     BrexaDatabase::class.java,
                     "brexa_database.db"
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .addCallback(BrexaDatabaseCallback(scope))
                     .build()
                 INSTANCE = instance

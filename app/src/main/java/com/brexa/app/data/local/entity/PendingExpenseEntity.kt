@@ -33,7 +33,8 @@ import androidx.room.PrimaryKey
         Index(value = ["is_paid"]),
         Index(value = ["category_id"]),
         Index(value = ["account_id"]),
-        Index(value = ["transaction_id"])
+        Index(value = ["transaction_id"]),
+        Index(value = ["expense_type"])
     ]
 )
 data class PendingExpenseEntity(
@@ -70,6 +71,15 @@ data class PendingExpenseEntity(
 
     @ColumnInfo(name = "transaction_id")
     val transactionId: String? = null,
+
+    @ColumnInfo(name = "expense_type")
+    val expenseType: String = "VARIABLE", // "VARIABLE" (puntual) o "FIXED" (recurrente)
+
+    @ColumnInfo(name = "recurrence_period")
+    val recurrencePeriod: String? = null, // "WEEKLY", "BIWEEKLY", "MONTHLY"
+
+    @ColumnInfo(name = "recurrence_day")
+    val recurrenceDay: Int? = null, // Día del mes para fijos (ej. 1 para todos los 1)
 
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis(),

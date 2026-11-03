@@ -702,6 +702,9 @@ class BrexaViewModel(
         categoryId: String? = null,
         accountId: String? = null,
         note: String = "",
+        expenseType: String = "VARIABLE",
+        recurrencePeriod: String? = null,
+        recurrenceDay: Int? = null,
         onSuccess: () -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
@@ -713,7 +716,10 @@ class BrexaViewModel(
                 dueDateTimestamp = dueDateTimestamp,
                 categoryId = categoryId,
                 accountId = accountId,
-                note = note
+                note = note,
+                expenseType = expenseType,
+                recurrencePeriod = recurrencePeriod,
+                recurrenceDay = recurrenceDay
             )
             result.onSuccess {
                 triggerAutoBackup()
