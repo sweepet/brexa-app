@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Condiciones del Servicio // Brexa</title>
+    <style>
+        :root {
+            --bg: #111111;
+            --surface: #1A1A1A;
+            --border: #2C2C2C;
+            --lime: #D4FF00;
+            --text-primary: #FFFFFF;
+            --text-secondary: #8E8E93;
+            --accent-red: #FF3366;
+            --accent-green: #00FF88;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Space Mono", monospace, sans-serif;
+        }
+        body {
+            background-color: var(--bg);
+            color: var(--text-primary);
+            line-height: 1.6;
+            padding: 24px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        header {
+            border: 2px solid var(--lime);
+            background-color: var(--surface);
+            padding: 24px;
+            box-shadow: 4px 4px 0px var(--lime);
+            margin-bottom: 32px;
+        }
+        h1 {
+            color: var(--lime);
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            color: var(--text-secondary);
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .card {
+            border: 2px solid var(--border);
+            background-color: var(--surface);
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 4px 4px 0px #000;
+        }
+        .card h2 {
+            color: var(--lime);
+            font-size: 16px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 6px;
+        }
+        p {
+            color: #CCCCCC;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        ul {
+            list-style: none;
+            margin-bottom: 14px;
+        }
+        ul li {
+            padding: 6px 0;
+            border-bottom: 1px solid #222;
+            font-size: 14px;
+            color: #E0E0E0;
+        }
+        ul li::before {
+            content: "• ";
+            color: var(--lime);
+            font-weight: bold;
+        }
+        .highlight {
+            color: var(--lime);
+            font-weight: bold;
+        }
+        footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--text-secondary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        footer a {
+            color: var(--lime);
+            text-decoration: none;
+        }
+        footer a:hover {
+            text-decoration: underline;
+        }
+        .back-link {
+            display: inline-block;
+            margin-bottom: 16px;
+            color: var(--lime);
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+    <a href="index.html" class="back-link">← Volver al inicio</a>
+
+    <header>
+        <h1>CONDICIONES DEL SERVICIO</h1>
+        <div class="subtitle">Brexa // Última actualización: Noviembre 2026</div>
+    </header>
+
+    <div class="card">
+        <h2>1. Aceptación de los Términos</h2>
+        <p>Al descargar, instalar o utilizar la aplicación <strong>Brexa</strong>, aceptas quedar vinculado por estas Condiciones del Servicio. Si no estás de acuerdo con alguno de los términos aquí estipulados, te recomendamos desinstalar la aplicación y no hacer uso de sus servicios.</p>
+    </div>
+
+    <div class="card">
+        <h2>2. Naturaleza del Servicio</h2>
+        <p><strong>Brexa</strong> es una herramienta de software orientada exclusivamente a la gestión, registro y organización personal de finanzas y contabilidad doméstica:</p>
+        <ul>
+            <li><strong>No es una entidad financiera:</strong> Brexa no es un banco, pasarela de pago, intermediario cambiario ni billetera electrónica con custodia de fondos.</li>
+            <li><strong>No procesa dinero real:</strong> Los registros de gastos, ingresos, saldos o transferencias entre cuentas corresponden a simulaciones y anotaciones contables efectuadas por el propio usuario. Brexa no mueve dinero real entre tus cuentas bancarias.</li>
+            <li><strong>Herramienta de autocontrol:</strong> La exactitud de las cifras y balances reflejados depende en su totalidad de la fidelidad de los datos ingresados voluntariamente por el usuario.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>3. Privacidad y Almacenamiento Local</h2>
+        <p>Brexa opera con un enfoque <em>Local-First</em>. La totalidad de tus datos se almacena en el almacenamiento interno de tu dispositivo móvil y no se recopilan ni comercializan en servidores propios de los desarrolladores.</p>
+        <p>Para más información detallada sobre el tratamiento de tus datos, consulta nuestra <a href="privacidad.html" style="color: var(--lime); font-weight: bold;">Política de Privacidad</a>.</p>
+    </div>
+
+    <div class="card">
+        <h2>4. Servicios de Terceros y Google Drive</h2>
+        <p>La aplicación incluye una funcionalidad voluntaria de sincronización y respaldo con tu cuenta personal de Google Drive:</p>
+        <ul>
+            <li>Al conectar tu cuenta de Google, concedes a Brexa autorización técnica limitada para crear y actualizar un archivo de respaldo cifrado en la carpeta privada de datos de la aplicación (<code>drive.appdata</code>).</li>
+            <li>Brexa no accede a documentos, fotos ni archivos privados fuera de su propia carpeta de respaldo.</li>
+            <li>El usuario es responsable de mantener la seguridad, credenciales y métodos de autenticación de su cuenta de Google.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>5. Tasas de Cambio y Cotizaciones de Referencia</h2>
+        <p>Brexa puede consultar y presentar tasas de cambio de referencia (como el Banco Central de Venezuela o la Tasa Representativa del Mercado) obtenidas a través de servicios públicos en línea:</p>
+        <ul>
+            <li>Dichas tasas son únicamente informativas y de apoyo para tus cálculos personales.</li>
+            <li>Brexa no garantiza la inmediatez, exactitud absoluta ni continuidad ininterrumpida de estas tasas públicas.</li>
+            <li>Las decisiones financieras tomadas con base en dichas estimaciones son responsabilidad exclusiva del usuario.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>6. Limitación de Responsabilidad</h2>
+        <p>La aplicación se proporciona "tal cual" y "según disponibilidad", sin garantías expresas o implícitas de ningún tipo. Los desarrolladores no serán responsables por:</p>
+        <ul>
+            <li>Pérdida de datos provocada por daños físicos en el dispositivo, desinstalación de la app sin respaldo previo o fallos ajenos del sistema operativo.</li>
+            <li>Errores en cálculos o registros derivados de datos introducidos de forma errónea por el usuario.</li>
+            <li>Interrupciones en servicios de terceros como Google Drive o servicios de cotización cambiaria.</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h2>7. Modificaciones de los Términos</h2>
+        <p>Nos reservamos el derecho de actualizar o modificar estas Condiciones del Servicio en cualquier momento. Cualquier cambio significativo se publicará en esta página web y en el repositorio oficial de código abierto.</p>
+    </div>
+
+    <div class="card">
+        <h2>8. Contacto</h2>
+        <p>Si tienes preguntas o inquietudes respecto a estas Condiciones del Servicio, puedes contactar al desarrollador en:</p>
+        <p><strong>Correo electrónico:</strong> <a href="mailto:fuenmayorvhfs@gmail.com" style="color: var(--lime);">fuenmayorvhfs@gmail.com</a><br>
+        <strong>Repositorio oficial:</strong> <a href="https://github.com/sweepet/brexa-app" target="_blank" style="color: var(--lime);">github.com/sweepet/brexa-app</a></p>
+    </div>
+
+    <footer>
+        <div>© 2026 Brexa. Desarrollado por Víctor Fuenmayor.</div>
+        <div>
+            <a href="index.html">Página Principal</a> • 
+            <a href="privacidad.html">Política de Privacidad</a>
+        </div>
+    </footer>
+
+</body>
+</html>
