@@ -398,6 +398,9 @@ class BrexaRepository(private val db: BrexaDatabase) {
     }
 
     // --- TRANSACCIONES CON REVERSIÓN Y FÓRMULAS CONTABLES ---
+    fun getAllTransactions(): Flow<List<TransactionEntity>> =
+        transactionDao.getAllTransactions()
+
     fun getRecentTransactions(limit: Int = 20): Flow<List<TransactionEntity>> =
         transactionDao.getRecentTransactions(limit)
 

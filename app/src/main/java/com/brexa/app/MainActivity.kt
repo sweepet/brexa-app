@@ -148,8 +148,15 @@ class MainActivity : ComponentActivity() {
                                 onOpenAnalytics = { currentScreen = "ANALYTICS" },
                                 onOpenSettings = { currentScreen = "SETTINGS" },
                                 onOpenPendingExpenses = { currentScreen = "PENDING_EXPENSES" },
+                                onOpenTransactionHistory = { currentScreen = "TRANSACTION_HISTORY" },
                                 forceStartTour = shouldForceTour,
                                 onTourDismissed = { shouldForceTour = false }
+                            )
+                        }
+                        "TRANSACTION_HISTORY" -> {
+                            TransactionHistoryScreen(
+                                viewModel = viewModel,
+                                onBack = { currentScreen = "HOME" }
                             )
                         }
                         "PENDING_EXPENSES" -> {

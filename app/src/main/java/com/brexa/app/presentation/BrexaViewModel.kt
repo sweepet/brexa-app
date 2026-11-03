@@ -122,6 +122,9 @@ class BrexaViewModel(
     val recentTransactions: StateFlow<List<TransactionEntity>> = repository.getRecentTransactions(30)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val allTransactions: StateFlow<List<TransactionEntity>> = repository.getAllTransactions()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     val expenseCategories: StateFlow<List<CategoryEntity>> = repository.getActiveCategoriesByType("EXPENSE")
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

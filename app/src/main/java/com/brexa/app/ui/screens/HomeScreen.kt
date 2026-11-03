@@ -36,6 +36,7 @@ import com.brexa.app.data.local.entity.AccountEntity
 import com.brexa.app.data.local.entity.TransactionEntity
 import com.brexa.app.presentation.BrexaViewModel
 import com.brexa.app.ui.components.BrutalistBadge
+import com.brexa.app.ui.components.BrutalistButton
 import com.brexa.app.ui.components.BrutalistCard
 import com.brexa.app.ui.components.OnboardingTour
 import com.brexa.app.ui.theme.*
@@ -52,6 +53,7 @@ fun HomeScreen(
     onOpenAnalytics: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenPendingExpenses: () -> Unit,
+    onOpenTransactionHistory: () -> Unit = {},
     forceStartTour: Boolean = false,
     onTourDismissed: () -> Unit = {}
 ) {
@@ -60,6 +62,7 @@ fun HomeScreen(
     val currencies by viewModel.allCurrencies.collectAsState()
     val baseCurrency by viewModel.baseCurrency.collectAsState()
     val recentTransactions by viewModel.recentTransactions.collectAsState()
+    val allTransactions by viewModel.allTransactions.collectAsState()
     val isIncognito by viewModel.incognitoMode.collectAsState()
     val expenseCats by viewModel.expenseCategories.collectAsState()
     val incomeCats by viewModel.incomeCategories.collectAsState()
@@ -726,14 +729,27 @@ fun HomeScreen(
                         text = "HISTORIAL DE MOVIMIENTOS",
                         style = BrexaTypography.labelLarge.copy(color = TextPrimary)
                     )
-                    Text(
-                        text = "${recentTransactions.size} REGISTROS",
-                        style = BrexaTypography.labelMedium.copy(color = TextSecondary)
-                    )
+                    if (allTransactions.isNotEmpty()) {
+                        Text(
+                            text = "VER TODO (${allTransactions.size}) ➔",
+                            style = BrexaTypography.labelMedium.copy(
+                                color = AccentLime,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            modifier = Modifier
+                                .clickable { onOpenTransactionHistory() }
+                                .padding(vertical = 4.dp)
+                        )
+                    } else {
+                        Text(
+                            text = "0 REGISTROS",
+                            style = BrexaTypography.labelMedium.copy(color = TextSecondary)
+                        )
+                    }
                 }
             }
 
-            if (recentTransactions.isEmpty()) {
+            if (allTransactions.isEmpty()) {
                 item {
                     Box(
                         modifier = Modifier
@@ -757,7 +773,7 @@ fun HomeScreen(
                     }
                 }
             } else {
-                items(recentTransactions) { tx ->
+                items(allTransactions.take(3)) { tx ->
                     val acc = accounts.find { it.id == tx.accountId }
                     val destAcc = tx.destinationAccountId?.let { id -> accounts.find { it.id == id } }
                     val cat = tx.categoryId?.let { categoryMap[it] }
@@ -913,6 +929,18 @@ fun HomeScreen(
                             }
                         }
                     }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    BrutalistButton(
+                        text = "VER HISTORIAL COMPLETO (${allTransactions.size} REGISTROS) ➔",
+                        onClick = onOpenTransactionHistory,
+                        containerColor = SurfaceCard,
+                        contentColor = AccentLime,
+                        borderColor = AccentLime,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
