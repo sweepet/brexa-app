@@ -704,10 +704,82 @@ class BrexaRepository(private val db: BrexaDatabase) {
             when (recurrencePeriod) {
                 "WEEKLY" -> cal.add(Calendar.WEEK_OF_YEAR, 1)
                 "BIWEEKLY" -> cal.add(Calendar.DAY_OF_YEAR, 14)
-                else -> cal.add(Calendar.MONTH, 1)
+                else -> {
+                    cal.add(Calendar.MONTH, 1)
+                    if (recurrenceDay != null && recurrenceDay in 1..31) {
+                        val maxDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                        cal.set(Calendar.DAY_OF_MONTH, minOf(recurrenceDay, maxDay))
+                    }
+                }
             }
         }
         return cal.timeInMillis
+    }
+
+    fun calculateInitialDueDate(
+        recurrencePeriod: String?,
+        recurrenceDay: Int?,
+        isCurrentCyclePaid: Boolean = true,
+        baseTime: Long = System.currentTimeMillis()
+    ): Long {
+        val cal = Calendar.getInstance().apply {
+            timeInMillis = baseTime
+            set(Calendar.HOUR_OF_DAY, 12)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val currentDay = cal.get(Calendar.DAY_OF_MONTH)
+
+        when (recurrencePeriod) {
+            "WEEKLY" -> {
+                cal.add(Calendar.WEEK_OF_YEAR, 1)
+            }
+            "BIWEEKLY" -> {
+                cal.add(Calendar.DAY_OF_YEAR, 14)
+            }
+            "MONTHLY" -> {
+                val day = recurrenceDay ?: 1
+                if (day > currentDay) {
+                    val maxDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                    cal.set(Calendar.DAY_OF_MONTH, minOf(day, maxDay))
+                } else if (day == currentDay) {
+                    val maxDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                    cal.set(Calendar.DAY_OF_MONTH, minOf(day, maxDay))
+                } else {
+                    if (isCurrentCyclePaid) {
+                        cal.add(Calendar.MONTH, 1)
+                        val maxDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                        cal.set(Calendar.DAY_OF_MONTH, minOf(day, maxDay))
+                    } else {
+                        val maxDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                        cal.set(Calendar.DAY_OF_MONTH, minOf(day, maxDay))
+                    }
+                }
+            }
+            else -> {
+                cal.add(Calendar.MONTH, 1)
+            }
+        }
+        return cal.timeInMillis
+    }
+
+    suspend fun repairInconsistentFixedExpenses() {
+        try {
+            val all = pendingExpenseDao.getAllPendingExpensesSync()
+            all.filter { it.expenseType == "FIXED" && it.recurrencePeriod == "MONTHLY" && it.recurrenceDay != null }.forEach { item ->
+                val cal = Calendar.getInstance().apply { timeInMillis = item.dueDateTimestamp }
+                val targetDay = item.recurrenceDay ?: 1
+                if (cal.get(Calendar.DAY_OF_MONTH) != targetDay) {
+                    val fixedDueDate = calculateInitialDueDate(
+                        recurrencePeriod = item.recurrencePeriod,
+                        recurrenceDay = item.recurrenceDay,
+                        isCurrentCyclePaid = true
+                    )
+                    pendingExpenseDao.update(item.copy(dueDateTimestamp = fixedDueDate, updatedAt = System.currentTimeMillis()))
+                }
+            }
+        } catch (_: Exception) {}
     }
 
     suspend fun addPendingExpense(

@@ -1291,10 +1291,74 @@ fun CreateOrEditPendingExpenseDialog(
     var note by remember { mutableStateOf(initialItem?.note ?: "") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
+    var isCurrentMonthPaid by remember {
+        mutableStateOf(
+            if (initialItem != null) {
+                val cal = Calendar.getInstance().apply { timeInMillis = initialItem.dueDateTimestamp }
+                val today = Calendar.getInstance()
+                cal.timeInMillis >= today.timeInMillis
+            } else true
+        )
+    }
+
+    fun computeFixedDueDate(period: String, day: Int, isPaidThisMonth: Boolean): Long {
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 12)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        val todayDay = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+        when (period) {
+            "MONTHLY" -> {
+                val maxDayThisMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                val clampedDay = minOf(day, maxDayThisMonth)
+                if (clampedDay > todayDay) {
+                    cal.set(Calendar.DAY_OF_MONTH, clampedDay)
+                } else if (clampedDay == todayDay) {
+                    cal.set(Calendar.DAY_OF_MONTH, clampedDay)
+                } else {
+                    if (isPaidThisMonth) {
+                        cal.add(Calendar.MONTH, 1)
+                        val maxDayNextMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+                        cal.set(Calendar.DAY_OF_MONTH, minOf(day, maxDayNextMonth))
+                    } else {
+                        cal.set(Calendar.DAY_OF_MONTH, clampedDay)
+                    }
+                }
+            }
+            "BIWEEKLY" -> {
+                cal.add(Calendar.DAY_OF_YEAR, 14)
+            }
+            "WEEKLY" -> {
+                cal.add(Calendar.WEEK_OF_YEAR, 1)
+            }
+        }
+        return cal.timeInMillis
+    }
+
     // Fecha de vencimiento
     var dueTimestamp by remember {
         mutableLongStateOf(
-            initialItem?.dueDateTimestamp ?: Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 3) }.timeInMillis
+            if (initialItem != null) {
+                if (initialItem.expenseType == "FIXED" && initialItem.recurrencePeriod == "MONTHLY" && initialItem.recurrenceDay != null) {
+                    val cal = Calendar.getInstance().apply { timeInMillis = initialItem.dueDateTimestamp }
+                    if (cal.get(Calendar.DAY_OF_MONTH) != initialItem.recurrenceDay) {
+                        computeFixedDueDate("MONTHLY", initialItem.recurrenceDay, true)
+                    } else {
+                        initialItem.dueDateTimestamp
+                    }
+                } else {
+                    initialItem.dueDateTimestamp
+                }
+            } else {
+                val isFixed = (if (defaultExpenseType == "FIJOS") "FIXED" else "VARIABLE") == "FIXED"
+                if (isFixed) {
+                    computeFixedDueDate("MONTHLY", 1, true)
+                } else {
+                    Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 3) }.timeInMillis
+                }
+            }
         )
     }
 
@@ -1329,7 +1393,10 @@ fun CreateOrEditPendingExpenseDialog(
                                 .weight(1f)
                                 .background(if (isVar) AccentLime else BackgroundBase, RectangleShape)
                                 .border(1.5.dp, if (isVar) AccentLime else BorderSolid, RectangleShape)
-                                .clickable { expenseType = "VARIABLE" }
+                                .clickable {
+                                    expenseType = "VARIABLE"
+                                    dueTimestamp = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 3) }.timeInMillis
+                                }
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1349,7 +1416,10 @@ fun CreateOrEditPendingExpenseDialog(
                                 .weight(1f)
                                 .background(if (isFix) AccentPurple else BackgroundBase, RectangleShape)
                                 .border(1.5.dp, if (isFix) AccentPurple else BorderSolid, RectangleShape)
-                                .clickable { expenseType = "FIXED" }
+                                .clickable {
+                                    expenseType = "FIXED"
+                                    dueTimestamp = computeFixedDueDate(recurrencePeriod, recurrenceDay, isCurrentMonthPaid)
+                                }
                                 .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
@@ -1388,7 +1458,10 @@ fun CreateOrEditPendingExpenseDialog(
                                         .weight(1f)
                                         .background(if (isSel) AccentPurple else BackgroundBase, RectangleShape)
                                         .border(1.5.dp, if (isSel) AccentPurple else BorderSolid, RectangleShape)
-                                        .clickable { recurrencePeriod = pKey }
+                                        .clickable {
+                                            recurrencePeriod = pKey
+                                            dueTimestamp = computeFixedDueDate(pKey, recurrenceDay, isCurrentMonthPaid)
+                                        }
                                         .padding(vertical = 7.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -1420,7 +1493,12 @@ fun CreateOrEditPendingExpenseDialog(
                                     modifier = Modifier
                                         .background(BackgroundBase, RectangleShape)
                                         .border(1.dp, BorderSolid, RectangleShape)
-                                        .clickable { if (recurrenceDay > 1) recurrenceDay-- }
+                                        .clickable {
+                                            if (recurrenceDay > 1) {
+                                                recurrenceDay--
+                                                dueTimestamp = computeFixedDueDate(recurrencePeriod, recurrenceDay, isCurrentMonthPaid)
+                                            }
+                                        }
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(text = "−", style = BrexaTypography.titleLarge.copy(color = AccentLime))
@@ -1435,7 +1513,12 @@ fun CreateOrEditPendingExpenseDialog(
                                     modifier = Modifier
                                         .background(BackgroundBase, RectangleShape)
                                         .border(1.dp, BorderSolid, RectangleShape)
-                                        .clickable { if (recurrenceDay < 31) recurrenceDay++ }
+                                        .clickable {
+                                            if (recurrenceDay < 31) {
+                                                recurrenceDay++
+                                                dueTimestamp = computeFixedDueDate(recurrencePeriod, recurrenceDay, isCurrentMonthPaid)
+                                            }
+                                        }
                                         .padding(horizontal = 16.dp, vertical = 8.dp)
                                 ) {
                                     Text(text = "+", style = BrexaTypography.titleLarge.copy(color = AccentLime))
@@ -1454,7 +1537,10 @@ fun CreateOrEditPendingExpenseDialog(
                                             .weight(1f)
                                             .background(if (recurrenceDay == d) AccentPurple else BackgroundBase, RectangleShape)
                                             .border(1.dp, if (recurrenceDay == d) AccentPurple else BorderSolid, RectangleShape)
-                                            .clickable { recurrenceDay = d }
+                                            .clickable {
+                                                recurrenceDay = d
+                                                dueTimestamp = computeFixedDueDate(recurrencePeriod, d, isCurrentMonthPaid)
+                                            }
                                             .padding(vertical = 4.dp),
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -1463,6 +1549,70 @@ fun CreateOrEditPendingExpenseDialog(
                                             style = BrexaTypography.labelSmall.copy(
                                                 color = if (recurrenceDay == d) Color.White else TextSecondary,
                                                 fontSize = 9.sp
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Si el día ya pasó este mes (ej. hoy es día 3 y el pago es el 1)
+                            val currentDay = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+                            if (currentDay > recurrenceDay) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                val calNext = Calendar.getInstance().apply { add(Calendar.MONTH, 1) }
+                                val nextMonthName = SimpleDateFormat("MMMM", Locale("es", "ES")).format(calNext.time).replaceFirstChar { it.uppercase() }
+                                val currentMonthName = SimpleDateFormat("MMMM", Locale("es", "ES")).format(Calendar.getInstance().time).replaceFirstChar { it.uppercase() }
+
+                                Text(
+                                    text = "El día $recurrenceDay ya pasó este mes (hoy es $currentDay de $currentMonthName):",
+                                    style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 9.5.sp)
+                                )
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .background(if (isCurrentMonthPaid) AccentPurple else BackgroundBase, RectangleShape)
+                                            .border(1.dp, if (isCurrentMonthPaid) AccentPurple else BorderSolid, RectangleShape)
+                                            .clickable {
+                                                isCurrentMonthPaid = true
+                                                dueTimestamp = computeFixedDueDate(recurrencePeriod, recurrenceDay, true)
+                                            }
+                                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "✓ YA PAGUÉ ESTE MES\nPróximo: $recurrenceDay de $nextMonthName",
+                                            textAlign = TextAlign.Center,
+                                            style = BrexaTypography.labelSmall.copy(
+                                                color = if (isCurrentMonthPaid) Color.White else TextSecondary,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        )
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .background(if (!isCurrentMonthPaid) ExpenseRed else BackgroundBase, RectangleShape)
+                                            .border(1.dp, if (!isCurrentMonthPaid) ExpenseRed else BorderSolid, RectangleShape)
+                                            .clickable {
+                                                isCurrentMonthPaid = false
+                                                dueTimestamp = computeFixedDueDate(recurrencePeriod, recurrenceDay, false)
+                                            }
+                                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "⚠ DEBO EL DE ESTE MES\nVencido: $recurrenceDay de $currentMonthName",
+                                            textAlign = TextAlign.Center,
+                                            style = BrexaTypography.labelSmall.copy(
+                                                color = if (!isCurrentMonthPaid) Color.White else TextSecondary,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold
                                             )
                                         )
                                     }

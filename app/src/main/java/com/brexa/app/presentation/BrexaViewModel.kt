@@ -40,6 +40,12 @@ class BrexaViewModel(
 
     private var autoBackupJob: Job? = null
 
+    init {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.repairInconsistentFixedExpenses()
+        }
+    }
+
     /**
      * Sincronización automática silenciosa con Google Drive si la sesión está activa.
      * Consolida operaciones rápidas con debounce de 1.2s y actualiza el timestamp en Room.
