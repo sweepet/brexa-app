@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -152,15 +153,27 @@ object DailyReminderManager {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val largeIcon = try {
+            BitmapFactory.decodeResource(context.resources, R.drawable.logo_brexa)
+        } catch (_: Exception) {
+            null
+        }
+
+        val notificationBuilder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_brexa_notification)
+            .setColor(0xFFD4FF00.toInt()) // Brexa Neon Lime (#D4FF00)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(contentPendingIntent)
             .setAutoCancel(true)
-            .build()
+
+        if (largeIcon != null) {
+            notificationBuilder.setLargeIcon(largeIcon)
+        }
+
+        val notification = notificationBuilder.build()
 
         try {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
