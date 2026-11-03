@@ -430,7 +430,12 @@ fun HomeScreen(
                             }
                         }
 
-                        if (totalPendingUsd > 0.0) {
+                        val urgentPendingUsd = projections.total7DaysUsd
+                        val hasOverdue = projections.overdueCount > 0
+                        val hasDueSoon = projections.count7Days > 0
+
+                        if (urgentPendingUsd > 0.0) {
+                            val freeAvailableUsd = totalUsd - urgentPendingUsd
                             Spacer(modifier = Modifier.height(10.dp))
                             Box(
                                 modifier = Modifier
@@ -445,13 +450,13 @@ fun HomeScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "SALDO LIBRE REAL:",
+                                    text = if (hasOverdue) "SALDO LIBRE (RESTANDO VENCIDOS):" else "SALDO LIBRE (PRÓX. 7 DÍAS):",
                                     style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 10.sp)
                                 )
                                 Text(
-                                    text = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(realAvailableUsd)}",
+                                    text = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(freeAvailableUsd)}",
                                     style = BrexaTypography.labelMedium.copy(
-                                        color = if (realAvailableUsd >= 0.0) IncomeGreen else ExpenseRed,
+                                        color = if (freeAvailableUsd >= 0.0) IncomeGreen else ExpenseRed,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 12.sp
                                     )
@@ -464,10 +469,14 @@ fun HomeScreen(
 
             // --- 2.1 WIDGET ACCESO A PAGOS PENDIENTES ---
             item {
+                val hasOverdue = projections.overdueCount > 0
+                val hasDueSoon = projections.count7Days > 0
+                val urgentPendingUsd = projections.total7DaysUsd
+
                 BrutalistCard(
                     modifier = Modifier.fillMaxWidth(),
                     backgroundColor = SurfaceCard,
-                    borderColor = if (projections.overdueCount > 0) ExpenseRed else BorderSolid,
+                    borderColor = if (hasOverdue) ExpenseRed else BorderSolid,
                     borderWidth = 1.5.dp,
                     onClick = onOpenPendingExpenses
                 ) {
@@ -485,47 +494,68 @@ fun HomeScreen(
                             Text(
                                 text = "📋 PAGOS PENDIENTES",
                                 style = BrexaTypography.labelMedium.copy(
-                                    color = if (projections.overdueCount > 0) ExpenseRed else TextPrimary,
+                                    color = if (hasOverdue) ExpenseRed else TextPrimary,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.5.sp
                                 )
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            if (activePending.isNotEmpty()) {
-                                val badgeText = if (projections.overdueCount > 0) {
-                                    "${projections.overdueCount} VENCIDO${if (projections.overdueCount > 1) "S" else ""}"
-                                } else {
-                                    "${activePending.size} POR PAGAR"
+
+                            when {
+                                hasOverdue -> {
+                                    BrutalistBadge(
+                                        text = "${projections.overdueCount} VENCIDO${if (projections.overdueCount > 1) "S" else ""}",
+                                        backgroundColor = ExpenseRed,
+                                        contentColor = Color.White,
+                                        borderColor = ExpenseRed,
+                                        fontSize = 9.sp
+                                    )
                                 }
-                                BrutalistBadge(
-                                    text = badgeText,
-                                    backgroundColor = if (projections.overdueCount > 0) ExpenseRed else BackgroundBase,
-                                    contentColor = if (projections.overdueCount > 0) Color.White else AccentLime,
-                                    borderColor = if (projections.overdueCount > 0) ExpenseRed else AccentLime,
-                                    fontSize = 9.sp
-                                )
-                            } else {
-                                BrutalistBadge(
-                                    text = "AL DÍA ✓",
-                                    backgroundColor = BackgroundBase,
-                                    contentColor = IncomeGreen,
-                                    borderColor = IncomeGreen,
-                                    fontSize = 9.sp
-                                )
+                                hasDueSoon -> {
+                                    BrutalistBadge(
+                                        text = "${projections.count7Days} ESTA SEMANA",
+                                        backgroundColor = BackgroundBase,
+                                        contentColor = AccentLime,
+                                        borderColor = AccentLime,
+                                        fontSize = 9.sp
+                                    )
+                                }
+                                else -> {
+                                    BrutalistBadge(
+                                        text = "AL DÍA ✓",
+                                        backgroundColor = BackgroundBase,
+                                        contentColor = IncomeGreen,
+                                        borderColor = IncomeGreen,
+                                        fontSize = 9.sp
+                                    )
+                                }
                             }
                         }
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (totalPendingUsd > 0.0) {
+                            if (urgentPendingUsd > 0.0) {
                                 Text(
-                                    text = if (isIncognito) "•••••••" else "-$baseSymbol${formatter.format(totalPendingUsd)}",
+                                    text = if (isIncognito) "•••••••" else "-$baseSymbol${formatter.format(urgentPendingUsd)}",
                                     style = BrexaTypography.labelMedium.copy(
-                                        color = ExpenseRed,
+                                        color = if (hasOverdue) ExpenseRed else AccentLime,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 11.5.sp
                                     )
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
+                            } else if (activePending.isNotEmpty()) {
+                                val nextItem = activePending.minByOrNull { it.dueDateTimestamp }
+                                if (nextItem != null) {
+                                    val nextDateStr = SimpleDateFormat("dd MMM", Locale("es", "ES")).format(Date(nextItem.dueDateTimestamp))
+                                    Text(
+                                        text = "Próx: $nextDateStr",
+                                        style = BrexaTypography.labelSmall.copy(
+                                            color = TextMuted,
+                                            fontSize = 10.sp
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                }
                             }
                             Text(
                                 text = "➔",
