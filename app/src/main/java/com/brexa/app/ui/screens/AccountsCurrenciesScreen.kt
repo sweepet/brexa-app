@@ -82,6 +82,7 @@ fun AccountsCurrenciesScreen(
     var showCreateCurrencyDialog by remember { mutableStateOf(false) }
     var showCreateCategoryDialog by remember { mutableStateOf(false) }
     var showEditBaseCurrencyDialog by remember { mutableStateOf(false) }
+    var editingCurrency by remember { mutableStateOf<CurrencyEntity?>(null) }
     var editingRateCurrency by remember { mutableStateOf<CurrencyEntity?>(null) }
     var deletingCurrency by remember { mutableStateOf<CurrencyEntity?>(null) }
     var adjustingAccount by remember { mutableStateOf<AccountEntity?>(null) }
@@ -350,13 +351,28 @@ fun AccountsCurrenciesScreen(
                                                 modifier = Modifier.clickable { showEditBaseCurrencyDialog = true }
                                             )
                                         } else {
+                                            val isOfficial = curr.code.equals("Bs", ignoreCase = true) ||
+                                                    curr.code.equals("VES", ignoreCase = true) ||
+                                                    curr.code.equals("COP", ignoreCase = true)
+
                                             BrutalistBadge(
-                                                text = "TASA ✎",
+                                                text = "EDITAR ✎",
                                                 backgroundColor = BackgroundBase,
-                                                contentColor = AccentPurple,
-                                                borderColor = AccentPurple,
-                                                modifier = Modifier.clickable { editingRateCurrency = curr }
+                                                contentColor = AccentLime,
+                                                borderColor = AccentLime,
+                                                modifier = Modifier.clickable { editingCurrency = curr }
                                             )
+
+                                            if (!isOfficial) {
+                                                BrutalistBadge(
+                                                    text = "TASA ✎",
+                                                    backgroundColor = BackgroundBase,
+                                                    contentColor = AccentPurple,
+                                                    borderColor = AccentPurple,
+                                                    modifier = Modifier.clickable { editingRateCurrency = curr }
+                                                )
+                                            }
+
                                             BrutalistBadge(
                                                 text = "BORRAR ✕",
                                                 backgroundColor = BackgroundBase,
@@ -955,6 +971,129 @@ fun AccountsCurrenciesScreen(
                     contentColor = TextSecondary,
                     borderColor = BorderSolid,
                     modifier = Modifier.clickable { deletingCurrency = null }
+                )
+            }
+        )
+    }
+
+    // Modal: Editar Moneda Secundaria / Personalizada
+    if (editingCurrency != null) {
+        val curr = editingCurrency!!
+        val isOfficial = curr.code.equals("Bs", ignoreCase = true) ||
+                curr.code.equals("VES", ignoreCase = true) ||
+                curr.code.equals("COP", ignoreCase = true)
+
+        var codeText by remember { mutableStateOf(curr.code) }
+        var nameText by remember { mutableStateOf(curr.name) }
+        var symbolText by remember { mutableStateOf(curr.symbol) }
+        var rateText by remember { mutableStateOf(CurrencyFormat.formatForInput(curr.rateToUsd)) }
+        var dialogError by remember { mutableStateOf<String?>(null) }
+
+        AlertDialog(
+            onDismissRequest = { editingCurrency = null },
+            shape = RectangleShape,
+            containerColor = SurfaceCard,
+            title = {
+                Text(
+                    text = "EDITAR MONEDA // ${curr.code}",
+                    style = BrexaTypography.titleLarge.copy(color = AccentPurple)
+                )
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    BrutalistTextField(
+                        value = nameText,
+                        onValueChange = { nameText = it },
+                        label = "NOMBRE DE LA MONEDA",
+                        placeholder = "ej. Binance, Tether USD, Euro"
+                    )
+
+                    if (!isOfficial) {
+                        BrutalistTextField(
+                            value = codeText,
+                            onValueChange = { if (it.length <= 4) codeText = it.uppercase() },
+                            label = "SIGLA (HASTA 4 LETRAS)",
+                            placeholder = "ej. USDT, EUR"
+                        )
+
+                        val baseCode = baseCurrency?.code ?: "USD"
+                        BrutalistTextField(
+                            value = rateText,
+                            onValueChange = { rateText = it },
+                            label = "TASA DE CAMBIO: 1 $baseCode = [ X ] $codeText",
+                            placeholder = "ej. 1.00",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                        )
+                    } else {
+                        val officialSource = if (curr.code.equals("COP", ignoreCase = true)) "TRM Colombia" else "BCV Venezuela"
+                        Text(
+                            text = "ℹ La tasa de cambio de esta moneda está vinculada a la cotización oficial de $officialSource y se actualiza de forma automática.",
+                            style = BrexaTypography.labelSmall.copy(color = AccentLime, fontSize = 10.5.sp)
+                        )
+                    }
+
+                    if (dialogError != null) {
+                        Text(text = "⚠️ $dialogError", style = BrexaTypography.labelMedium.copy(color = ExpenseRed))
+                    }
+                }
+            },
+            confirmButton = {
+                BrutalistBadge(
+                    text = "GUARDAR CAMBIOS",
+                    backgroundColor = AccentPurple,
+                    contentColor = Color.White,
+                    borderColor = AccentPurple,
+                    modifier = Modifier.clickable {
+                        val cleanName = nameText.trim()
+                        if (cleanName.isEmpty()) {
+                            dialogError = "El nombre de la moneda no puede estar vacío."
+                            return@clickable
+                        }
+                        if (!isOfficial) {
+                            val newRate = CurrencyFormat.parseNumber(rateText) ?: curr.rateToUsd
+                            if (newRate <= 0.0) {
+                                dialogError = "Ingresa una tasa válida mayor a 0."
+                                return@clickable
+                            }
+                            viewModel.updateCurrency(
+                                currencyId = curr.id,
+                                name = cleanName,
+                                code = codeText,
+                                symbol = symbolText,
+                                onSuccess = {
+                                    if (newRate != curr.rateToUsd) {
+                                        viewModel.updateCurrencyRate(
+                                            currencyId = curr.id,
+                                            newRate = newRate,
+                                            onSuccess = { editingCurrency = null },
+                                            onError = { dialogError = it }
+                                        )
+                                    } else {
+                                        editingCurrency = null
+                                    }
+                                },
+                                onError = { dialogError = it }
+                            )
+                        } else {
+                            viewModel.updateCurrency(
+                                currencyId = curr.id,
+                                name = cleanName,
+                                code = curr.code,
+                                symbol = curr.symbol,
+                                onSuccess = { editingCurrency = null },
+                                onError = { dialogError = it }
+                            )
+                        }
+                    }
+                )
+            },
+            dismissButton = {
+                BrutalistBadge(
+                    text = "CANCELAR",
+                    backgroundColor = BackgroundBase,
+                    contentColor = TextSecondary,
+                    borderColor = BorderSolid,
+                    modifier = Modifier.clickable { editingCurrency = null }
                 )
             }
         )

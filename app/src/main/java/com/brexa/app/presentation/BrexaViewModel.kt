@@ -600,6 +600,23 @@ class BrexaViewModel(
         }
     }
 
+    fun updateCurrency(
+        currencyId: String,
+        name: String,
+        code: String? = null,
+        symbol: String? = null,
+        onSuccess: () -> Unit = {},
+        onError: (String) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val result = repository.updateCurrency(currencyId, name, code, symbol)
+            result.onSuccess {
+                triggerAutoBackup()
+                onSuccess()
+            }.onFailure { onError(it.message ?: "Error al actualizar moneda.") }
+        }
+    }
+
     fun updateCurrencyRate(
         currencyId: String,
         newRate: Double,

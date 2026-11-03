@@ -67,6 +67,34 @@ class BrexaRepository(private val db: BrexaDatabase) {
         return Result.success(Unit)
     }
 
+    suspend fun updateCurrency(
+        currencyId: String,
+        name: String,
+        code: String? = null,
+        symbol: String? = null
+    ): Result<Unit> {
+        val currency = currencyDao.getCurrencyByIdSync(currencyId)
+            ?: return Result.failure(IllegalArgumentException("Moneda no encontrada."))
+        val cleanName = name.trim()
+        if (cleanName.isEmpty()) {
+            return Result.failure(IllegalArgumentException("El nombre de la moneda no puede estar vacío."))
+        }
+        val cleanCode = if (!code.isNullOrBlank()) {
+            val trimmed = code.trim().take(4)
+            if (trimmed.equals("bs", ignoreCase = true)) "Bs" else trimmed.uppercase()
+        } else currency.code
+
+        val cleanSymbol = symbol?.trim()?.ifEmpty { cleanCode } ?: currency.symbol
+
+        currencyDao.updateBaseCurrencyDetails(
+            id = currencyId,
+            code = cleanCode,
+            name = cleanName,
+            symbol = cleanSymbol
+        )
+        return Result.success(Unit)
+    }
+
     suspend fun addCustomCurrency(
         code: String,
         name: String,
