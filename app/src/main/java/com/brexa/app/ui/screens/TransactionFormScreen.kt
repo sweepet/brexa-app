@@ -1050,12 +1050,6 @@ fun TransactionFormScreen(
 
     // Modal Neobrutalista para Escribir Nota / Concepto sin que el teclado la tape
     if (showNoteModalDialog) {
-        val quickNotes = listOf(
-            "Supermercado", "Almuerzo", "Cena", "Transporte",
-            "Farmacia", "Servicios", "Combustible", "Pago Móvil",
-            "Repuestos", "Salida", "Ropa", "Transferencia"
-        )
-
         AlertDialog(
             onDismissRequest = { showNoteModalDialog = false },
             shape = RectangleShape,
@@ -1101,35 +1095,6 @@ fun TransactionFormScreen(
                         isMonospace = false,
                         modifier = Modifier.fillMaxWidth()
                     )
-
-                    Text(
-                        text = "SUGERENCIAS RÁPIDAS EN 1 TOQUE:",
-                        style = BrexaTypography.labelSmall.copy(
-                            color = TextMuted,
-                            fontSize = 9.sp,
-                            letterSpacing = 0.5.sp
-                        )
-                    )
-
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(quickNotes) { suggestion ->
-                            val isSel = tempModalNoteText.equals(suggestion, ignoreCase = true)
-                            BrutalistBadge(
-                                text = suggestion,
-                                backgroundColor = if (isSel) AccentLime else BackgroundBase,
-                                contentColor = if (isSel) Color.Black else TextPrimary,
-                                borderColor = if (isSel) AccentLime else BorderSolid,
-                                fontSize = 9.5.sp,
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                modifier = Modifier.clickable {
-                                    tempModalNoteText = suggestion
-                                }
-                            )
-                        }
-                    }
                 }
             },
             confirmButton = {
