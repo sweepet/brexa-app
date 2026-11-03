@@ -160,7 +160,7 @@ fun TransactionFormScreen(
             val tabs = listOf(
                 Triple("EXPENSE", "GASTO", ExpenseRed),
                 Triple("INCOME", "INGRESO", IncomeGreen),
-                Triple("EXCHANGE", "EXCHANGE", ExchangeBlue)
+                Triple("EXCHANGE", "TRANSFERIR", ExchangeBlue)
             )
             tabs.forEach { (typeKey, label, activeColor) ->
                 val isSelected = selectedType == typeKey
@@ -841,7 +841,7 @@ fun TransactionFormScreen(
         val btnText = when (selectedType) {
             "EXPENSE" -> "REGISTRAR GASTO"
             "INCOME" -> "REGISTRAR INGRESO"
-            else -> "CONFIRMAR EXCHANGE"
+            else -> "CONFIRMAR TRANSFERENCIA"
         }
 
         BrutalistButton(

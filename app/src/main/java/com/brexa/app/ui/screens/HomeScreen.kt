@@ -863,7 +863,7 @@ fun HomeScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = if (tx.note.isNotEmpty()) tx.note else (cat?.name ?: if (tx.type == "EXCHANGE") "Exchange entre cuentas" else "Sin descripción"),
+                                        text = if (tx.note.isNotEmpty()) tx.note else (cat?.name ?: if (tx.type == "EXCHANGE") "Transferencia entre cuentas" else "Sin descripción"),
                                         style = BrexaTypography.titleMedium.copy(
                                             color = TextPrimary,
                                             fontSize = 13.sp
@@ -1003,7 +1003,7 @@ fun HomeScreen(
         val typeLabel = when {
             tx.type == "EXPENSE" -> "GASTO"
             tx.type == "INCOME" -> "INGRESO"
-            tx.type == "EXCHANGE" -> "EXCHANGE"
+            tx.type == "EXCHANGE" -> "TRANSFERENCIA"
             isAdjustment && adjIsIncrease -> "AJUSTE (+)"
             isAdjustment && !adjIsIncrease -> "AJUSTE (−)"
             else -> tx.type
