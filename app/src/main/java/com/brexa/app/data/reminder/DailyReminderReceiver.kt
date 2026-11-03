@@ -9,11 +9,15 @@ class DailyReminderReceiver : BroadcastReceiver() {
         val action = intent?.action
         if (action == Intent.ACTION_BOOT_COMPLETED || action == Intent.ACTION_MY_PACKAGE_REPLACED) {
             DailyReminderManager.scheduleDailyReminder(context)
-        } else if (action == DailyReminderManager.ACTION_DAILY_REMINDER || action == null) {
+            DailyReminderManager.scheduleMorningDuePaymentsCheck(context)
+        } else if (action == DailyReminderManager.ACTION_DAILY_REMINDER) {
             if (DailyReminderManager.isEnabled(context)) {
                 DailyReminderManager.showNotification(context)
                 DailyReminderManager.scheduleDailyReminder(context)
             }
+        } else if (action == DailyReminderManager.ACTION_DUE_PAYMENTS_REMINDER) {
+            DailyReminderManager.checkAndNotifyDuePayments(context)
+            DailyReminderManager.scheduleMorningDuePaymentsCheck(context)
         }
     }
 }

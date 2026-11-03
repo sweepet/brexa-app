@@ -41,12 +41,13 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Receptor del Recordatorio Diario de Movimientos -->
+        <!-- Receptor del Recordatorio Diario de Movimientos y Pagos Pendientes -->
         <receiver
             android:name=".data.reminder.DailyReminderReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.brexa.app.ACTION_DAILY_REMINDER" />
+                <action android:name="com.brexa.app.ACTION_DUE_PAYMENTS_REMINDER" />
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>

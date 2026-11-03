@@ -8,5 +8,6 @@ class BrexaApplication : Application() {
         super.onCreate()
         DailyReminderManager.createNotificationChannel(this)
         DailyReminderManager.scheduleDailyReminder(this)
+        DailyReminderManager.scheduleMorningDuePaymentsCheck(this)
     }
 }

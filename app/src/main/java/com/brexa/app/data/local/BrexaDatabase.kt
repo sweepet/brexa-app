@@ -81,7 +81,7 @@ abstract class BrexaDatabase : RoomDatabase() {
             }
         }
 
-        fun getDatabase(context: Context, scope: CoroutineScope): BrexaDatabase {
+        fun getDatabase(context: Context, scope: CoroutineScope = CoroutineScope(Dispatchers.IO)): BrexaDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,

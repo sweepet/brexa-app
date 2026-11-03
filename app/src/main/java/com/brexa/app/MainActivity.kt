@@ -66,8 +66,11 @@ class MainActivity : ComponentActivity() {
                 val isUserSignedIn = remember { syncManager.getLastSignedInAccount() != null }
                 val hasChosenMode = remember { prefs.getBoolean("has_chosen_mode", false) }
 
+                val extraScreen = remember { intent?.getStringExtra("EXTRA_SCREEN") }
                 var currentScreen by remember {
-                    mutableStateOf(if (isUserSignedIn || hasChosenMode) "HOME" else "AUTH")
+                    mutableStateOf(
+                        extraScreen ?: if (isUserSignedIn || hasChosenMode) "HOME" else "AUTH"
+                    )
                 }
                 var transactionTypeToOpen by remember { mutableStateOf("EXPENSE") }
                 var shouldForceTour by remember { mutableStateOf(false) }
@@ -82,10 +85,11 @@ class MainActivity : ComponentActivity() {
                 ) { isGranted ->
                     if (isGranted) {
                         DailyReminderManager.scheduleDailyReminder(applicationContext)
+                        DailyReminderManager.scheduleMorningDuePaymentsCheck(applicationContext)
                     }
                 }
 
-                // Comprobaciones iniciales (actualización en GitHub y recordatorio diario)
+                // Comprobaciones iniciales (actualización en GitHub y recordatorios programados)
                 LaunchedEffect(Unit) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         if (ContextCompat.checkSelfPermission(
@@ -97,6 +101,13 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                     DailyReminderManager.scheduleDailyReminder(applicationContext)
+                    DailyReminderManager.scheduleMorningDuePaymentsCheck(applicationContext)
+
+                    // Si ya son las 8:00 AM o más hoy, verificar si hay pagos para hoy (máx 1 vez al día)
+                    val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+                    if (currentHour >= 8) {
+                        DailyReminderManager.checkAndNotifyDuePayments(applicationContext)
+                    }
 
                     // Limpieza proactiva de archivos APK residuales para recuperar almacenamiento
                     withContext(Dispatchers.IO) {

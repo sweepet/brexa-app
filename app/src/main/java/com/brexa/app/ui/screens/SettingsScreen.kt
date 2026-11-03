@@ -675,6 +675,20 @@ fun SettingsScreen(
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                BrutalistButton(
+                    text = "PROBAR AVISO PAGOS DE HOY 🔔",
+                    onClick = {
+                        DailyReminderManager.checkAndNotifyDuePayments(context, isManualTest = true)
+                        Toast.makeText(context, "Verificando pagos de hoy y enviando aviso...", Toast.LENGTH_SHORT).show()
+                    },
+                    containerColor = SurfaceCardElevated,
+                    contentColor = AccentPurple,
+                    borderColor = AccentPurple,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         }
 
