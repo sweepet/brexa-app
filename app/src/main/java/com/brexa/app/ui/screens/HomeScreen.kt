@@ -314,17 +314,25 @@ fun HomeScreen(
                             modifier = Modifier.clickable { showBreakdownModal = true }
                         )
 
-                        // 2. PRESUPUESTO MENSUAL (Interactiva y táctil para configurar)
+                        // 2. PRESUPUESTO MENSUAL (HUD Neobrutalista Adaptativo, Simétrico y Elegante)
                         Spacer(modifier = Modifier.height(10.dp))
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(BackgroundBase, RectangleShape)
-                                .border(1.dp, if (budgetInfo.isOverBudget) ExpenseRed else BorderSolid, RectangleShape)
+                                .background(Color(0xFF141414), RectangleShape)
+                                .border(
+                                    width = 1.dp,
+                                    color = if (budgetInfo.isOverBudget) ExpenseRed else BorderSolid,
+                                    shape = RectangleShape
+                                )
                                 .clickable { showBudgetModal = true }
-                                .padding(horizontal = 10.dp, vertical = 7.dp)
+                                .padding(horizontal = 12.dp, vertical = 9.dp)
                         ) {
-                            Column(modifier = Modifier.fillMaxWidth()) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                // FILA 1: Contexto / Título + Badge de Modo (Espaciado equilibrado en extremos)
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -332,41 +340,53 @@ fun HomeScreen(
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        modifier = Modifier.weight(1f, fill = false)
                                     ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(5.dp)
+                                                .background(
+                                                    color = if (budgetInfo.isOverBudget) ExpenseRed
+                                                    else if (budgetInfo.budgetAmountUsd <= 0.0) TextMuted
+                                                    else AccentLime,
+                                                    shape = RectangleShape
+                                                )
+                                        )
                                         Text(
                                             text = "PRESUPUESTO ${budgetInfo.monthName.uppercase()}",
                                             style = BrexaTypography.labelSmall.copy(
                                                 color = TextSecondary,
-                                                fontSize = 10.sp,
+                                                fontSize = 9.5.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                letterSpacing = 0.5.sp
-                                            )
-                                        )
-                                        BrutalistBadge(
-                                            text = if (budgetInfo.mode == "AUTO") "AUTO ⚙" else "MANUAL ✎",
-                                            backgroundColor = SurfaceCardElevated,
-                                            contentColor = if (budgetInfo.mode == "AUTO") AccentLime else AccentPurple,
-                                            borderColor = if (budgetInfo.mode == "AUTO") AccentLime else AccentPurple,
-                                            fontSize = 8.5.sp,
-                                            contentPadding = PaddingValues(horizontal = 5.dp, vertical = 1.dp)
+                                                letterSpacing = 0.8.sp
+                                            ),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
                                         )
                                     }
 
-                                    val spentText = if (isIncognito) "••••" else "$baseSymbol ${formatter.format(budgetInfo.spentThisMonthUsd)}"
-                                    val budgetText = if (isIncognito) "••••" else if (budgetInfo.budgetAmountUsd > 0.0) "$baseSymbol ${formatter.format(budgetInfo.budgetAmountUsd)}" else "SIN FIJAR"
-                                    Text(
-                                        text = "$spentText / $budgetText",
-                                        style = BrexaTypography.labelSmall.copy(
-                                            color = if (budgetInfo.isOverBudget) ExpenseRed else TextPrimary,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp
-                                        )
+                                    val modeBadgeColor = when {
+                                        budgetInfo.budgetAmountUsd <= 0.0 -> TextMuted
+                                        budgetInfo.mode == "AUTO" -> AccentLime
+                                        else -> ExchangeBlue
+                                    }
+                                    val modeBadgeText = when {
+                                        budgetInfo.budgetAmountUsd <= 0.0 -> "SIN FIJAR"
+                                        budgetInfo.mode == "AUTO" -> "AUTO ⚙"
+                                        else -> "MANUAL ✎"
+                                    }
+                                    BrutalistBadge(
+                                        text = modeBadgeText,
+                                        backgroundColor = BackgroundBase,
+                                        contentColor = modeBadgeColor,
+                                        borderColor = modeBadgeColor,
+                                        fontSize = 8.sp,
+                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 1.5.dp)
                                     )
                                 }
 
-                                Spacer(modifier = Modifier.height(6.dp))
-
+                                // FILA 2: Barra de Progreso Neobrutalista Continua
                                 val progressRatio = if (budgetInfo.budgetAmountUsd > 0.0) {
                                     (budgetInfo.spentThisMonthUsd / budgetInfo.budgetAmountUsd).toFloat().coerceIn(0f, 1f)
                                 } else 0f
@@ -380,55 +400,90 @@ fun HomeScreen(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(6.dp)
-                                        .background(SurfaceCardElevated, RectangleShape)
-                                        .border(0.5.dp, BorderSolid, RectangleShape)
+                                        .height(4.dp)
+                                        .background(Color(0xFF262626), RectangleShape)
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxHeight()
-                                            .fillMaxWidth(progressRatio)
-                                            .background(barColor, RectangleShape)
-                                    )
+                                    if (progressRatio > 0f) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxHeight()
+                                                .fillMaxWidth(progressRatio)
+                                                .background(barColor, RectangleShape)
+                                        )
+                                    }
                                 }
 
-                                Spacer(modifier = Modifier.height(5.dp))
-
+                                // FILA 3: Métricas Financieras (Adaptativas, precisas y sin rupturas de línea)
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    val statusText = when {
-                                        budgetInfo.budgetAmountUsd <= 0.0 -> "Toca para configurar tu presupuesto"
-                                        budgetInfo.isOverBudget -> {
-                                            val excess = budgetInfo.spentThisMonthUsd - budgetInfo.budgetAmountUsd
-                                            "Excedido por ${if (isIncognito) "••••" else "$baseSymbol ${formatter.format(excess)}"}"
-                                        }
-                                        else -> {
-                                            "Disponible: ${if (isIncognito) "••••" else "$baseSymbol ${formatter.format(budgetInfo.remainingUsd)}"}"
-                                        }
+                                    val spentFormatted = if (isIncognito) "••••" else "$baseSymbol ${formatter.format(budgetInfo.spentThisMonthUsd)}"
+                                    val budgetFormatted = if (isIncognito) "••••" else "$baseSymbol ${formatter.format(budgetInfo.budgetAmountUsd)}"
+
+                                    // Lado Izquierdo: Gasto actual vs Presupuesto objetivo
+                                    if (budgetInfo.budgetAmountUsd > 0.0) {
+                                        Text(
+                                            text = buildAnnotatedString {
+                                                withStyle(SpanStyle(color = if (budgetInfo.isOverBudget) ExpenseRed else TextPrimary, fontWeight = FontWeight.Bold)) {
+                                                    append(spentFormatted)
+                                                }
+                                                withStyle(SpanStyle(color = TextMuted, fontWeight = FontWeight.Normal)) {
+                                                    append(" / ")
+                                                    append(budgetFormatted)
+                                                }
+                                            },
+                                            style = BrexaTypography.labelSmall.copy(fontSize = 10.sp),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
+                                    } else {
+                                        Text(
+                                            text = "$spentFormatted gastados",
+                                            style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        )
                                     }
 
-                                    Text(
-                                        text = statusText,
-                                        style = BrexaTypography.labelSmall.copy(
-                                            color = if (budgetInfo.isOverBudget) ExpenseRed else if (budgetInfo.budgetAmountUsd <= 0.0) TextMuted else AccentGreen,
-                                            fontSize = 9.5.sp,
-                                            fontWeight = if (budgetInfo.isOverBudget) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
 
+                                    // Lado Derecho: Estado de Disponibilidad y Porcentaje consumido
                                     val percentInt = if (budgetInfo.budgetAmountUsd > 0.0) {
                                         ((budgetInfo.spentThisMonthUsd / budgetInfo.budgetAmountUsd) * 100).toInt()
                                     } else 0
 
+                                    val rightStatusText = when {
+                                        budgetInfo.budgetAmountUsd <= 0.0 -> "Configurar ➔"
+                                        budgetInfo.isOverBudget -> {
+                                            val excess = budgetInfo.spentThisMonthUsd - budgetInfo.budgetAmountUsd
+                                            val excessFormatted = if (isIncognito) "••••" else "$baseSymbol ${formatter.format(excess)}"
+                                            "Excedido: $excessFormatted ($percentInt%)"
+                                        }
+                                        else -> {
+                                            val remainingFormatted = if (isIncognito) "••••" else "$baseSymbol ${formatter.format(budgetInfo.remainingUsd)}"
+                                            "Libre: $remainingFormatted ($percentInt%)"
+                                        }
+                                    }
+
+                                    val rightStatusColor = when {
+                                        budgetInfo.budgetAmountUsd <= 0.0 -> AccentLime
+                                        budgetInfo.isOverBudget -> ExpenseRed
+                                        else -> AccentGreen
+                                    }
+
                                     Text(
-                                        text = if (budgetInfo.budgetAmountUsd > 0.0) "$percentInt% consumido" else "Configurar ➔",
+                                        text = rightStatusText,
                                         style = BrexaTypography.labelSmall.copy(
-                                            color = TextSecondary,
-                                            fontSize = 9.sp
-                                        )
+                                            color = rightStatusColor,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 10.sp
+                                        ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                             }
@@ -1582,9 +1637,11 @@ fun HomeScreen(
         var selectedMode by remember { mutableStateOf(budgetInfo.mode) }
         var manualInput by remember {
             mutableStateOf(
-                if (budgetInfo.budgetAmountUsd > 0.0 && budgetInfo.mode == "MANUAL") {
+                if (budgetInfo.budgetAmountUsd > 0.0) {
                     if (budgetInfo.budgetAmountUsd % 1.0 == 0.0) budgetInfo.budgetAmountUsd.toLong().toString()
                     else String.format(Locale.US, "%.2f", budgetInfo.budgetAmountUsd)
+                } else if (budgetInfo.fixedExpensesTotalUsd + budgetInfo.variableExpensesTotalUsd > 0.0) {
+                    String.format(Locale.US, "%.2f", budgetInfo.fixedExpensesTotalUsd + budgetInfo.variableExpensesTotalUsd)
                 } else ""
             )
         }
@@ -1652,9 +1709,9 @@ fun HomeScreen(
 
                         BrutalistBadge(
                             text = "✎ MANUAL",
-                            backgroundColor = if (selectedMode == "MANUAL") AccentPurple else SurfaceCardElevated,
+                            backgroundColor = if (selectedMode == "MANUAL") ExchangeBlue else SurfaceCardElevated,
                             contentColor = if (selectedMode == "MANUAL") Color.White else TextSecondary,
-                            borderColor = if (selectedMode == "MANUAL") AccentPurple else BorderSolid,
+                            borderColor = if (selectedMode == "MANUAL") ExchangeBlue else BorderSolid,
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable { selectedMode = "MANUAL" },
