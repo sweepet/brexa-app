@@ -1063,6 +1063,8 @@ class BrexaRepository(private val db: BrexaDatabase) {
 
     suspend fun getSetting(key: String): String? = appSettingDao.getSettingSync(key)
 
+    fun getSettingFlow(key: String): Flow<String?> = appSettingDao.getSetting(key)
+
     suspend fun setSetting(key: String, value: String) {
         appSettingDao.setSetting(AppSettingEntity(key, value))
     }

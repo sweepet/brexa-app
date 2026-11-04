@@ -14,6 +14,7 @@ val AccentLime = Color(0xFFD4FF00)      // Dólares (USD) & Acciones Primarias
 val AccentPurple = Color(0xFF9D4EDD)    // Bolívares (VES) & Fluctuaciones / Cripto
 val ExpenseRed = Color(0xFFFF3366)      // Gastos / Pérdidas
 val IncomeGreen = Color(0xFF00FF88)     // Ingresos
+val AccentGreen = IncomeGreen           // Alias para compatibilidad
 val ExchangeBlue = Color(0xFF3A86FF)    // Transferencias entre cuentas (Exchange)
 
 // Textos

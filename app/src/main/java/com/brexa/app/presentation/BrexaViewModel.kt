@@ -15,7 +15,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Locale
 
 enum class AnalyticsPeriod {
     WEEK, MONTH
@@ -31,6 +33,20 @@ data class PendingProjections(
     val totalAllUsd: Double,
     val countAll: Int,
     val overdueCount: Int
+)
+
+data class MonthlyBudgetInfo(
+    val mode: String = "AUTO", // "AUTO" | "MANUAL"
+    val budgetAmountUsd: Double = 0.0,
+    val spentThisMonthUsd: Double = 0.0,
+    val remainingUsd: Double = 0.0,
+    val percentageUsed: Float = 0f,
+    val isOverBudget: Boolean = false,
+    val fixedExpensesTotalUsd: Double = 0.0,
+    val variableExpensesTotalUsd: Double = 0.0,
+    val fixedExpensesCount: Int = 0,
+    val variableExpensesCount: Int = 0,
+    val monthName: String = ""
 )
 
 class BrexaViewModel(
@@ -263,6 +279,122 @@ class BrexaViewModel(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
         PendingProjections(0.0, 0, 0.0, 0, 0.0, 0, 0.0, 0, 0)
+    )
+
+    // --- PRESUPUESTO MENSUAL ---
+    val budgetMode: StateFlow<String> = repository.getSettingFlow("monthly_budget_mode")
+        .map { it ?: "AUTO" }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "AUTO")
+
+    val budgetManualAmount: StateFlow<Double> = repository.getSettingFlow("monthly_budget_manual_amount")
+        .map { it?.toDoubleOrNull() ?: 0.0 }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    fun setBudgetConfig(mode: String, manualAmount: Double) {
+        viewModelScope.launch {
+            repository.setSetting("monthly_budget_mode", mode)
+            repository.setSetting("monthly_budget_manual_amount", manualAmount.toString())
+            triggerAutoBackup()
+        }
+    }
+
+    val monthlyBudgetInfo: StateFlow<MonthlyBudgetInfo> = combine(
+        budgetMode,
+        budgetManualAmount,
+        allPendingExpenses,
+        allCurrencies,
+        allTransactions
+    ) { mode, manualAmount, pendingList, currencies, transactions ->
+        val currMap = currencies.associateBy { it.code.uppercase() }
+
+        fun toUsd(amount: Double, currencyCode: String): Double {
+            val curr = currMap[currencyCode.uppercase()]
+            val rate = curr?.rateToUsd ?: 1.0
+            return if (curr?.isBase == true || currencyCode.equals("USD", ignoreCase = true)) {
+                amount
+            } else if (rate > 0.0) {
+                amount / rate
+            } else {
+                amount
+            }
+        }
+
+        val cal = Calendar.getInstance()
+        val monthName = SimpleDateFormat("MMMM", Locale("es", "ES")).format(cal.time)
+            .replaceFirstChar { it.uppercase() }
+
+        val calStartMonth = Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+
+        val calEndMonth = Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_MONTH, getActualMaximum(Calendar.DAY_OF_MONTH))
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+            set(Calendar.MILLISECOND, 999)
+        }.timeInMillis
+
+        // 1. Gastos Fijos (Cálculo mensual según periodicidad)
+        val fixedItems = pendingList.filter { it.expenseType == "FIXED" }
+        var fixedSumUsd = 0.0
+        for (item in fixedItems) {
+            val usdAmount = toUsd(item.amount, item.currencyCode)
+            val monthlyMultiplier = when (item.recurrencePeriod?.uppercase()) {
+                "WEEKLY" -> 4.0
+                "BIWEEKLY" -> 2.0
+                else -> 1.0 // "MONTHLY"
+            }
+            fixedSumUsd += (usdAmount * monthlyMultiplier)
+        }
+
+        // 2. Gastos Variables asignados o pagados en este mes
+        val variableItems = pendingList.filter { item ->
+            item.expenseType != "FIXED" && (
+                (item.dueDateTimestamp in calStartMonth..calEndMonth) ||
+                (item.isPaid && item.paidAtTimestamp != null && item.paidAtTimestamp in calStartMonth..calEndMonth)
+            )
+        }
+        var variableSumUsd = 0.0
+        for (item in variableItems) {
+            variableSumUsd += toUsd(item.amount, item.currencyCode)
+        }
+
+        val autoBudgetUsd = fixedSumUsd + variableSumUsd
+        val budgetAmountUsd = if (mode == "MANUAL") manualAmount else autoBudgetUsd
+
+        // 3. Gasto real registrado en este mes (tipo EXPENSE)
+        val spentThisMonthUsd = transactions.filter {
+            it.type == "EXPENSE" && it.dateTimestamp in calStartMonth..calEndMonth
+        }.sumOf { it.usdEquivalent }
+
+        val remainingUsd = budgetAmountUsd - spentThisMonthUsd
+        val percentageUsed = if (budgetAmountUsd > 0.0) {
+            (spentThisMonthUsd / budgetAmountUsd).toFloat().coerceIn(0f, 1f)
+        } else 0f
+        val isOverBudget = budgetAmountUsd > 0.0 && spentThisMonthUsd > budgetAmountUsd
+
+        MonthlyBudgetInfo(
+            mode = mode,
+            budgetAmountUsd = budgetAmountUsd,
+            spentThisMonthUsd = spentThisMonthUsd,
+            remainingUsd = remainingUsd,
+            percentageUsed = percentageUsed,
+            isOverBudget = isOverBudget,
+            fixedExpensesTotalUsd = fixedSumUsd,
+            variableExpensesTotalUsd = variableSumUsd,
+            fixedExpensesCount = fixedItems.size,
+            variableExpensesCount = variableItems.size,
+            monthName = monthName
+        )
+    }.stateIn(
+        viewModelScope,
+        SharingStarted.WhileSubscribed(5000),
+        MonthlyBudgetInfo()
     )
 
     // Filtros de fecha para analítica

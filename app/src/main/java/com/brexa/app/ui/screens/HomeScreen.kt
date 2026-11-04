@@ -1,6 +1,7 @@
 package com.brexa.app.ui.screens
 
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -27,6 +29,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
@@ -40,6 +43,7 @@ import com.brexa.app.presentation.BrexaViewModel
 import com.brexa.app.ui.components.BrutalistBadge
 import com.brexa.app.ui.components.BrutalistButton
 import com.brexa.app.ui.components.BrutalistCard
+import com.brexa.app.ui.components.BrutalistTextField
 import com.brexa.app.ui.components.OnboardingTour
 import com.brexa.app.ui.theme.*
 import com.brexa.app.ui.util.CurrencyFormat
@@ -155,6 +159,8 @@ fun HomeScreen(
         )
     }
     var showBreakdownModal by remember { mutableStateOf(false) }
+    var showBudgetModal by remember { mutableStateOf(false) }
+    val budgetInfo by viewModel.monthlyBudgetInfo.collectAsState()
 
     Box(
         modifier = Modifier
@@ -294,7 +300,7 @@ fun HomeScreen(
                             currencies.find { it.code.equals("COP", ignoreCase = true) }
                         }
 
-                        // 1. Monto Total Consolidado (Limpio y destacado a ancho completo)
+                        // 1. Monto Total Consolidado (Clickeable directamente para ver el desglose patrimonial)
                         val balanceDisplay = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(totalUsd)}"
                         Text(
                             text = balanceDisplay,
@@ -304,74 +310,126 @@ fun HomeScreen(
                                 fontSize = if (balanceDisplay.length > 13) 24.sp else 30.sp
                             ),
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.clickable { showBreakdownModal = true }
                         )
 
-                        // 2. Desglose Unificado por Moneda (Anti-Rupturas: Top 2 en tarjeta + Modal de Patrimonio al tocar)
-                        if (currencyBreakdown.isNotEmpty()) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(BackgroundBase, RectangleShape)
-                                    .border(1.dp, BorderSolid, RectangleShape)
-                                    .clickable { showBreakdownModal = true }
-                                    .padding(horizontal = 10.dp, vertical = 7.dp)
-                            ) {
+                        // 2. PRESUPUESTO MENSUAL (Interactiva y táctil para configurar)
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(BackgroundBase, RectangleShape)
+                                .border(1.dp, if (budgetInfo.isOverBudget) ExpenseRed else BorderSolid, RectangleShape)
+                                .clickable { showBudgetModal = true }
+                                .padding(horizontal = 10.dp, vertical = 7.dp)
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth()) {
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    // Fila de las Top 2 monedas
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                        modifier = Modifier.weight(1f, fill = false)
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
-                                        val visibleCurrencies = currencyBreakdown.take(2)
-                                        visibleCurrencies.forEachIndexed { index, (curr, _, usdSum) ->
-                                            if (index > 0) {
-                                                Text(
-                                                    text = "•",
-                                                    style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 11.sp)
-                                                )
-                                            }
-                                            val labelText = if (curr.isBase) "En Efectivo" else "En ${curr.code}"
-                                            val valueColor = if (curr.isBase) AccentLime else AccentPurple
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Text(
-                                                    text = "$labelText = ",
-                                                    style = BrexaTypography.labelSmall.copy(
-                                                        color = TextSecondary,
-                                                        fontWeight = FontWeight.Normal,
-                                                        fontSize = 11.sp
-                                                    )
-                                                )
-                                                Text(
-                                                    text = if (isIncognito) "••••" else "$baseSymbol ${formatter.format(usdSum)}",
-                                                    style = BrexaTypography.labelSmall.copy(
-                                                        color = valueColor,
-                                                        fontWeight = FontWeight.Bold,
-                                                        fontSize = 11.5.sp
-                                                    )
-                                                )
-                                            }
+                                        Text(
+                                            text = "PRESUPUESTO ${budgetInfo.monthName.uppercase()}",
+                                            style = BrexaTypography.labelSmall.copy(
+                                                color = TextSecondary,
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                letterSpacing = 0.5.sp
+                                            )
+                                        )
+                                        BrutalistBadge(
+                                            text = if (budgetInfo.mode == "AUTO") "AUTO ⚙" else "MANUAL ✎",
+                                            backgroundColor = SurfaceCardElevated,
+                                            contentColor = if (budgetInfo.mode == "AUTO") AccentLime else AccentPurple,
+                                            borderColor = if (budgetInfo.mode == "AUTO") AccentLime else AccentPurple,
+                                            fontSize = 8.5.sp,
+                                            contentPadding = PaddingValues(horizontal = 5.dp, vertical = 1.dp)
+                                        )
+                                    }
+
+                                    val spentText = if (isIncognito) "••••" else "$baseSymbol ${formatter.format(budgetInfo.spentThisMonthUsd)}"
+                                    val budgetText = if (isIncognito) "••••" else if (budgetInfo.budgetAmountUsd > 0.0) "$baseSymbol ${formatter.format(budgetInfo.budgetAmountUsd)}" else "SIN FIJAR"
+                                    Text(
+                                        text = "$spentText / $budgetText",
+                                        style = BrexaTypography.labelSmall.copy(
+                                            color = if (budgetInfo.isOverBudget) ExpenseRed else TextPrimary,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 11.sp
+                                        )
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(6.dp))
+
+                                val progressRatio = if (budgetInfo.budgetAmountUsd > 0.0) {
+                                    (budgetInfo.spentThisMonthUsd / budgetInfo.budgetAmountUsd).toFloat().coerceIn(0f, 1f)
+                                } else 0f
+
+                                val barColor = when {
+                                    budgetInfo.isOverBudget -> ExpenseRed
+                                    progressRatio > 0.8f -> Color(0xFFFFB800)
+                                    else -> AccentLime
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(6.dp)
+                                        .background(SurfaceCardElevated, RectangleShape)
+                                        .border(0.5.dp, BorderSolid, RectangleShape)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxHeight()
+                                            .fillMaxWidth(progressRatio)
+                                            .background(barColor, RectangleShape)
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(5.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val statusText = when {
+                                        budgetInfo.budgetAmountUsd <= 0.0 -> "Toca para configurar tu presupuesto"
+                                        budgetInfo.isOverBudget -> {
+                                            val excess = budgetInfo.spentThisMonthUsd - budgetInfo.budgetAmountUsd
+                                            "Excedido por ${if (isIncognito) "••••" else "$baseSymbol ${formatter.format(excess)}"}"
+                                        }
+                                        else -> {
+                                            "Disponible: ${if (isIncognito) "••••" else "$baseSymbol ${formatter.format(budgetInfo.remainingUsd)}"}"
                                         }
                                     }
 
-                                    // Si hay más de 2 monedas, mostrar insignia Neobrutalista "+X MÁS ▾"
-                                    if (currencyBreakdown.size > 2) {
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        BrutalistBadge(
-                                            text = "+${currencyBreakdown.size - 2} MÁS ▾",
-                                            backgroundColor = SurfaceCardElevated,
-                                            contentColor = AccentLime,
-                                            borderColor = AccentLime,
-                                            fontSize = 9.sp,
-                                            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp)
+                                    Text(
+                                        text = statusText,
+                                        style = BrexaTypography.labelSmall.copy(
+                                            color = if (budgetInfo.isOverBudget) ExpenseRed else if (budgetInfo.budgetAmountUsd <= 0.0) TextMuted else AccentGreen,
+                                            fontSize = 9.5.sp,
+                                            fontWeight = if (budgetInfo.isOverBudget) FontWeight.Bold else FontWeight.Normal
                                         )
-                                    }
+                                    )
+
+                                    val percentInt = if (budgetInfo.budgetAmountUsd > 0.0) {
+                                        ((budgetInfo.spentThisMonthUsd / budgetInfo.budgetAmountUsd) * 100).toInt()
+                                    } else 0
+
+                                    Text(
+                                        text = if (budgetInfo.budgetAmountUsd > 0.0) "$percentInt% consumido" else "Configurar ➔",
+                                        style = BrexaTypography.labelSmall.copy(
+                                            color = TextSecondary,
+                                            fontSize = 9.sp
+                                        )
+                                    )
                                 }
                             }
                         }
@@ -1511,6 +1569,235 @@ fun HomeScreen(
                 BrutalistButton(
                     text = "ENTENDIDO",
                     onClick = { showBreakdownModal = false },
+                    containerColor = AccentLime,
+                    contentColor = TextOnLime,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        )
+    }
+
+    // Modal Neobrutalista de Configuración de Presupuesto Mensual
+    if (showBudgetModal) {
+        var selectedMode by remember { mutableStateOf(budgetInfo.mode) }
+        var manualInput by remember {
+            mutableStateOf(
+                if (budgetInfo.budgetAmountUsd > 0.0 && budgetInfo.mode == "MANUAL") {
+                    if (budgetInfo.budgetAmountUsd % 1.0 == 0.0) budgetInfo.budgetAmountUsd.toLong().toString()
+                    else String.format(Locale.US, "%.2f", budgetInfo.budgetAmountUsd)
+                } else ""
+            )
+        }
+
+        AlertDialog(
+            onDismissRequest = { showBudgetModal = false },
+            shape = RectangleShape,
+            containerColor = SurfaceCard,
+            tonalElevation = 0.dp,
+            modifier = Modifier.border(2.dp, BorderSolid, RectangleShape),
+            title = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "PRESUPUESTO MENSUAL",
+                            style = BrexaTypography.titleLarge.copy(color = AccentLime, fontSize = 15.sp)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "PERÍODO: ${budgetInfo.monthName.uppercase()}",
+                            style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 10.5.sp)
+                        )
+                    }
+                    Text(
+                        text = "✕",
+                        style = BrexaTypography.titleMedium.copy(color = TextMuted),
+                        modifier = Modifier
+                            .clickable { showBudgetModal = false }
+                            .padding(4.dp)
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Text(
+                        text = "Estipula cuánto proyectas gastar en el mes. Brexa monitoreará tus compras en tiempo real para mantenerte al tanto:",
+                        style = BrexaTypography.bodySmall.copy(color = TextSecondary, fontSize = 11.5.sp, lineHeight = 16.sp)
+                    )
+
+                    // Selector Neobrutalista de Modo: Automático vs Manual
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        BrutalistBadge(
+                            text = "⚙ AUTOMÁTICO",
+                            backgroundColor = if (selectedMode == "AUTO") AccentLime else SurfaceCardElevated,
+                            contentColor = if (selectedMode == "AUTO") Color.Black else TextSecondary,
+                            borderColor = if (selectedMode == "AUTO") AccentLime else BorderSolid,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { selectedMode = "AUTO" },
+                            fontSize = 10.5.sp,
+                            contentPadding = PaddingValues(vertical = 8.dp)
+                        )
+
+                        BrutalistBadge(
+                            text = "✎ MANUAL",
+                            backgroundColor = if (selectedMode == "MANUAL") AccentPurple else SurfaceCardElevated,
+                            contentColor = if (selectedMode == "MANUAL") Color.White else TextSecondary,
+                            borderColor = if (selectedMode == "MANUAL") AccentPurple else BorderSolid,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { selectedMode = "MANUAL" },
+                            fontSize = 10.5.sp,
+                            contentPadding = PaddingValues(vertical = 8.dp)
+                        )
+                    }
+
+                    if (selectedMode == "AUTO") {
+                        // Tarjeta de Desglose Automático
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(BackgroundBase, RectangleShape)
+                                .border(1.dp, BorderSolid, RectangleShape)
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "CÁLCULO AUTOMÁTICO EN BASE A PAGOS PENDIENTES",
+                                style = BrexaTypography.labelSmall.copy(
+                                    color = AccentLime,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 9.sp
+                                )
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Gastos Fijos (${budgetInfo.fixedExpensesCount}):",
+                                    style = BrexaTypography.bodySmall.copy(color = TextSecondary, fontSize = 11.sp)
+                                )
+                                Text(
+                                    text = "$baseSymbol ${formatter.format(budgetInfo.fixedExpensesTotalUsd)} $baseCode",
+                                    style = BrexaTypography.bodySmall.copy(color = AccentPurple, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = "Gastos Variables de este mes (${budgetInfo.variableExpensesCount}):",
+                                    style = BrexaTypography.bodySmall.copy(color = TextSecondary, fontSize = 11.sp)
+                                )
+                                Text(
+                                    text = "$baseSymbol ${formatter.format(budgetInfo.variableExpensesTotalUsd)} $baseCode",
+                                    style = BrexaTypography.bodySmall.copy(color = AccentLime, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(1.dp)
+                                    .background(BorderSolid)
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "TOTAL PRESUPUESTO AUTO:",
+                                    style = BrexaTypography.labelSmall.copy(color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                )
+                                Text(
+                                    text = "$baseSymbol ${formatter.format(budgetInfo.fixedExpensesTotalUsd + budgetInfo.variableExpensesTotalUsd)} $baseCode",
+                                    style = BrexaTypography.titleMedium.copy(color = AccentLime, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                )
+                            }
+
+                            Text(
+                                text = "💡 Se recalcula en vivo si agregas, editas o cambias compromisos fijos o variables para ${budgetInfo.monthName}.",
+                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 9.5.sp)
+                            )
+                        }
+                    } else {
+                        // Entrada Manual
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            BrutalistTextField(
+                                value = manualInput,
+                                onValueChange = { input ->
+                                    if (input.isEmpty() || input.matches(Regex("^\\d*(\\.\\d{0,2})?$"))) {
+                                        manualInput = input
+                                    }
+                                },
+                                label = "MONTO TOTAL DEL PRESUPUESTO ($baseCode)",
+                                placeholder = "ej. 350.00",
+                                prefix = "$baseSymbol ",
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                            )
+
+                            Text(
+                                text = "Escribe el tope de gasto mensual que deseas cumplir. Útil si deseas presupuestar salidas, ocio y compras espontáneas.",
+                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp, lineHeight = 14.sp)
+                            )
+                        }
+                    }
+
+                    // Resumen de gasto actual este mes
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(SurfaceCardElevated, RectangleShape)
+                            .border(1.dp, BorderSolid, RectangleShape)
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Gasto real a la fecha:",
+                            style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 11.sp)
+                        )
+                        Text(
+                            text = "$baseSymbol ${formatter.format(budgetInfo.spentThisMonthUsd)} $baseCode",
+                            style = BrexaTypography.labelSmall.copy(
+                                color = if (budgetInfo.isOverBudget) ExpenseRed else AccentLime,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                BrutalistButton(
+                    text = "GUARDAR PRESUPUESTO",
+                    onClick = {
+                        val amount = if (selectedMode == "MANUAL") {
+                            manualInput.toDoubleOrNull() ?: 0.0
+                        } else {
+                            budgetInfo.fixedExpensesTotalUsd + budgetInfo.variableExpensesTotalUsd
+                        }
+                        viewModel.setBudgetConfig(selectedMode, amount)
+                        Toast.makeText(context, "Presupuesto de ${budgetInfo.monthName} actualizado", Toast.LENGTH_SHORT).show()
+                        showBudgetModal = false
+                    },
                     containerColor = AccentLime,
                     contentColor = TextOnLime,
                     modifier = Modifier.fillMaxWidth()
