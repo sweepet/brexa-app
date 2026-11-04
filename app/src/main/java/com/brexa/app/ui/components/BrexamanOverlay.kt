@@ -56,7 +56,7 @@ fun BrexamanOverlay(
         val screenWidthPx = with(density) { maxWidth.toPx() }
         val screenHeightPx = with(density) { maxHeight.toPx() }
 
-        // Tamaño compacto y cómodo (64dp de ancho x 119dp de alto)
+        // Tamaño compacto y proporcionado
         val mascotWidthDp = 64.dp
         val mascotHeightDp = 119.dp
         val mascotWidthPx = with(density) { mascotWidthDp.toPx() }
@@ -106,14 +106,14 @@ fun BrexamanOverlay(
 
         LaunchedEffect(showDialogBubble) {
             if (showDialogBubble) {
-                delay(4000)
+                delay(4500)
                 showDialogBubble = false
             }
         }
 
         val speechGreetings = remember {
             listOf(
-                "¡Hola! Cuidando cada centavo.",
+                "¡Hola! Cuidando cada centavo de tus cuentas.",
                 "¡Brexaman al servicio de tu bolsillo!",
                 "Toca aquí para analizar tus finanzas.",
                 "¿Sabías que puedes moverme a cualquier borde?",
@@ -121,6 +121,7 @@ fun BrexamanOverlay(
             )
         }
 
+        // 1. EL MUÑECO BREXAMAN
         Box(
             modifier = Modifier
                 .offset {
@@ -195,56 +196,86 @@ fun BrexamanOverlay(
                         showDialogBubble = !showDialogBubble
                     }
             )
+        }
 
-            AnimatedVisibility(
-                visible = showDialogBubble && !isDragging,
-                enter = fadeIn() + scaleIn(initialScale = 0.8f),
-                exit = fadeOut() + scaleOut(targetScale = 0.8f),
-                modifier = Modifier
-                    .align(if (isDockedLeft) Alignment.TopEnd else Alignment.TopStart)
-                    .offset(
-                        x = if (isDockedLeft) (70).dp else (-175).dp,
-                        y = 6.dp
+        // 2. VENTANA FLOTANTE DE TEXTO (GLOBO DE DIÁLOGO ADAPTATIVO)
+        // Se coloca como hermano directo para tener el ancho completo de la pantalla y no ser comprimido
+        val bubbleMaxWidthDp = (maxWidth - mascotWidthDp - 28.dp).coerceIn(170.dp, 240.dp)
+        val bubbleMaxWidthPx = with(density) { bubbleMaxWidthDp.toPx() }
+
+        val bubbleTargetX = if (isDockedLeft) {
+            // A la derecha de Brexaman
+            (animX.value + mascotWidthPx + with(density) { 8.dp.toPx() })
+        } else {
+            // A la izquierda de Brexaman
+            (animX.value - bubbleMaxWidthPx - with(density) { 8.dp.toPx() }).coerceAtLeast(with(density) { 10.dp.toPx() })
+        }
+
+        AnimatedVisibility(
+            visible = showDialogBubble && !isDragging,
+            enter = fadeIn() + scaleIn(initialScale = 0.85f),
+            exit = fadeOut() + scaleOut(targetScale = 0.85f),
+            modifier = Modifier
+                .offset {
+                    IntOffset(
+                        x = bubbleTargetX.roundToInt(),
+                        y = (animY.value + if (isDragging) 0f else breathOffsetY).roundToInt().coerceAtLeast(with(density) { 10.dp.toPx() }.toInt())
                     )
+                }
+        ) {
+            Column(
+                modifier = Modifier
+                    .widthIn(min = 160.dp, max = bubbleMaxWidthDp)
+                    .background(SurfaceCardElevated, RoundedCornerShape(14.dp))
+                    .border(1.5.dp, AccentLime, RoundedCornerShape(14.dp))
+                    .clickable {
+                        showDialogBubble = false
+                        onOpenAssistant()
+                    }
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .width(165.dp)
-                        .background(SurfaceCardElevated, RoundedCornerShape(12.dp))
-                        .border(1.5.dp, AccentLime, RoundedCornerShape(12.dp))
-                        .clickable {
-                            showDialogBubble = false
-                            onOpenAssistant()
-                        }
-                        .padding(10.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "BREXAMAN",
+                        text = "BREXAMAN // IA",
                         style = BrexaTypography.labelSmall.copy(
                             color = AccentLime,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 9.sp
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(3.dp))
-                    Text(
-                        text = speechBubbleText,
-                        style = BrexaTypography.bodySmall.copy(
-                            color = TextPrimary,
-                            fontSize = 11.sp,
-                            lineHeight = 14.sp
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "TOCA PARA CHATEAR ⚡",
-                        style = BrexaTypography.labelSmall.copy(
-                            color = AccentPurple,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 8.sp
-                        )
+                            fontSize = 10.sp,
+                            letterSpacing = 0.5.sp
+                        ),
+                        maxLines = 1
                     )
                 }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = speechBubbleText,
+                    style = BrexaTypography.bodySmall.copy(
+                        color = TextPrimary,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp,
+                        fontWeight = FontWeight.Normal
+                    ),
+                    softWrap = true
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = "TOCA PARA CHATEAR ⚡",
+                    style = BrexaTypography.labelSmall.copy(
+                        color = AccentPurple,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 9.sp,
+                        letterSpacing = 0.5.sp
+                    ),
+                    maxLines = 1
+                )
             }
         }
     }
