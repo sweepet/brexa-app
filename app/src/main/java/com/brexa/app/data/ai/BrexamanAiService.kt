@@ -23,6 +23,14 @@ class BrexamanAiService(
     private val gson = Gson()
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
+    // Modelos en orden de preferencia y disponibilidad activa en Google AI Studio
+    private val candidateModels = listOf(
+        "gemini-3.5-flash",
+        "gemini-3.7-flash",
+        "gemini-3.8-flash",
+        "gemini-flash-latest"
+    )
+
     suspend fun askBrexaman(
         userMessage: String,
         snapshot: BrexamanFinancialSnapshot,
@@ -37,93 +45,94 @@ class BrexamanAiService(
             return@withContext Result.success(localResponse)
         }
 
-        try {
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=$apiKey"
+        val systemPrompt = """
+            Eres Brexaman, la mascota interactiva y el asistente de inteligencia artificial de la app de finanzas personales Brexa.
+            
+            TU PERSONALIDAD:
+            - Eres carismático, súper amigable, ocurrente, divertido, empático y servicial.
+            - Hablas con soltura, calidez y naturalidad (como un gran amigo o compañero inteligente en tu teléfono).
+            - Tienes libertad total para conversar: responde preguntas de conocimiento general, saluda, bromea o ayuda con cualquier duda cotidiana que te haga el usuario (por ejemplo: si te preguntan "¿cuánto es 2 + 2?", responde amablemente con gracia).
+            - Siempre que la charla trate sobre dinero, gastos, presupuestos o cuando el usuario te pregunte cómo van sus finanzas, consulta con orgullo los datos reales de su billetera en el siguiente resumen financiero para darle consejos hiperpersonalizados y cifras exactas.
+            - Nunca seas sermoneador ni aburrido. Usa un toque de humor cuando sea oportuno y celebra sus ahorros.
+            
+            ${snapshot.toContextString()}
+        """.trimIndent()
 
-            val rootJson = JsonObject()
+        // Intentar con los modelos disponibles hasta que uno responda
+        for (modelName in candidateModels) {
+            try {
+                val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent?key=$apiKey"
+                val rootJson = JsonObject()
 
-            val systemInstruction = JsonObject()
-            val sysParts = JsonArray()
-            val sysPartText = JsonObject()
+                // 1. System instruction
+                val systemInstruction = JsonObject()
+                val sysParts = JsonArray()
+                val sysPartText = JsonObject()
+                sysPartText.addProperty("text", systemPrompt)
+                sysParts.add(sysPartText)
+                systemInstruction.add("parts", sysParts)
+                rootJson.add("systemInstruction", systemInstruction)
 
-            val systemPrompt = """
-                Eres Brexaman, la mascota y asistente de inteligencia artificial amigable, tierno, pero disciplinado y protector de la app financiera Brexa.
-                
-                TUS REGLAS DE ORO:
-                1. Basa tus respuestas en los números reales del siguiente resumen financiero del usuario.
-                2. No inventes cifras. Si te preguntan algo que no aparece en los datos, dilo con amabilidad.
-                3. Sé conciso, cálido y utiliza viñetas o frases directas.
-                4. Usa un tono optimista, motivador y con humor ligero cuando sea oportuno.
-                5. Destaca siempre los montos y divisas (USD y Bs).
-                
-                ${snapshot.toContextString()}
-            """.trimIndent()
-
-            sysPartText.addProperty("text", systemPrompt)
-            sysParts.add(sysPartText)
-            systemInstruction.add("parts", sysParts)
-            rootJson.add("systemInstruction", systemInstruction)
-
-            val contentsArray = JsonArray()
-
-            val recentHistory = conversationHistory.takeLast(4)
-            for (msg in recentHistory) {
-                val msgObj = JsonObject()
-                msgObj.addProperty("role", if (msg.sender == MessageSender.USER) "user" else "model")
-                val parts = JsonArray()
-                val partObj = JsonObject()
-                partObj.addProperty("text", msg.content)
-                parts.add(partObj)
-                msgObj.add("parts", parts)
-                contentsArray.add(msgObj)
-            }
-
-            val currentMsgObj = JsonObject()
-            currentMsgObj.addProperty("role", "user")
-            val currentParts = JsonArray()
-            val currentPartObj = JsonObject()
-            currentPartObj.addProperty("text", userMessage)
-            currentParts.add(currentPartObj)
-            currentMsgObj.add("parts", currentParts)
-            contentsArray.add(currentMsgObj)
-
-            rootJson.add("contents", contentsArray)
-
-            val genConfig = JsonObject()
-            genConfig.addProperty("temperature", 0.7)
-            genConfig.addProperty("maxOutputTokens", 500)
-            rootJson.add("generationConfig", genConfig)
-
-            val requestBody = rootJson.toString().toRequestBody(jsonMediaType)
-            val request = Request.Builder()
-                .url(url)
-                .post(requestBody)
-                .build()
-
-            client.newCall(request).execute().use { response ->
-                val bodyStr = response.body?.string() ?: ""
-                if (!response.isSuccessful) {
-                    return@withContext Result.success(
-                        generateOfflineResponse(userMessage, snapshot)
-                    )
+                // 2. Historial de mensajes
+                val contentsArray = JsonArray()
+                val recentHistory = conversationHistory.takeLast(6)
+                for (msg in recentHistory) {
+                    val msgObj = JsonObject()
+                    msgObj.addProperty("role", if (msg.sender == MessageSender.USER) "user" else "model")
+                    val parts = JsonArray()
+                    val partObj = JsonObject()
+                    partObj.addProperty("text", msg.content)
+                    parts.add(partObj)
+                    msgObj.add("parts", parts)
+                    contentsArray.add(msgObj)
                 }
 
-                val jsonResponse = gson.fromJson(bodyStr, JsonObject::class.java)
-                val candidates = jsonResponse.getAsJsonArray("candidates")
-                if (candidates != null && candidates.size() > 0) {
-                    val candidate = candidates[0].asJsonObject
-                    val contentObj = candidate.getAsJsonObject("content")
-                    val parts = contentObj?.getAsJsonArray("parts")
-                    val text = parts?.get(0)?.asJsonObject?.get("text")?.asString
-                    if (!text.isNullOrBlank()) {
-                        return@withContext Result.success(text.trim())
+                // Mensaje actual
+                val currentMsgObj = JsonObject()
+                currentMsgObj.addProperty("role", "user")
+                val currentParts = JsonArray()
+                val currentPartObj = JsonObject()
+                currentPartObj.addProperty("text", userMessage)
+                currentParts.add(currentPartObj)
+                currentMsgObj.add("parts", currentParts)
+                contentsArray.add(currentMsgObj)
+                rootJson.add("contents", contentsArray)
+
+                // Configuración
+                val genConfig = JsonObject()
+                genConfig.addProperty("temperature", 0.75)
+                genConfig.addProperty("maxOutputTokens", 600)
+                rootJson.add("generationConfig", genConfig)
+
+                val requestBody = rootJson.toString().toRequestBody(jsonMediaType)
+                val request = Request.Builder()
+                    .url(url)
+                    .post(requestBody)
+                    .build()
+
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) {
+                        val bodyStr = response.body?.string() ?: ""
+                        val jsonResponse = gson.fromJson(bodyStr, JsonObject::class.java)
+                        val candidates = jsonResponse.getAsJsonArray("candidates")
+                        if (candidates != null && candidates.size() > 0) {
+                            val candidate = candidates[0].asJsonObject
+                            val contentObj = candidate.getAsJsonObject("content")
+                            val parts = contentObj?.getAsJsonArray("parts")
+                            val text = parts?.get(0)?.asJsonObject?.get("text")?.asString
+                            if (!text.isNullOrBlank()) {
+                                return@withContext Result.success(text.trim())
+                            }
+                        }
                     }
                 }
-                Result.success(generateOfflineResponse(userMessage, snapshot))
+            } catch (_: Exception) {
+                // Si este modelo falla, prueba el siguiente de la lista
             }
-        } catch (e: Exception) {
-            Result.success(generateOfflineResponse(userMessage, snapshot))
         }
+
+        // Si todos los modelos fallaron por algún corte extremo de red
+        Result.success(generateOfflineResponse(userMessage, snapshot))
     }
 
     private fun generateOfflineResponse(userMessage: String, snapshot: BrexamanFinancialSnapshot): String {
@@ -138,14 +147,7 @@ class BrexamanAiService(
             lower.contains("consejo") || lower.contains("tip") || lower.contains("recomienda") || lower.contains("ahorro") ->
                 BrexamanFinancialAnalyzer.answerQuickPromptLocally("DAILY_TIP", snapshot)
             else -> {
-                """
-                ¡Hola! Soy Brexaman. Estoy monitoreando tus finanzas en tiempo real.
-                
-                Actualmente tu patrimonio neto es de $${String.format("%.2f", snapshot.totalNetWorthUsd)} USD.
-                Este mes has gastado $${String.format("%.2f", snapshot.currentMonthExpenseUsd)} USD frente a $${String.format("%.2f", snapshot.currentMonthIncomeUsd)} USD de ingresos.
-                
-                Usa las sugerencias rápidas de abajo o pregúntame sobre tus gastos, ahorros o deudas.
-                """.trimIndent()
+                "¡Hola! Soy Brexaman. Actualmente tu patrimonio neto es de $${String.format("%.2f", snapshot.totalNetWorthUsd)} USD. Puedes consultarme tus balances, gastos del mes o pedirme consejos financieros."
             }
         }
     }

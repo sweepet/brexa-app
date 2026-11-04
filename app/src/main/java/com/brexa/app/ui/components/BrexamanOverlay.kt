@@ -34,6 +34,7 @@ import com.brexa.app.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import kotlin.random.Random
 
 @Composable
 fun BrexamanOverlay(
@@ -45,7 +46,7 @@ fun BrexamanOverlay(
     val prefs = remember { context.getSharedPreferences("brexa_prefs", Context.MODE_PRIVATE) }
 
     val savedSideIsLeft = remember { prefs.getBoolean("brexaman_is_left", false) }
-    val savedRatioY = remember { prefs.getFloat("brexaman_ratio_y", 0.35f) }
+    val savedRatioY = remember { prefs.getFloat("brexaman_ratio_y", 0.40f) }
 
     BoxWithConstraints(
         modifier = modifier
@@ -55,13 +56,14 @@ fun BrexamanOverlay(
         val screenWidthPx = with(density) { maxWidth.toPx() }
         val screenHeightPx = with(density) { maxHeight.toPx() }
 
-        val mascotWidthDp = 100.dp
-        val mascotHeightDp = 186.dp
+        // Tamaño compacto y cómodo (64dp de ancho x 119dp de alto)
+        val mascotWidthDp = 64.dp
+        val mascotHeightDp = 119.dp
         val mascotWidthPx = with(density) { mascotWidthDp.toPx() }
         val mascotHeightPx = with(density) { mascotHeightDp.toPx() }
 
-        val topMarginPx = with(density) { 90.dp.toPx() }
-        val bottomMarginPx = with(density) { 100.dp.toPx() }
+        val topMarginPx = with(density) { 85.dp.toPx() }
+        val bottomMarginPx = with(density) { 95.dp.toPx() }
         val maxAvailableY = (screenHeightPx - mascotHeightPx - bottomMarginPx).coerceAtLeast(topMarginPx)
 
         val leftAnchorX = 0f
@@ -79,12 +81,24 @@ fun BrexamanOverlay(
         var showDialogBubble by remember { mutableStateOf(false) }
         var speechBubbleText by remember { mutableStateOf("¡Hola! Soy Brexaman. ¿En qué te ayudo hoy?") }
 
+        // Parpadeo orgánico de ojos
+        var isBlinking by remember { mutableStateOf(false) }
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(Random.nextLong(2800L, 5200L))
+                isBlinking = true
+                delay(140L)
+                isBlinking = false
+            }
+        }
+
+        // Micro-animación de respiración / flotación idle
         val infiniteTransition = rememberInfiniteTransition(label = "brexaman_breath")
         val breathOffsetY by infiniteTransition.animateFloat(
-            initialValue = -4f,
-            targetValue = 4f,
+            initialValue = -3f,
+            targetValue = 3f,
             animationSpec = infiniteRepeatable(
-                animation = tween(2200, easing = FastOutSlowInEasing),
+                animation = tween(2400, easing = FastOutSlowInEasing),
                 repeatMode = RepeatMode.Reverse
             ),
             label = "breath_y"
@@ -92,7 +106,7 @@ fun BrexamanOverlay(
 
         LaunchedEffect(showDialogBubble) {
             if (showDialogBubble) {
-                delay(4500)
+                delay(4000)
                 showDialogBubble = false
             }
         }
@@ -167,7 +181,9 @@ fun BrexamanOverlay(
                 }
         ) {
             Image(
-                painter = painterResource(id = R.drawable.brexaman_peeking),
+                painter = painterResource(
+                    id = if (isBlinking) R.drawable.brexaman_peeking_blink else R.drawable.brexaman_peeking
+                ),
                 contentDescription = "Brexaman Mascota",
                 modifier = Modifier
                     .fillMaxSize()
@@ -187,13 +203,13 @@ fun BrexamanOverlay(
                 modifier = Modifier
                     .align(if (isDockedLeft) Alignment.TopEnd else Alignment.TopStart)
                     .offset(
-                        x = if (isDockedLeft) (105).dp else (-175).dp,
-                        y = 10.dp
+                        x = if (isDockedLeft) (70).dp else (-175).dp,
+                        y = 6.dp
                     )
             ) {
                 Column(
                     modifier = Modifier
-                        .width(170.dp)
+                        .width(165.dp)
                         .background(SurfaceCardElevated, RoundedCornerShape(12.dp))
                         .border(1.5.dp, AccentLime, RoundedCornerShape(12.dp))
                         .clickable {
