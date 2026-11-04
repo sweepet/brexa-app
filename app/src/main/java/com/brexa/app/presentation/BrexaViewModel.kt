@@ -3,6 +3,7 @@ package com.brexa.app.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.brexa.app.data.ai.*
 import com.brexa.app.data.local.entity.*
 import com.brexa.app.data.repository.BackupPayload
 import com.brexa.app.data.repository.BrexaRepository
@@ -983,6 +984,78 @@ class BrexaViewModel(
             result
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    // --- BREXAMAN IA ASISTENTE ---
+    private val _brexamanMessages = MutableStateFlow<List<BrexamanChatMessage>>(emptyList())
+    val brexamanMessages: StateFlow<List<BrexamanChatMessage>> = _brexamanMessages.asStateFlow()
+
+    private val _isBrexamanThinking = MutableStateFlow(false)
+    val isBrexamanThinking: StateFlow<Boolean> = _isBrexamanThinking.asStateFlow()
+
+    private val brexamanAiService = BrexamanAiService()
+
+    fun getBrexamanSnapshot(): BrexamanFinancialSnapshot {
+        return BrexamanFinancialAnalyzer.generateSnapshot(
+            accounts = activeAccounts.value,
+            currencies = allCurrencies.value,
+            categories = expenseCategories.value + incomeCategories.value,
+            transactions = allTransactions.value,
+            pendingExpenses = allPendingExpenses.value
+        )
+    }
+
+    fun sendBrexamanMessage(userPrompt: String) {
+        if (userPrompt.isBlank()) return
+        val userMsg = BrexamanChatMessage(sender = MessageSender.USER, content = userPrompt.trim())
+        _brexamanMessages.value = _brexamanMessages.value + userMsg
+
+        viewModelScope.launch {
+            _isBrexamanThinking.value = true
+            val snapshot = getBrexamanSnapshot()
+            val savedApiKey = repository.getSetting("gemini_api_key")
+
+            val result = brexamanAiService.askBrexaman(
+                userMessage = userPrompt,
+                snapshot = snapshot,
+                conversationHistory = _brexamanMessages.value,
+                apiKeyOverride = savedApiKey
+            )
+            val replyText = if (result.isSuccess) {
+                result.getOrNull() ?: BrexamanFinancialAnalyzer.answerQuickPromptLocally("MONTH_STATUS", snapshot)
+            } else {
+                BrexamanFinancialAnalyzer.answerQuickPromptLocally("MONTH_STATUS", snapshot)
+            }
+            _brexamanMessages.value = _brexamanMessages.value + BrexamanChatMessage(
+                sender = MessageSender.BREXAMAN,
+                content = replyText
+            )
+            _isBrexamanThinking.value = false
+        }
+    }
+
+    fun sendBrexamanQuickPrompt(promptType: String) {
+        val userLabel = when (promptType) {
+            "MONTH_STATUS" -> "¿Cómo voy este mes?"
+            "TOP_EXPENSES" -> "¿En qué categoría gasté más?"
+            "DAILY_TIP" -> "Dame un consejo financiero para hoy"
+            "PENDING_DEBTS" -> "¿Cuáles son mis pagos pendientes?"
+            else -> "Resumen"
+        }
+        val userMsg = BrexamanChatMessage(sender = MessageSender.USER, content = userLabel)
+        _brexamanMessages.value = _brexamanMessages.value + userMsg
+
+        viewModelScope.launch {
+            _isBrexamanThinking.value = true
+            delay(300)
+            val snapshot = getBrexamanSnapshot()
+            val replyText = BrexamanFinancialAnalyzer.answerQuickPromptLocally(promptType, snapshot)
+            _brexamanMessages.value = _brexamanMessages.value + BrexamanChatMessage(
+                sender = MessageSender.BREXAMAN,
+                content = replyText
+            )
+            _isBrexamanThinking.value = false
         }
     }
 }

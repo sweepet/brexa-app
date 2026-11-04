@@ -36,6 +36,7 @@ jobs:
           KEYSTORE_PASSWORD: brexa1234
           KEY_ALIAS: brexakey
           KEY_PASSWORD: brexa1234
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: ./gradlew assembleRelease --stacktrace
 
       - name: Subir APK como Artefacto

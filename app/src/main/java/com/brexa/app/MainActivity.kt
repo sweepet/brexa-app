@@ -39,6 +39,8 @@ import com.brexa.app.data.sync.UpdateInfo
 import com.brexa.app.presentation.BrexaViewModel
 import com.brexa.app.presentation.BrexaViewModelFactory
 import com.brexa.app.ui.components.BrutalistBadge
+import com.brexa.app.ui.components.BrexamanOverlay
+import com.brexa.app.ui.components.BrexamanChatSheet
 import com.brexa.app.ui.screens.*
 import com.brexa.app.ui.theme.*
 import kotlinx.coroutines.Dispatchers
@@ -78,6 +80,11 @@ class MainActivity : ComponentActivity() {
                 var availableUpdate by remember { mutableStateOf<UpdateInfo?>(null) }
                 var isDownloadingUpdate by remember { mutableStateOf(false) }
                 var downloadProgress by remember { mutableFloatStateOf(0f) }
+
+                // Brexaman IA State
+                var showBrexamanChat by remember { mutableStateOf(false) }
+                val brexamanMessages by viewModel.brexamanMessages.collectAsState()
+                val isBrexamanThinking by viewModel.isBrexamanThinking.collectAsState()
 
                 // Permiso de notificaciones para Android 13+ (API 33+)
                 val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -207,6 +214,25 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
+
+                    // Mascota y Asistente Brexaman interactivo
+                    if (currentScreen == "HOME") {
+                        BrexamanOverlay(
+                            onOpenAssistant = {
+                                showBrexamanChat = true
+                            }
+                        )
+                    }
+
+                    // Modal de Conversacion con Brexaman
+                    BrexamanChatSheet(
+                        isOpen = showBrexamanChat,
+                        onDismiss = { showBrexamanChat = false },
+                        messages = brexamanMessages,
+                        isThinking = isBrexamanThinking,
+                        onSendMessage = { prompt: String -> viewModel.sendBrexamanMessage(prompt) },
+                        onSendQuickPrompt = { promptType: String -> viewModel.sendBrexamanQuickPrompt(promptType) }
+                    )
 
                     // Cartel Neobrutalista de Actualización Automática In-App
                     if (availableUpdate != null) {
