@@ -19,6 +19,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -45,6 +49,7 @@ fun BrexamanChatSheet(
     isThinking: Boolean,
     queriesRemaining: Int = 15,
     dailyLimit: Int = 15,
+    onClearChat: () -> Unit = {},
     onSendMessage: (String) -> Unit,
     onSendQuickPrompt: (String) -> Unit
 ) {
@@ -56,8 +61,9 @@ fun BrexamanChatSheet(
     val listState = rememberLazyListState()
 
     LaunchedEffect(messages.size, isThinking) {
-        if (messages.isNotEmpty()) {
-            listState.animateScrollToItem(messages.size)
+        if (messages.isNotEmpty() || isThinking) {
+            val target = if (isThinking) messages.size else (messages.size - 1).coerceAtLeast(0)
+            listState.animateScrollToItem(target)
         }
     }
 
@@ -163,19 +169,33 @@ fun BrexamanChatSheet(
                     }
                 }
 
-                IconButton(
-                    onClick = {
-                        coroutineScope.launch {
-                            sheetState.hide()
-                            onDismiss()
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (messages.isNotEmpty()) {
+                        IconButton(
+                            onClick = onClearChat
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Reiniciar conversación",
+                                tint = TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "Cerrar",
-                        tint = TextSecondary
-                    )
+                    IconButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                sheetState.hide()
+                                onDismiss()
+                            }
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Cerrar",
+                            tint = TextSecondary
+                        )
+                    }
                 }
             }
 
@@ -352,7 +372,9 @@ private fun QuickPromptChip(
 @Composable
 private fun BrexamanBubble(content: String) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(end = 12.dp),
         horizontalArrangement = Arrangement.Start
     ) {
         Box(
@@ -375,17 +397,17 @@ private fun BrexamanBubble(content: String) {
 
         Box(
             modifier = Modifier
-                .widthIn(max = 280.dp)
-                .background(BackgroundBase, RoundedCornerShape(topStart = 2.dp, topEnd = 12.dp, bottomStart = 12.dp, bottomEnd = 12.dp))
-                .border(1.dp, BorderSolid, RoundedCornerShape(topStart = 2.dp, topEnd = 12.dp, bottomStart = 12.dp, bottomEnd = 12.dp))
-                .padding(12.dp)
+                .weight(1f, fill = false)
+                .background(BackgroundBase, RoundedCornerShape(topStart = 2.dp, topEnd = 14.dp, bottomStart = 14.dp, bottomEnd = 14.dp))
+                .border(1.dp, BorderSolid, RoundedCornerShape(topStart = 2.dp, topEnd = 14.dp, bottomStart = 14.dp, bottomEnd = 14.dp))
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Text(
-                text = content,
+                text = parseMarkdownToAnnotatedString(content),
                 style = BrexaTypography.bodyMedium.copy(
                     color = TextPrimary,
-                    fontSize = 12.5.sp,
-                    lineHeight = 17.sp
+                    fontSize = 13.sp,
+                    lineHeight = 18.5.sp
                 )
             )
         }
@@ -395,24 +417,54 @@ private fun BrexamanBubble(content: String) {
 @Composable
 private fun UserBubble(content: String) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 28.dp),
         horizontalArrangement = Arrangement.End
     ) {
         Box(
             modifier = Modifier
-                .widthIn(max = 280.dp)
-                .background(SurfaceCardElevated, RoundedCornerShape(topStart = 12.dp, topEnd = 2.dp, bottomStart = 12.dp, bottomEnd = 12.dp))
-                .border(1.5.dp, AccentLime, RoundedCornerShape(topStart = 12.dp, topEnd = 2.dp, bottomStart = 12.dp, bottomEnd = 12.dp))
-                .padding(12.dp)
+                .weight(1f, fill = false)
+                .background(SurfaceCardElevated, RoundedCornerShape(topStart = 14.dp, topEnd = 2.dp, bottomStart = 14.dp, bottomEnd = 14.dp))
+                .border(1.5.dp, AccentLime, RoundedCornerShape(topStart = 14.dp, topEnd = 2.dp, bottomStart = 14.dp, bottomEnd = 14.dp))
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Text(
-                text = content,
+                text = parseMarkdownToAnnotatedString(content),
                 style = BrexaTypography.bodyMedium.copy(
                     color = TextPrimary,
-                    fontSize = 12.5.sp,
-                    lineHeight = 17.sp
+                    fontSize = 13.sp,
+                    lineHeight = 18.5.sp
                 )
             )
+        }
+    }
+}
+
+/**
+ * Parsea formato markdown básico (**negrita**) a AnnotatedString de Compose
+ * para que el texto de la IA se lea estilizado y sin asteriscos en pantalla.
+ */
+private fun parseMarkdownToAnnotatedString(text: String): AnnotatedString {
+    return buildAnnotatedString {
+        val boldRegex = Regex("\\*\\*(.*?)\\*\\*")
+        var lastIndex = 0
+
+        val matches = boldRegex.findAll(text)
+        for (match in matches) {
+            if (match.range.first > lastIndex) {
+                append(text.substring(lastIndex, match.range.first))
+            }
+            val boldText = match.groupValues[1]
+            pushStyle(SpanStyle(fontWeight = FontWeight.Bold, color = TextPrimary))
+            append(boldText)
+            pop()
+
+            lastIndex = match.range.last + 1
+        }
+
+        if (lastIndex < text.length) {
+            append(text.substring(lastIndex))
         }
     }
 }

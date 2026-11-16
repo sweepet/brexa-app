@@ -1027,6 +1027,10 @@ class BrexaViewModel(
         }
     }
 
+    fun clearBrexamanChat() {
+        _brexamanMessages.value = emptyList()
+    }
+
     fun getBrexamanSnapshot(): BrexamanFinancialSnapshot {
         return BrexamanFinancialAnalyzer.generateSnapshot(
             accounts = activeAccounts.value,

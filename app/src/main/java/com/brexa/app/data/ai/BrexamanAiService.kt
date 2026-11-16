@@ -162,9 +162,10 @@ class BrexamanAiService(
                  * Calcula matemáticamente la brecha porcentual: ((tasa_cobrada - tasa_bcv) / tasa_bcv) * 100%.
                  * Indica exactamente cuántos bolívares de más se pagan por dólar y da una recomendación financiera práctica y directa.
             
-            6. TONO Y ESTILO:
+            6. TONO, ESTILO Y COMPLETITUD:
                - Amigable, simpático, conciso, profesional y directo al grano.
                - Cifras exactas destacadas en negrita y sin introducciones innecesariamente largas.
+               - COMPLETITUD OBLIGATORIA: Concluye SIEMPRE tus oraciones, listas y consejos financieros de principio a fin, sin dejar nunca frases cortadas a medias.
             ================================================================================
         """.trimIndent()
 
@@ -182,35 +183,56 @@ class BrexamanAiService(
                 systemInstruction.add("parts", sysParts)
                 rootJson.add("systemInstruction", systemInstruction)
 
-                // Historial de mensajes
+                // Historial de conversación limpio y alternado (máximo 10 turnos previos para fluidez)
                 val contentsArray = JsonArray()
-                val recentHistory = conversationHistory.takeLast(6)
-                for (msg in recentHistory) {
-                    val msgObj = JsonObject()
-                    msgObj.addProperty("role", if (msg.sender == MessageSender.USER) "user" else "model")
+                val priorMessages = conversationHistory
+                    .filter { it.content.isNotBlank() }
+                    .let { list ->
+                        if (list.isNotEmpty() && list.last().content == userMessage.trim()) {
+                            list.dropLast(1)
+                        } else {
+                            list
+                        }
+                    }
+                    .takeLast(10)
+
+                val validTurns = mutableListOf<Pair<String, String>>()
+                for (msg in priorMessages) {
+                    val role = if (msg.sender == MessageSender.USER) "user" else "model"
+                    if (validTurns.isEmpty()) {
+                        if (role == "user") validTurns.add(role to msg.content)
+                    } else {
+                        if (validTurns.last().first != role) {
+                            validTurns.add(role to msg.content)
+                        }
+                    }
+                }
+                validTurns.add("user" to userMessage.trim())
+
+                for ((role, text) in validTurns) {
+                    val turnObj = JsonObject()
+                    turnObj.addProperty("role", role)
                     val parts = JsonArray()
                     val partObj = JsonObject()
-                    partObj.addProperty("text", msg.content)
+                    partObj.addProperty("text", text)
                     parts.add(partObj)
-                    msgObj.add("parts", parts)
-                    contentsArray.add(msgObj)
+                    turnObj.add("parts", parts)
+                    contentsArray.add(turnObj)
                 }
-
-                // Mensaje actual
-                val currentMsgObj = JsonObject()
-                currentMsgObj.addProperty("role", "user")
-                val currentParts = JsonArray()
-                val currentPartObj = JsonObject()
-                currentPartObj.addProperty("text", userMessage)
-                currentParts.add(currentPartObj)
-                currentMsgObj.add("parts", currentParts)
-                contentsArray.add(currentMsgObj)
                 rootJson.add("contents", contentsArray)
 
-                // Configuración
+                // Configuración de generación amplia (2500 tokens) para evitar cortes de texto
                 val genConfig = JsonObject()
                 genConfig.addProperty("temperature", 0.7)
-                genConfig.addProperty("maxOutputTokens", 650)
+                genConfig.addProperty("maxOutputTokens", 2500)
+
+                // Desactivar tokens de pensamiento en Gemini 3 para respuestas inmediatas y fluidas
+                if (modelName.contains("gemini-3")) {
+                    val thinkConfig = JsonObject()
+                    thinkConfig.addProperty("thinkingBudget", 0)
+                    genConfig.add("thinkingConfig", thinkConfig)
+                }
+
                 rootJson.add("generationConfig", genConfig)
 
                 val requestBody = rootJson.toString().toRequestBody(jsonMediaType)

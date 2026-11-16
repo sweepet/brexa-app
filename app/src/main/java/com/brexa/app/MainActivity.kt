@@ -264,6 +264,7 @@ class MainActivity : ComponentActivity() {
                         isThinking = isBrexamanThinking,
                         queriesRemaining = brexamanQueriesRemaining,
                         dailyLimit = viewModel.brexamanDailyLimit,
+                        onClearChat = { viewModel.clearBrexamanChat() },
                         onSendMessage = { prompt: String -> viewModel.sendBrexamanMessage(prompt) },
                         onSendQuickPrompt = { promptType: String -> viewModel.sendBrexamanQuickPrompt(promptType) }
                     )
