@@ -50,6 +50,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: app/build/outputs/apk/release/*.apk
+          name: Brexa ${{ github.ref_name }}
+          body: "Mejora en la navegación y retorno con gestos y botón atrás, solución a notas de versión y optimizaciones generales."
           draft: false
           prerelease: false
-          generate_release_notes: false
+          generate_release_notes: true

@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -132,6 +133,35 @@ class MainActivity : ComponentActivity() {
                     viewModel.syncOfficialRates()
                 }
 
+                // Control de navegación atrás por hardware y gestos
+                var lastBackPressTime by remember { mutableLongStateOf(0L) }
+
+                // 1. Si el chat con Brexaman está abierto, cerrarlo con atrás
+                BackHandler(enabled = showBrexamanChat) {
+                    showBrexamanChat = false
+                }
+
+                // 2. Si el diálogo de actualización está abierto (sin descarga activa), cerrarlo con atrás
+                BackHandler(enabled = availableUpdate != null && !isDownloadingUpdate && !showBrexamanChat) {
+                    availableUpdate = null
+                }
+
+                // 3. Si el usuario está en cualquier sub-pantalla, el botón/gesto de atrás lo regresa a HOME
+                BackHandler(enabled = currentScreen != "HOME" && currentScreen != "AUTH" && !showBrexamanChat && availableUpdate == null) {
+                    currentScreen = "HOME"
+                }
+
+                // 4. Si el usuario está en HOME, doble toque de atrás para salir (evita salir por accidente)
+                BackHandler(enabled = currentScreen == "HOME" && !showBrexamanChat && availableUpdate == null) {
+                    val currentTime = System.currentTimeMillis()
+                    if (currentTime - lastBackPressTime < 2000L) {
+                        finish()
+                    } else {
+                        lastBackPressTime = currentTime
+                        Toast.makeText(applicationContext, "Presiona atrás de nuevo para salir", Toast.LENGTH_SHORT).show()
+                    }
+                }
+
                 Surface(
                     modifier = Modifier
                         .fillMaxSize()
@@ -253,21 +283,24 @@ class MainActivity : ComponentActivity() {
                                         text = "Hay una nueva actualización disponible en GitHub con mejoras y correcciones.",
                                         style = BrexaTypography.bodyMedium.copy(color = TextPrimary)
                                     )
-                                    if (update.releaseNotes.isNotEmpty()) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .heightIn(max = 140.dp)
-                                                .background(BackgroundBase, RectangleShape)
-                                                .border(1.dp, BorderSolid, RectangleShape)
-                                                .padding(horizontal = 10.dp, vertical = 8.dp)
-                                                .verticalScroll(rememberScrollState())
-                                        ) {
-                                            Text(
-                                                text = update.releaseNotes,
-                                                style = BrexaTypography.labelMedium.copy(color = TextSecondary, fontSize = 11.sp)
-                                            )
-                                        }
+                                    val notes = if (update.releaseNotes.isNotBlank() && !update.releaseNotes.trim().equals("null", ignoreCase = true)) {
+                                        update.releaseNotes
+                                    } else {
+                                        "Mejora en la navegación y retorno con gestos, optimizaciones de estabilidad y rendimiento."
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 140.dp)
+                                            .background(BackgroundBase, RectangleShape)
+                                            .border(1.dp, BorderSolid, RectangleShape)
+                                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                                            .verticalScroll(rememberScrollState())
+                                    ) {
+                                        Text(
+                                            text = notes,
+                                            style = BrexaTypography.labelMedium.copy(color = TextSecondary, fontSize = 11.sp)
+                                        )
                                     }
                                     if (isDownloadingUpdate) {
                                         Spacer(modifier = Modifier.height(6.dp))

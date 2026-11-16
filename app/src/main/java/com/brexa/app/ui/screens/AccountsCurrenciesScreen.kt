@@ -1,6 +1,7 @@
 package com.brexa.app.ui.screens
 
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -91,6 +92,23 @@ fun AccountsCurrenciesScreen(
     var deletingCategory by remember { mutableStateOf<CategoryEntity?>(null) }
 
     val formatter = remember { CurrencyFormat.standardFormatter }
+
+    BackHandler {
+        when {
+            showCreateAccountDialog -> showCreateAccountDialog = false
+            showCreateCurrencyDialog -> showCreateCurrencyDialog = false
+            showCreateCategoryDialog -> showCreateCategoryDialog = false
+            showEditBaseCurrencyDialog -> showEditBaseCurrencyDialog = false
+            editingCurrency != null -> editingCurrency = null
+            editingRateCurrency != null -> editingRateCurrency = null
+            deletingCurrency != null -> deletingCurrency = null
+            adjustingAccount != null -> adjustingAccount = null
+            editingAccount != null -> editingAccount = null
+            deletingAccount != null -> deletingAccount = null
+            deletingCategory != null -> deletingCategory = null
+            else -> onBack()
+        }
+    }
 
     Column(
         modifier = Modifier

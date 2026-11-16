@@ -68,7 +68,9 @@ class AppUpdateManager(private val context: Context) {
                 val bodyStr = response.body?.string() ?: return@withContext Result.success(null)
                 val json = JSONObject(bodyStr)
                 val tagName = json.optString("tag_name", "").trim()
-                val bodyNotes = json.optString("body", "Mejoras y correcciones generales.")
+                val releaseName = json.optString("name", "").trim()
+                val bodyVal = if (json.isNull("body")) null else json.optString("body")
+                val bodyNotes = if (bodyVal == null || bodyVal.trim().equals("null", ignoreCase = true)) "" else bodyVal.trim()
 
                 // Comprobar si la versión de GitHub es más reciente que la instalada
                 if (isNewerVersion(tagName, currentVersion)) {
@@ -83,7 +85,7 @@ class AppUpdateManager(private val context: Context) {
                                 return@withContext Result.success(
                                     UpdateInfo(
                                         versionName = tagName,
-                                        releaseNotes = cleanReleaseNotes(bodyNotes, tagName),
+                                        releaseNotes = cleanReleaseNotes(bodyNotes, tagName, releaseName),
                                         downloadUrl = downloadUrl,
                                         fileSize = size
                                     )
@@ -123,15 +125,23 @@ class AppUpdateManager(private val context: Context) {
      * Limpia y formatea las notas de la versión para mostrar solo los cambios de esta versión
      * sin enlaces técnicos de git ni acumulación de versiones anteriores.
      */
-    fun cleanReleaseNotes(raw: String, tagName: String): String {
-        if (raw.isBlank()) return "Mejoras de estabilidad y rendimiento."
+    fun cleanReleaseNotes(raw: String, tagName: String, releaseName: String = ""): String {
+        val trimmedRaw = raw.trim()
+        if (trimmedRaw.isBlank() || trimmedRaw.equals("null", ignoreCase = true)) {
+            return if (releaseName.isNotBlank() && !releaseName.equals("null", ignoreCase = true) && !releaseName.equals(tagName, ignoreCase = true)) {
+                "Mejora: $releaseName"
+            } else {
+                "Mejora en la navegación y retorno con gestos, optimizaciones generales en $tagName."
+            }
+        }
 
         val lines = raw.lines()
         val cleanedLines = mutableListOf<String>()
 
         for (line in lines) {
             val trimmed = line.trim()
-            if (trimmed.startsWith("**Full Changelog**", ignoreCase = true) ||
+            if (trimmed.equals("null", ignoreCase = true) ||
+                trimmed.startsWith("**Full Changelog**", ignoreCase = true) ||
                 trimmed.startsWith("Full Changelog:", ignoreCase = true) ||
                 trimmed.startsWith("https://github.com", ignoreCase = true) ||
                 trimmed.startsWith("## Novedades", ignoreCase = true) ||
@@ -144,13 +154,17 @@ class AppUpdateManager(private val context: Context) {
                 .replace("**", "")
                 .replace("`", "")
 
-            if (cleanLine.isNotBlank()) {
+            if (cleanLine.isNotBlank() && !cleanLine.equals("null", ignoreCase = true)) {
                 cleanedLines.add(cleanLine)
             }
         }
 
         return if (cleanedLines.isEmpty()) {
-            "Mejoras y correcciones en $tagName."
+            if (releaseName.isNotBlank() && !releaseName.equals("null", ignoreCase = true) && !releaseName.equals(tagName, ignoreCase = true)) {
+                "Mejora: $releaseName"
+            } else {
+                "Mejora en la navegación y retorno con gestos, optimizaciones generales en $tagName."
+            }
         } else {
             cleanedLines.take(6).joinToString("\n")
         }

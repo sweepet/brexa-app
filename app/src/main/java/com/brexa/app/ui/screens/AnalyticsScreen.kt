@@ -1,5 +1,6 @@
 package com.brexa.app.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -48,6 +49,14 @@ fun AnalyticsScreen(
     val weekCalendar by viewModel.analyticsWeekCalendar.collectAsState()
 
     var selectedCategoryForDetail by remember { mutableStateOf<CategoryDistribution?>(null) }
+
+    BackHandler {
+        if (selectedCategoryForDetail != null) {
+            selectedCategoryForDetail = null
+        } else {
+            onBack()
+        }
+    }
     val txDateFormatter = remember { SimpleDateFormat("dd MMM yyyy, hh:mm a", Locale("es", "ES")) }
 
     val monthNames = listOf(

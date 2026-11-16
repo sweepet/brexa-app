@@ -3,6 +3,7 @@ package com.brexa.app.ui.screens
 import android.app.TimePickerDialog
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -66,6 +67,14 @@ fun SettingsScreen(
     var isDriveRestoring by remember { mutableStateOf(false) }
     var showRestoreConfirmDialog by remember { mutableStateOf(false) }
     var driveSyncErrorMessage by remember { mutableStateOf<String?>(null) }
+
+    BackHandler {
+        if (showRestoreConfirmDialog) {
+            showRestoreConfirmDialog = false
+        } else {
+            onBack()
+        }
+    }
 
     // Estados del Recordatorio Diario
     var isReminderEnabled by remember { mutableStateOf(DailyReminderManager.isEnabled(context)) }
@@ -819,21 +828,24 @@ fun SettingsScreen(
                             text = "⚡ ¡NUEVA VERSIÓN DETECTADA: ${update.versionName}!",
                             style = BrexaTypography.labelLarge.copy(color = AccentLime, fontWeight = FontWeight.Bold)
                         )
-                        if (update.releaseNotes.isNotEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .heightIn(max = 140.dp)
-                                    .background(BackgroundBase, RectangleShape)
-                                    .border(1.dp, BorderSolid, RectangleShape)
-                                    .padding(horizontal = 10.dp, vertical = 8.dp)
-                                    .verticalScroll(rememberScrollState())
-                            ) {
-                                Text(
-                                    text = update.releaseNotes,
-                                    style = BrexaTypography.bodyMedium.copy(color = TextSecondary, fontSize = 11.sp)
-                                )
-                            }
+                        val notes = if (update.releaseNotes.isNotBlank() && !update.releaseNotes.trim().equals("null", ignoreCase = true)) {
+                            update.releaseNotes
+                        } else {
+                            "Mejora en la navegación y retorno con gestos, optimizaciones generales en ${update.versionName}."
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 140.dp)
+                                .background(BackgroundBase, RectangleShape)
+                                .border(1.dp, BorderSolid, RectangleShape)
+                                .padding(horizontal = 10.dp, vertical = 8.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            Text(
+                                text = notes,
+                                style = BrexaTypography.bodyMedium.copy(color = TextSecondary, fontSize = 11.sp)
+                            )
                         }
 
                         if (isDownloadingInSettings) {

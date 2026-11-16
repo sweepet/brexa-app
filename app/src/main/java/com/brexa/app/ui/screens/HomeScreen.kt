@@ -2,6 +2,7 @@ package com.brexa.app.ui.screens
 
 import android.content.Context
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -203,6 +204,24 @@ fun HomeScreen(
     var showBreakdownModal by remember { mutableStateOf(false) }
     var showBudgetModal by remember { mutableStateOf(false) }
     val budgetInfo by viewModel.monthlyBudgetInfo.collectAsState()
+
+    // Manejo de gesto/botón atrás para modales internos en HomeScreen
+    val isAnyModalOpen = selectedTxDetail != null || showBreakdownModal || showBudgetModal || showTour
+    BackHandler(enabled = isAnyModalOpen) {
+        when {
+            showTour -> {
+                showTour = false
+                onTourDismissed()
+            }
+            showConfirmDeleteTx -> showConfirmDeleteTx = false
+            selectedTxDetail != null -> {
+                selectedTxDetail = null
+                showConfirmDeleteTx = false
+            }
+            showBreakdownModal -> showBreakdownModal = false
+            showBudgetModal -> showBudgetModal = false
+        }
+    }
 
     Box(
         modifier = Modifier

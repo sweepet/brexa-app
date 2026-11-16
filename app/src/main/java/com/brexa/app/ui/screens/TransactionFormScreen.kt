@@ -2,6 +2,7 @@ package com.brexa.app.ui.screens
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -49,6 +50,19 @@ fun TransactionFormScreen(
     initialType: String = "EXPENSE",
     onDismiss: () -> Unit
 ) {
+    var showCreateCategoryDialog by remember { mutableStateOf(false) }
+    var showNoteModalDialog by remember { mutableStateOf(false) }
+
+    BackHandler {
+        if (showCreateCategoryDialog) {
+            showCreateCategoryDialog = false
+        } else if (showNoteModalDialog) {
+            showNoteModalDialog = false
+        } else {
+            onDismiss()
+        }
+    }
+
     val accounts by viewModel.activeAccounts.collectAsState()
     val currencies by viewModel.allCurrencies.collectAsState()
     val baseCurrency by viewModel.baseCurrency.collectAsState()
@@ -63,8 +77,6 @@ fun TransactionFormScreen(
     var destinationAmountText by remember { mutableStateOf("") }
     var noteText by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
-    var showCreateCategoryDialog by remember { mutableStateOf(false) }
-    var showNoteModalDialog by remember { mutableStateOf(false) }
     var tempModalNoteText by remember { mutableStateOf("") }
 
     val context = LocalContext.current
