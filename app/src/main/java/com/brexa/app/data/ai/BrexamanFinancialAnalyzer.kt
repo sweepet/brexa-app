@@ -5,6 +5,7 @@ import com.brexa.app.data.local.entity.CategoryEntity
 import com.brexa.app.data.local.entity.CurrencyEntity
 import com.brexa.app.data.local.entity.PendingExpenseEntity
 import com.brexa.app.data.local.entity.TransactionEntity
+import com.brexa.app.presentation.MonthlyBudgetInfo
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -16,7 +17,8 @@ object BrexamanFinancialAnalyzer {
         currencies: List<CurrencyEntity>,
         categories: List<CategoryEntity>,
         transactions: List<TransactionEntity>,
-        pendingExpenses: List<PendingExpenseEntity>
+        pendingExpenses: List<PendingExpenseEntity>,
+        budgetInfo: MonthlyBudgetInfo? = null
     ): BrexamanFinancialSnapshot {
         val currMap = currencies.associateBy { it.id }
         val currByCode = currencies.associateBy { it.code.uppercase() }
@@ -24,6 +26,9 @@ object BrexamanFinancialAnalyzer {
 
         val bcvCurrency = currencies.find { it.code.equals("VES", ignoreCase = true) }
         val bcvRate = bcvCurrency?.rateToUsd ?: 1.0
+
+        val copCurrency = currencies.find { it.code.equals("COP", ignoreCase = true) }
+        val copRate = copCurrency?.rateToUsd ?: 0.0
 
         fun toUsd(amount: Double, currencyIdOrCode: String): Double {
             val curr = currMap[currencyIdOrCode] ?: currByCode[currencyIdOrCode.uppercase()]
@@ -160,7 +165,13 @@ object BrexamanFinancialAnalyzer {
             totalNetWorthUsd = totalUsd,
             totalNetWorthVes = totalVes,
             bcvRate = bcvRate,
+            copRate = copRate,
             accountsSummary = accountsSummary,
+            budgetAmountUsd = budgetInfo?.budgetAmountUsd ?: 0.0,
+            budgetSpentUsd = budgetInfo?.spentThisMonthUsd ?: currentMonthExpense,
+            budgetRemainingUsd = budgetInfo?.remainingUsd ?: 0.0,
+            budgetPercentageUsed = budgetInfo?.percentageUsed ?: 0f,
+            isOverBudget = budgetInfo?.isOverBudget ?: false,
             monthName = monthName,
             currentMonthIncomeUsd = currentMonthIncome,
             currentMonthExpenseUsd = currentMonthExpense,
@@ -185,30 +196,34 @@ object BrexamanFinancialAnalyzer {
                     snapshot.netSavingsUsd < 0 -> "Cuidado: tus gastos superan tus ingresos por $${String.format("%.2f", -snapshot.netSavingsUsd)} USD este mes."
                     else -> "Tus gastos están exactamente empatados con tus ingresos."
                 }
+                val budgetLine = if (snapshot.budgetAmountUsd > 0) {
+                    "\n• Presupuesto mensual: $${String.format("%.2f", snapshot.budgetSpentUsd)} de $${String.format("%.2f", snapshot.budgetAmountUsd)} USD (Libre: $${String.format("%.2f", snapshot.budgetRemainingUsd)} USD)"
+                } else ""
+
                 """
                 ⚡ Resumen de ${snapshot.monthName}:
                 • Ingresos totales: $${String.format("%.2f", snapshot.currentMonthIncomeUsd)} USD
-                • Gastos registrados: $${String.format("%.2f", snapshot.currentMonthExpenseUsd)} USD
+                • Gastos registrados: $${String.format("%.2f", snapshot.currentMonthExpenseUsd)} USD$budgetLine
                 • $savingsStatus
-                • Patrimonio total en cuentas: $${String.format("%.2f", snapshot.totalNetWorthUsd)} USD (~${String.format("%.2f", snapshot.totalNetWorthVes)} Bs)
+                • Patrimonio en cuentas: $${String.format("%.2f", snapshot.totalNetWorthUsd)} USD (~${String.format("%.2f", snapshot.totalNetWorthVes)} Bs a tasa BCV: ${String.format("%.2f", snapshot.bcvRate)})
                 """.trimIndent()
             }
             "TOP_EXPENSES" -> {
                 if (snapshot.topExpenseCategories.isEmpty()) {
                     "Aún no tienes gastos clasificados por categoría este mes. ¡Registra tus compras para empezar a analizarlas!"
                 } else {
-                    val sb = StringBuilder("📊 Tus mayores fugas de dinero en ${snapshot.monthName}:\n")
+                    val sb = StringBuilder("📊 Tus mayores salidas de dinero en ${snapshot.monthName}:\n")
                     snapshot.topExpenseCategories.forEachIndexed { i, cat ->
                         sb.appendLine("${i + 1}. ${cat.categoryName}: $${String.format("%.2f", cat.spentUsd)} USD (${String.format("%.1f", cat.percentageOfTotal)}%)")
                     }
                     val topCat = snapshot.topExpenseCategories.first()
-                    sb.append("\n💡 Tu mayor atención debe estar en '${topCat.categoryName}', que representa casi ${String.format("%.0f", topCat.percentageOfTotal)}% de tus salidas.")
+                    sb.append("\n💡 Tu mayor foco de atención está en '${topCat.categoryName}' (${String.format("%.0f", topCat.percentageOfTotal)}% de tus gastos).")
                     sb.toString()
                 }
             }
             "PENDING_DEBTS" -> {
                 if (snapshot.overdueDebtsCount == 0 && snapshot.upcoming7DaysDebtsCount == 0) {
-                    "¡Excelente noticia! No tienes pagos vencidos ni cuentas urgentes programadas para los próximos 7 días. Tu horizonte financiero está despejado."
+                    "¡Excelente noticia! No tienes pagos vencidos ni cuentas urgentes programadas para los próximos 7 días. Tu horizonte financiero está totalmente despejado."
                 } else {
                     val sb = StringBuilder("🚨 Estado de tus compromisos por pagar:\n")
                     if (snapshot.overdueDebtsCount > 0) {
@@ -225,17 +240,19 @@ object BrexamanFinancialAnalyzer {
             }
             "DAILY_TIP" -> {
                 when {
+                    snapshot.isOverBudget ->
+                        "💡 Consejo de Brexaman: ¡Alerta de presupuesto! Has sobrepasado el límite fijado para este mes. Congela gastos no esenciales y usa solo efectivo para compras estrictamente necesarias."
                     snapshot.savingsRatePercentage > 20f ->
-                        "💡 Consejo de Brexaman: Llevas una excelente tasa de ahorro (${String.format("%.1f", snapshot.savingsRatePercentage)}%). Es un gran momento para transferir una parte a tu fondo de reserva o inversión antes de que surjan gastos tentadores."
+                        "💡 Consejo de Brexaman: Llevas una excelente tasa de ahorro (${String.format("%.1f", snapshot.savingsRatePercentage)}%). Es un gran momento para apartar una porción a tu fondo de reserva o Binance antes de que surjan gastos imprevistos."
                     snapshot.overdueDebtsCount > 0 ->
-                        "💡 Consejo de Brexaman: Tu prioridad número uno hoy debe ser liquidar esos ${snapshot.overdueDebtsCount} pagos vencidos. Quitarte ese estrés te dará tranquilidad y evitará recargos."
+                        "💡 Consejo de Brexaman: Tu prioridad número uno hoy debe ser liquidar esos ${snapshot.overdueDebtsCount} pagos vencidos. Quitarte ese compromiso te dará tranquilidad y evitará recargos."
                     snapshot.expenseDifferencePercentage > 15f ->
-                        "💡 Consejo de Brexaman: Tus gastos van un ${String.format("%.1f", snapshot.expenseDifferencePercentage)}% más altos que el mes anterior a esta fecha. Trata de aplicar la regla de esperar 24 horas antes de compras no esenciales."
+                        "💡 Consejo de Brexaman: Tus gastos van un ${String.format("%.1f", snapshot.expenseDifferencePercentage)}% más altos que el mes anterior. Aplica la regla de esperar 24 horas antes de compras por impulso."
                     else ->
-                        "💡 Consejo de Brexaman: Mantén tus gastos hormiga bajo radar. Si compras café o comida rápida fuera de casa, anótalo de inmediato en Brexa para que no se te escapen de las manos."
+                        "💡 Consejo de Brexaman: Recuerda que la tasa oficial BCV está en ${String.format("%.2f", snapshot.bcvRate)} Bs/USD. Si en algún comercio te cobran una tasa paralela muy superior, prefiere pagar en bolívares a la oficial para proteger tu bolsillo."
                 }
             }
-            else -> "¡Hola! Estoy listo para responder cualquier duda sobre tus gastos o balances."
+            else -> "¡Hola! Soy Brexaman. Estoy monitoreando tus finanzas y la tasa oficial en tiempo real."
         }
     }
 }

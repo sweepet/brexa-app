@@ -2,13 +2,21 @@ package com.brexa.app.data.ai
 
 /**
  * Representa el resumen financiero procesado en tiempo real desde Room DB
- * para suministrar contexto analítico a Brexaman.
+ * para suministrar contexto analítico exacto a Brexaman.
  */
 data class BrexamanFinancialSnapshot(
     val totalNetWorthUsd: Double,
     val totalNetWorthVes: Double,
     val bcvRate: Double,
+    val copRate: Double = 0.0,
     val accountsSummary: List<AccountBalanceSummary>,
+    
+    // Presupuesto mensual
+    val budgetAmountUsd: Double = 0.0,
+    val budgetSpentUsd: Double = 0.0,
+    val budgetRemainingUsd: Double = 0.0,
+    val budgetPercentageUsed: Float = 0f,
+    val isOverBudget: Boolean = false,
     
     // Mes actual
     val monthName: String,
@@ -32,48 +40,65 @@ data class BrexamanFinancialSnapshot(
     val unusualExpenses: List<UnusualExpenseSummary>
 ) {
     /**
-     * Construye un bloque de texto denso y estructurado para el System Prompt de Gemini.
+     * Construye un bloque de contexto en tiempo real para inyectar en Gemini.
      */
     fun toContextString(): String {
         val sb = StringBuilder()
-        sb.appendLine("=== RESUMEN FINANCIERO EN TIEMPO REAL DEL USUARIO (ROOM DB) ===")
-        sb.appendLine("• Patrimonio Neto Total: $${String.format("%.2f", totalNetWorthUsd)} USD (~${String.format("%.2f", totalNetWorthVes)} Bs. a tasa BCV: ${String.format("%.2f", bcvRate)} Bs/USD)")
+        sb.appendLine("=== DATOS FINANCIEROS REALES DEL USUARIO EN TIEMPO REAL (BREXA APP) ===")
+        sb.appendLine("• TASAS OFICIALES REGISTRADAS:")
+        sb.appendLine("  - Tasa Oficial BCV (Venezuela): ${String.format("%.2f", bcvRate)} Bs por cada 1 USD")
+        if (copRate > 0) {
+            sb.appendLine("  - Tasa TRM (Colombia): ${String.format("%.2f", copRate)} COP por cada 1 USD")
+        }
+        sb.appendLine("• PATRIMONIO TOTAL:")
+        sb.appendLine("  - $${String.format("%.2f", totalNetWorthUsd)} USD (equivalente a ${String.format("%.2f", totalNetWorthVes)} Bs a tasa BCV)")
         
-        sb.appendLine("• Cuentas activas:")
+        sb.appendLine("• CUENTAS Y SALDOS:")
         accountsSummary.forEach { acc ->
             sb.appendLine("  - ${acc.accountName}: ${String.format("%.2f", acc.nativeBalance)} ${acc.currencyCode} (~$${String.format("%.2f", acc.usdBalance)} USD)")
         }
         
-        sb.appendLine("• Mes en curso ($monthName):")
-        sb.appendLine("  - Ingresos: $${String.format("%.2f", currentMonthIncomeUsd)} USD")
-        sb.appendLine("  - Gastos: $${String.format("%.2f", currentMonthExpenseUsd)} USD")
-        sb.appendLine("  - Ahorro Neto: $${String.format("%.2f", netSavingsUsd)} USD (Tasa de Ahorro: ${String.format("%.1f", savingsRatePercentage)}%)")
+        if (budgetAmountUsd > 0) {
+            sb.appendLine("• PRESUPUESTO DE $monthName:")
+            sb.appendLine("  - Asignado: $${String.format("%.2f", budgetAmountUsd)} USD")
+            sb.appendLine("  - Gastado: $${String.format("%.2f", budgetSpentUsd)} USD (${String.format("%.0f", budgetPercentageUsed * 100)}%)")
+            sb.appendLine("  - Disponible Libre: $${String.format("%.2f", budgetRemainingUsd)} USD")
+            if (isOverBudget) {
+                sb.appendLine("  - ALERTA: ¡Ha superado su presupuesto mensual!")
+            }
+        }
+        
+        sb.appendLine("• RESUMEN DEL MES ($monthName):")
+        sb.appendLine("  - Ingresos registrados: $${String.format("%.2f", currentMonthIncomeUsd)} USD")
+        sb.appendLine("  - Gastos registrados: $${String.format("%.2f", currentMonthExpenseUsd)} USD")
+        sb.appendLine("  - Balance Neto: $${String.format("%.2f", netSavingsUsd)} USD")
         
         if (topExpenseCategories.isNotEmpty()) {
-            sb.appendLine("• Top Categorías de Gasto de $monthName:")
+            sb.appendLine("• CATEGORÍAS DONDE MÁS HA GASTADO EN $monthName:")
             topExpenseCategories.forEachIndexed { i, cat ->
-                sb.appendLine("  ${i + 1}. ${cat.categoryName}: $${String.format("%.2f", cat.spentUsd)} USD (${String.format("%.1f", cat.percentageOfTotal)}% del gasto mensual)")
+                sb.appendLine("  ${i + 1}. ${cat.categoryName}: $${String.format("%.2f", cat.spentUsd)} USD (${String.format("%.1f", cat.percentageOfTotal)}% de los gastos)")
             }
         }
         
-        sb.appendLine("• Comparativa contra el mes pasado:")
-        sb.appendLine("  - Gasto mes anterior: $${String.format("%.2f", previousMonthExpenseUsd)} USD")
-        if (expenseDifferencePercentage != 0f) {
-            val direction = if (expenseDifferencePercentage > 0) "más alto (+)" else "más bajo (-)"
-            sb.appendLine("  - Variación de gasto: ${String.format("%.1f", expenseDifferencePercentage)}% ($direction)")
+        sb.appendLine("• ESTADO DE COMPROMISOS / DEUDAS PENDIENTES:")
+        if (overdueDebtsCount == 0 && upcoming7DaysDebtsCount == 0) {
+            sb.appendLine("  - AL DÍA: No tiene pagos vencidos ni deudas próximas en los siguientes 7 días.")
+        } else {
+            if (overdueDebtsCount > 0) {
+                sb.appendLine("  - VENCIDOS: $overdueDebtsCount pagos por un total de $${String.format("%.2f", overdueDebtsAmountUsd)} USD.")
+            }
+            if (upcoming7DaysDebtsCount > 0) {
+                sb.appendLine("  - PRÓXIMOS 7 DÍAS: $upcoming7DaysDebtsCount pagos por un total de $${String.format("%.2f", upcoming7DaysDebtsAmountUsd)} USD.")
+            }
         }
-        
-        sb.appendLine("• Compromisos y Cuentas por Pagar:")
-        sb.appendLine("  - Vencidos: $overdueDebtsCount compromisos por $${String.format("%.2f", overdueDebtsAmountUsd)} USD")
-        sb.appendLine("  - Próximos 7 días: $upcoming7DaysDebtsCount compromisos por $${String.format("%.2f", upcoming7DaysDebtsAmountUsd)} USD")
         
         if (unusualExpenses.isNotEmpty()) {
-            sb.appendLine("• Gastos grandes / atípicos recientes:")
+            sb.appendLine("• MOVIMIENTOS RECIENTES RELEVANTES:")
             unusualExpenses.forEach { ue ->
-                sb.appendLine("  - ${ue.description} (${ue.categoryName}): $${String.format("%.2f", ue.usdAmount)} USD el ${ue.dateFormatted}")
+                sb.appendLine("  - ${ue.description} (${ue.categoryName}): $${String.format("%.2f", ue.usdAmount)} USD [${ue.dateFormatted}]")
             }
         }
-        sb.appendLine("=============================================================")
+        sb.appendLine("=========================================================================")
         return sb.toString()
     }
 }

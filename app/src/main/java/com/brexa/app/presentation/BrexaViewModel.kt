@@ -1002,7 +1002,8 @@ class BrexaViewModel(
             currencies = allCurrencies.value,
             categories = expenseCategories.value + incomeCategories.value,
             transactions = allTransactions.value,
-            pendingExpenses = allPendingExpenses.value
+            pendingExpenses = allPendingExpenses.value,
+            budgetInfo = monthlyBudgetInfo.value
         )
     }
 
