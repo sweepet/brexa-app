@@ -1,9 +1,12 @@
 package com.brexa.app.data.repository
 
 import androidx.room.withTransaction
+import android.content.Context
 import com.brexa.app.data.local.BrexaDatabase
 import com.brexa.app.data.local.entity.*
 import com.brexa.app.data.rates.OfficialRatesManager
+import com.brexa.app.data.rates.MarketRatesManager
+import com.brexa.app.data.rates.MarketRateItem
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -166,8 +169,33 @@ class BrexaRepository(private val db: BrexaDatabase) {
         return Result.success(Unit)
     }
 
-    // --- TASAS OFICIALES AUTOMATIZADAS (BCV & TRM) ---
+    // --- TASAS OFICIALES Y DE MERCADO (CAMBIO FÁCIL & BCV/TRM) ---
     private val officialRatesManager = OfficialRatesManager()
+    val marketRatesManager = MarketRatesManager()
+
+    suspend fun getMarketRates(context: Context?): List<MarketRateItem> {
+        return marketRatesManager.loadCachedRates(context)
+    }
+
+    suspend fun refreshMarketRates(context: Context?): Result<List<MarketRateItem>> {
+        val result = marketRatesManager.fetchLiveRates(context)
+        result.onSuccess { items ->
+            val allCurrencies = currencyDao.getAllCurrenciesSync()
+            items.find { it.id == "BCV_USD" }?.let { bcvItem ->
+                val vesCurr = allCurrencies.find { it.code.equals("Bs", ignoreCase = true) || it.code.equals("VES", ignoreCase = true) }
+                if (vesCurr != null) {
+                    updateCurrencyRate(vesCurr.id, bcvItem.rate)
+                }
+            }
+            items.find { it.id == "COP_TRM" }?.let { copItem ->
+                val copCurr = allCurrencies.find { it.code.equals("COP", ignoreCase = true) }
+                if (copCurr != null) {
+                    updateCurrencyRate(copCurr.id, copItem.rate)
+                }
+            }
+        }
+        return result
+    }
 
     suspend fun syncOfficialRates(): Result<String> {
         val result = officialRatesManager.fetchAllOfficialRates()

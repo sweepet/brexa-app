@@ -16,10 +16,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.Calculate
+import androidx.compose.material.icons.filled.CurrencyExchange
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,6 +79,8 @@ class MainActivity : ComponentActivity() {
                         extraScreen ?: if (isUserSignedIn || hasChosenMode) "HOME" else "AUTH"
                     )
                 }
+                var preselectedRateId by remember { mutableStateOf<String?>(null) }
+                var controlInitialTab by remember { mutableIntStateOf(0) }
                 var transactionTypeToOpen by remember { mutableStateOf("EXPENSE") }
                 var shouldForceTour by remember { mutableStateOf(false) }
 
@@ -130,8 +136,8 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    // Sincronización silenciosa al momento de tasas oficiales (BCV & TRM)
-                    viewModel.syncOfficialRates()
+                    // Sincronización silenciosa de tasas de cambio (DolarApi)
+                    viewModel.refreshMarketRates()
                 }
 
                 // Control de navegación atrás por hardware y gestos
@@ -147,8 +153,9 @@ class MainActivity : ComponentActivity() {
                     availableUpdate = null
                 }
 
-                // 3. Si el usuario está en cualquier sub-pantalla, el botón/gesto de atrás lo regresa a HOME
-                BackHandler(enabled = currentScreen != "HOME" && currentScreen != "AUTH" && !showBrexamanChat && availableUpdate == null) {
+                // 3. Si el usuario está en cualquier sub-pantalla o pestaña distinta a HOME, atrás lo regresa a HOME
+                val isSecondaryScreen = currentScreen != "HOME" && currentScreen != "AUTH"
+                BackHandler(enabled = isSecondaryScreen && !showBrexamanChat && availableUpdate == null) {
                     currentScreen = "HOME"
                 }
 
@@ -163,98 +170,251 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                Surface(
+                val isMainTabScreen = currentScreen in listOf("HOME", "RATES", "CALCULATOR", "CONTROL")
+
+                Scaffold(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(BackgroundBase)
                         .statusBarsPadding()
                         .navigationBarsPadding()
                         .imePadding(),
-                    color = BackgroundBase
-                ) {
-                    when (currentScreen) {
-                        "AUTH" -> {
-                            AuthScreen(
-                                viewModel = viewModel,
-                                onAuthSuccess = {
-                                    prefs.edit().putBoolean("has_chosen_mode", true).apply()
-                                    currentScreen = "HOME"
-                                },
-                                onContinueGuest = {
-                                    prefs.edit().putBoolean("has_chosen_mode", true).apply()
-                                    currentScreen = "HOME"
-                                }
-                            )
-                        }
-                        "HOME" -> {
-                            HomeScreen(
-                                viewModel = viewModel,
-                                onOpenTransactionForm = { type ->
-                                    transactionTypeToOpen = type
-                                    currentScreen = "TRANSACTION_FORM"
-                                },
-                                onOpenAccountsManagement = { currentScreen = "ACCOUNTS" },
-                                onOpenAnalytics = { currentScreen = "ANALYTICS" },
-                                onOpenSettings = { currentScreen = "SETTINGS" },
-                                onOpenPendingExpenses = { currentScreen = "PENDING_EXPENSES" },
-                                onOpenTransactionHistory = { currentScreen = "TRANSACTION_HISTORY" },
-                                forceStartTour = shouldForceTour,
-                                onTourDismissed = { shouldForceTour = false }
-                            )
-                        }
-                        "TRANSACTION_HISTORY" -> {
-                            TransactionHistoryScreen(
-                                viewModel = viewModel,
-                                onBack = { currentScreen = "HOME" }
-                            )
-                        }
-                        "PENDING_EXPENSES" -> {
-                            PendingExpensesScreen(
-                                viewModel = viewModel,
-                                onBack = { currentScreen = "HOME" }
-                            )
-                        }
-                        "TRANSACTION_FORM" -> {
-                            TransactionFormScreen(
-                                viewModel = viewModel,
-                                initialType = transactionTypeToOpen,
-                                onDismiss = { currentScreen = "HOME" }
-                            )
-                        }
-                        "ANALYTICS" -> {
-                            AnalyticsScreen(
-                                viewModel = viewModel,
-                                onBack = { currentScreen = "HOME" }
-                            )
-                        }
-                        "ACCOUNTS" -> {
-                            AccountsCurrenciesScreen(
-                                viewModel = viewModel,
-                                onBack = { currentScreen = "HOME" }
-                            )
-                        }
-                        "SETTINGS" -> {
-                            SettingsScreen(
-                                viewModel = viewModel,
-                                onBack = { currentScreen = "HOME" },
-                                onRestartTour = {
-                                    prefs.edit().putBoolean("has_seen_onboarding_tour", false).apply()
-                                    shouldForceTour = true
-                                    currentScreen = "HOME"
-                                }
-                            )
-                        }
-                    }
+                    containerColor = BackgroundBase,
+                    bottomBar = {
+                        if (isMainTabScreen) {
+                            NavigationBar(
+                                containerColor = SurfaceCard,
+                                contentColor = TextSecondary,
+                                tonalElevation = 6.dp
+                            ) {
+                                NavigationBarItem(
+                                    selected = currentScreen == "HOME",
+                                    onClick = { currentScreen = "HOME" },
+                                    icon = {
+                                        Icon(
+                                            imageVector = Icons.Default.AccountBalanceWallet,
+                                            contentDescription = "Billetera"
+                                        )
+                                    },
+                                    label = {
+                                        Text(
+                                            text = "Billetera",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (currentScreen == "HOME") FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = AccentGold,
+                                        selectedTextColor = AccentGold,
+                                        indicatorColor = AccentGold.copy(alpha = 0.18f),
+                                        unselectedIconColor = TextSecondary,
+                                        unselectedTextColor = TextSecondary
+                                    )
+                                )
 
-                    // Mascota y Asistente Brexaman interactivo
-                    if (currentScreen == "HOME") {
-                        BrexamanOverlay(
-                            onOpenAssistant = {
-                                viewModel.refreshBrexamanDailyUsageSync()
-                                showBrexamanChat = true
+                                NavigationBarItem(
+                                    selected = currentScreen == "RATES",
+                                    onClick = { currentScreen = "RATES" },
+                                    icon = {
+                                        Icon(
+                                            imageVector = Icons.Default.CurrencyExchange,
+                                            contentDescription = "Tasas"
+                                        )
+                                    },
+                                    label = {
+                                        Text(
+                                            text = "Tasas",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (currentScreen == "RATES") FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = AccentGold,
+                                        selectedTextColor = AccentGold,
+                                        indicatorColor = AccentGold.copy(alpha = 0.18f),
+                                        unselectedIconColor = TextSecondary,
+                                        unselectedTextColor = TextSecondary
+                                    )
+                                )
+
+                                NavigationBarItem(
+                                    selected = currentScreen == "CALCULATOR",
+                                    onClick = { currentScreen = "CALCULATOR" },
+                                    icon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Calculate,
+                                            contentDescription = "Calculadora"
+                                        )
+                                    },
+                                    label = {
+                                        Text(
+                                            text = "Calculadora",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (currentScreen == "CALCULATOR") FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = AccentGold,
+                                        selectedTextColor = AccentGold,
+                                        indicatorColor = AccentGold.copy(alpha = 0.18f),
+                                        unselectedIconColor = TextSecondary,
+                                        unselectedTextColor = TextSecondary
+                                    )
+                                )
+
+                                NavigationBarItem(
+                                    selected = currentScreen == "CONTROL",
+                                    onClick = { currentScreen = "CONTROL" },
+                                    icon = {
+                                        Icon(
+                                            imageVector = Icons.Default.Assessment,
+                                            contentDescription = "Control"
+                                        )
+                                    },
+                                    label = {
+                                        Text(
+                                            text = "Control",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (currentScreen == "CONTROL") FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = AccentGold,
+                                        selectedTextColor = AccentGold,
+                                        indicatorColor = AccentGold.copy(alpha = 0.18f),
+                                        unselectedIconColor = TextSecondary,
+                                        unselectedTextColor = TextSecondary
+                                    )
+                                )
                             }
-                        )
+                        }
                     }
+                ) { innerPadding ->
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(innerPadding)
+                    ) {
+                        when (currentScreen) {
+                            "AUTH" -> {
+                                AuthScreen(
+                                    viewModel = viewModel,
+                                    onAuthSuccess = {
+                                        prefs.edit().putBoolean("has_chosen_mode", true).apply()
+                                        currentScreen = "HOME"
+                                    },
+                                    onContinueGuest = {
+                                        prefs.edit().putBoolean("has_chosen_mode", true).apply()
+                                        currentScreen = "HOME"
+                                    }
+                                )
+                            }
+                            "HOME" -> {
+                                HomeScreen(
+                                    viewModel = viewModel,
+                                    onOpenTransactionForm = { type ->
+                                        transactionTypeToOpen = type
+                                        currentScreen = "TRANSACTION_FORM"
+                                    },
+                                    onOpenAccountsManagement = { currentScreen = "ACCOUNTS" },
+                                    onOpenAnalytics = {
+                                        controlInitialTab = 2
+                                        currentScreen = "CONTROL"
+                                    },
+                                    onOpenSettings = { currentScreen = "SETTINGS" },
+                                    onOpenPendingExpenses = {
+                                        controlInitialTab = 0
+                                        currentScreen = "CONTROL"
+                                    },
+                                    onOpenTransactionHistory = {
+                                        controlInitialTab = 1
+                                        currentScreen = "CONTROL"
+                                    },
+                                    forceStartTour = shouldForceTour,
+                                    onTourDismissed = { shouldForceTour = false }
+                                )
+                            }
+                            "RATES" -> {
+                                RatesScreen(
+                                    viewModel = viewModel,
+                                    onNavigateToCalculatorWithRate = { rateItem ->
+                                        preselectedRateId = rateItem.id
+                                        currentScreen = "CALCULATOR"
+                                    }
+                                )
+                            }
+                            "CALCULATOR" -> {
+                                CalculatorScreen(
+                                    viewModel = viewModel,
+                                    preselectedRateId = preselectedRateId,
+                                    onNavigateToTransactionWithAmount = { amount, rate, curr ->
+                                        transactionTypeToOpen = "EXPENSE"
+                                        currentScreen = "TRANSACTION_FORM"
+                                    }
+                                )
+                            }
+                            "CONTROL" -> {
+                                ControlScreen(
+                                    viewModel = viewModel,
+                                    initialTab = controlInitialTab,
+                                    onNavigateToWallet = { currentScreen = "HOME" }
+                                )
+                            }
+                            "TRANSACTION_HISTORY" -> {
+                                TransactionHistoryScreen(
+                                    viewModel = viewModel,
+                                    onBack = { currentScreen = "CONTROL" }
+                                )
+                            }
+                            "PENDING_EXPENSES" -> {
+                                PendingExpensesScreen(
+                                    viewModel = viewModel,
+                                    onBack = { currentScreen = "CONTROL" }
+                                )
+                            }
+                            "ANALYTICS" -> {
+                                AnalyticsScreen(
+                                    viewModel = viewModel,
+                                    onBack = { currentScreen = "CONTROL" }
+                                )
+                            }
+                            "TRANSACTION_FORM" -> {
+                                TransactionFormScreen(
+                                    viewModel = viewModel,
+                                    initialType = transactionTypeToOpen,
+                                    onDismiss = { currentScreen = "HOME" }
+                                )
+                            }
+                            "ACCOUNTS" -> {
+                                AccountsCurrenciesScreen(
+                                    viewModel = viewModel,
+                                    onBack = { currentScreen = "HOME" }
+                                )
+                            }
+                            "SETTINGS" -> {
+                                SettingsScreen(
+                                    viewModel = viewModel,
+                                    onBack = { currentScreen = "HOME" },
+                                    onRestartTour = {
+                                        prefs.edit().putBoolean("has_seen_onboarding_tour", false).apply()
+                                        shouldForceTour = true
+                                        currentScreen = "HOME"
+                                    }
+                                )
+                            }
+                        }
+
+                        // Mascota y Asistente Brexaman interactivo
+                        if (currentScreen == "HOME") {
+                            BrexamanOverlay(
+                                onOpenAssistant = {
+                                    viewModel.refreshBrexamanDailyUsageSync()
+                                    showBrexamanChat = true
+                                }
+                            )
+                        }
+                    }
+                }
 
                     // Modal de Conversacion con Brexaman
                     BrexamanChatSheet(
@@ -269,17 +429,17 @@ class MainActivity : ComponentActivity() {
                         onSendQuickPrompt = { promptType: String -> viewModel.sendBrexamanQuickPrompt(promptType) }
                     )
 
-                    // Cartel Neobrutalista de Actualización Automática In-App
+                    // Cartel Elegante de Actualización Automática In-App
                     if (availableUpdate != null) {
                         val update = availableUpdate!!
                         AlertDialog(
                             onDismissRequest = { if (!isDownloadingUpdate) availableUpdate = null },
-                            shape = RectangleShape,
+                            shape = RoundedCornerShape(16.dp),
                             containerColor = SurfaceCard,
                             title = {
                                 Text(
                                     text = "⚡ NUEVA VERSIÓN // ${update.versionName}",
-                                    style = BrexaTypography.titleLarge.copy(color = AccentLime)
+                                    style = BrexaTypography.titleLarge.copy(color = AccentGold)
                                 )
                             },
                             text = {
@@ -297,35 +457,35 @@ class MainActivity : ComponentActivity() {
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .heightIn(max = 140.dp)
-                                            .background(BackgroundBase, RectangleShape)
-                                            .border(1.dp, BorderSolid, RectangleShape)
-                                            .padding(horizontal = 10.dp, vertical = 8.dp)
+                                            .background(BackgroundBase, RoundedCornerShape(10.dp))
+                                            .border(1.dp, BorderSolid, RoundedCornerShape(10.dp))
+                                            .padding(horizontal = 12.dp, vertical = 10.dp)
                                             .verticalScroll(rememberScrollState())
                                     ) {
                                         Text(
                                             text = notes,
-                                            style = BrexaTypography.labelMedium.copy(color = TextSecondary, fontSize = 11.sp)
+                                            style = BrexaTypography.labelMedium.copy(color = TextSecondary, fontSize = 13.sp)
                                         )
                                     }
                                     if (isDownloadingUpdate) {
                                         Spacer(modifier = Modifier.height(6.dp))
                                         Text(
                                             text = "DESCARGANDO APK: ${(downloadProgress * 100).toInt()}%",
-                                            style = BrexaTypography.labelLarge.copy(color = AccentLime, fontWeight = FontWeight.Bold)
+                                            style = BrexaTypography.labelLarge.copy(color = AccentGold, fontWeight = FontWeight.Bold)
                                         )
-                                        // Barra de progreso neobrutalista
+                                        // Barra de progreso
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .height(14.dp)
-                                                .background(BackgroundBase, RectangleShape)
-                                                .border(1.5.dp, BorderSolid, RectangleShape)
+                                                .background(BackgroundBase, RoundedCornerShape(7.dp))
+                                                .border(1.dp, BorderSolid, RoundedCornerShape(7.dp))
                                         ) {
                                             Box(
                                                 modifier = Modifier
                                                     .fillMaxHeight()
                                                     .fillMaxWidth(fraction = downloadProgress.coerceIn(0.01f, 1f))
-                                                    .background(AccentLime, RectangleShape)
+                                                    .background(AccentGold, RoundedCornerShape(7.dp))
                                             )
                                         }
                                     }
@@ -335,9 +495,9 @@ class MainActivity : ComponentActivity() {
                                 if (!isDownloadingUpdate) {
                                     BrutalistBadge(
                                         text = "ACTUALIZAR AHORA",
-                                        backgroundColor = AccentLime,
-                                        contentColor = Color.Black,
-                                        borderColor = AccentLime,
+                                        backgroundColor = AccentGold,
+                                        contentColor = Color(0xFF0D1117),
+                                        borderColor = AccentGold,
                                         modifier = Modifier.clickable {
                                             isDownloadingUpdate = true
                                             lifecycleScope.launch {
@@ -374,4 +534,3 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-}

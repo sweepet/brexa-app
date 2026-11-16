@@ -10,6 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -375,25 +376,25 @@ fun HomeScreen(
                             modifier = Modifier.clickable { showBreakdownModal = true }
                         )
 
-                        // 2. PRESUPUESTO MENSUAL (HUD Neobrutalista Adaptativo, Simétrico y Elegante)
+                        // 2. PRESUPUESTO MENSUAL (HUD Adaptativo, Simétrico y Elegante)
                         Spacer(modifier = Modifier.height(10.dp))
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(Color(0xFF141414), RectangleShape)
+                                .background(SurfaceCardElevated, RoundedCornerShape(12.dp))
                                 .border(
                                     width = 1.dp,
                                     color = if (budgetInfo.isOverBudget) ExpenseRed else BorderSolid,
-                                    shape = RectangleShape
+                                    shape = RoundedCornerShape(12.dp)
                                 )
                                 .clickable { showBudgetModal = true }
-                                .padding(horizontal = 12.dp, vertical = 9.dp)
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
                         ) {
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                // FILA 1: Contexto / Título + Badge de Modo (Espaciado equilibrado en extremos)
+                                // FILA 1: Contexto / Título + Badge de Modo
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -406,19 +407,19 @@ fun HomeScreen(
                                     ) {
                                         Box(
                                             modifier = Modifier
-                                                .size(5.dp)
+                                                .size(6.dp)
                                                 .background(
                                                     color = if (budgetInfo.isOverBudget) ExpenseRed
                                                     else if (budgetInfo.budgetAmountUsd <= 0.0) TextMuted
-                                                    else AccentLime,
-                                                    shape = RectangleShape
+                                                    else AccentGold,
+                                                    shape = RoundedCornerShape(3.dp)
                                                 )
                                         )
                                         Text(
                                             text = "PRESUPUESTO ${budgetInfo.monthName.uppercase()}",
                                             style = BrexaTypography.labelSmall.copy(
                                                 color = TextSecondary,
-                                                fontSize = 9.5.sp,
+                                                fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
                                                 letterSpacing = 0.8.sp
                                             ),
@@ -429,7 +430,7 @@ fun HomeScreen(
 
                                     val modeBadgeColor = when {
                                         budgetInfo.budgetAmountUsd <= 0.0 -> TextMuted
-                                        budgetInfo.mode == "AUTO" -> AccentLime
+                                        budgetInfo.mode == "AUTO" -> AccentGold
                                         else -> ExchangeBlue
                                     }
                                     val modeBadgeText = when {
@@ -442,12 +443,12 @@ fun HomeScreen(
                                         backgroundColor = BackgroundBase,
                                         contentColor = modeBadgeColor,
                                         borderColor = modeBadgeColor,
-                                        fontSize = 8.sp,
-                                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 1.5.dp)
+                                        fontSize = 12.sp,
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
                                     )
                                 }
 
-                                // FILA 2: Barra de Progreso Neobrutalista Continua
+                                // FILA 2: Barra de Progreso Continua
                                 val progressRatio = if (budgetInfo.budgetAmountUsd > 0.0) {
                                     (budgetInfo.spentThisMonthUsd / budgetInfo.budgetAmountUsd).toFloat().coerceIn(0f, 1f)
                                 } else 0f
@@ -455,21 +456,21 @@ fun HomeScreen(
                                 val barColor = when {
                                     budgetInfo.isOverBudget -> ExpenseRed
                                     progressRatio > 0.8f -> Color(0xFFFFB800)
-                                    else -> AccentLime
+                                    else -> AccentGold
                                 }
 
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .height(4.dp)
-                                        .background(Color(0xFF262626), RectangleShape)
+                                        .height(6.dp)
+                                        .background(BorderSolid, RoundedCornerShape(3.dp))
                                 ) {
                                     if (progressRatio > 0f) {
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxHeight()
                                                 .fillMaxWidth(progressRatio)
-                                                .background(barColor, RectangleShape)
+                                                .background(barColor, RoundedCornerShape(3.dp))
                                         )
                                     }
                                 }
@@ -495,7 +496,7 @@ fun HomeScreen(
                                                     append(budgetFormatted)
                                                 }
                                             },
-                                            style = BrexaTypography.labelSmall.copy(fontSize = 10.sp),
+                                            style = BrexaTypography.labelSmall.copy(fontSize = 12.sp),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.weight(1f, fill = false)
@@ -503,7 +504,7 @@ fun HomeScreen(
                                     } else {
                                         Text(
                                             text = "$spentFormatted gastados",
-                                            style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp),
+                                            style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 12.sp),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                             modifier = Modifier.weight(1f, fill = false)
@@ -541,7 +542,7 @@ fun HomeScreen(
                                         style = BrexaTypography.labelSmall.copy(
                                             color = rightStatusColor,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 10.sp
+                                            fontSize = 12.sp
                                         ),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
@@ -575,7 +576,7 @@ fun HomeScreen(
                                         text = "🏛 OFICIAL:",
                                         style = BrexaTypography.labelSmall.copy(
                                             color = TextMuted,
-                                            fontSize = 9.5.sp,
+                                            fontSize = 12.sp,
                                             fontWeight = FontWeight.Bold
                                         )
                                     )
@@ -585,7 +586,7 @@ fun HomeScreen(
                                             style = BrexaTypography.labelSmall.copy(
                                                 color = AccentPurple,
                                                 fontWeight = FontWeight.Bold,
-                                                fontSize = 9.5.sp
+                                                fontSize = 12.sp
                                             )
                                         )
                                     }
@@ -597,7 +598,7 @@ fun HomeScreen(
                                         style = BrexaTypography.labelSmall.copy(
                                             color = ExchangeBlue,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 9.5.sp
+                                            fontSize = 12.sp
                                         )
                                     )
                                 }
@@ -625,7 +626,7 @@ fun HomeScreen(
                             ) {
                                 Text(
                                     text = if (hasOverdue) "SALDO LIBRE (RESTANDO VENCIDOS):" else "SALDO LIBRE (PRÓX. 7 DÍAS):",
-                                    style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 10.sp)
+                                    style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 12.sp)
                                 )
                                 Text(
                                     text = if (isIncognito) "$baseSymbol •••••••" else "$baseSymbol ${formatter.format(freeAvailableUsd)}",
@@ -670,7 +671,7 @@ fun HomeScreen(
                                 style = BrexaTypography.labelMedium.copy(
                                     color = if (hasOverdue) ExpenseRed else TextPrimary,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 11.5.sp
+                                    fontSize = 13.sp
                                 )
                             )
                             Spacer(modifier = Modifier.width(8.dp))
@@ -682,7 +683,7 @@ fun HomeScreen(
                                         backgroundColor = ExpenseRed,
                                         contentColor = Color.White,
                                         borderColor = ExpenseRed,
-                                        fontSize = 9.sp
+                                        fontSize = 12.sp
                                     )
                                 }
                                 hasDueSoon -> {
@@ -691,7 +692,7 @@ fun HomeScreen(
                                         backgroundColor = BackgroundBase,
                                         contentColor = AccentLime,
                                         borderColor = AccentLime,
-                                        fontSize = 9.sp
+                                        fontSize = 12.sp
                                     )
                                 }
                                 else -> {
@@ -700,7 +701,7 @@ fun HomeScreen(
                                         backgroundColor = BackgroundBase,
                                         contentColor = IncomeGreen,
                                         borderColor = IncomeGreen,
-                                        fontSize = 9.sp
+                                        fontSize = 12.sp
                                     )
                                 }
                             }
@@ -713,7 +714,7 @@ fun HomeScreen(
                                     style = BrexaTypography.labelMedium.copy(
                                         color = if (hasOverdue) ExpenseRed else AccentLime,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 11.5.sp
+                                        fontSize = 13.sp
                                     )
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -725,7 +726,7 @@ fun HomeScreen(
                                         text = "Próx: $nextDateStr",
                                         style = BrexaTypography.labelSmall.copy(
                                             color = TextMuted,
-                                            fontSize = 10.sp
+                                            fontSize = 12.sp
                                         )
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
@@ -763,18 +764,18 @@ fun HomeScreen(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .background(ExpenseRed, RectangleShape)
-                            .border(2.dp, BorderBright, RectangleShape)
+                            .height(48.dp)
+                            .background(ExpenseRed, RoundedCornerShape(12.dp))
                             .clickable { onOpenTransactionForm("EXPENSE") }
-                            .padding(vertical = 12.dp, horizontal = 4.dp),
+                            .padding(horizontal = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "− GASTAR",
                             style = BrexaTypography.labelLarge.copy(
-                                color = Color.Black,
+                                color = Color.White,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
+                                fontSize = 13.5.sp,
                                 textAlign = TextAlign.Center
                             ),
                             maxLines = 1,
@@ -786,18 +787,18 @@ fun HomeScreen(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .background(IncomeGreen, RectangleShape)
-                            .border(2.dp, BorderBright, RectangleShape)
+                            .height(48.dp)
+                            .background(IncomeGreen, RoundedCornerShape(12.dp))
                             .clickable { onOpenTransactionForm("INCOME") }
-                            .padding(vertical = 12.dp, horizontal = 4.dp),
+                            .padding(horizontal = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "+ INGRESAR",
                             style = BrexaTypography.labelLarge.copy(
-                                color = Color.Black,
+                                color = Color.White,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
+                                fontSize = 13.5.sp,
                                 textAlign = TextAlign.Center
                             ),
                             maxLines = 1,
@@ -809,18 +810,18 @@ fun HomeScreen(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .background(ExchangeBlue, RectangleShape)
-                            .border(2.dp, BorderBright, RectangleShape)
+                            .height(48.dp)
+                            .background(ExchangeBlue, RoundedCornerShape(12.dp))
                             .clickable { onOpenTransactionForm("EXCHANGE") }
-                            .padding(vertical = 12.dp, horizontal = 4.dp),
+                            .padding(horizontal = 4.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             text = "⇄ TRANSFERIR",
                             style = BrexaTypography.labelLarge.copy(
-                                color = Color.Black,
+                                color = Color.White,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp,
+                                fontSize = 13.5.sp,
                                 textAlign = TextAlign.Center
                             ),
                             maxLines = 1,
@@ -936,7 +937,7 @@ fun HomeScreen(
                                             text = if (isIncognito) "≈ $baseSymbol •••" else "≈ $baseSymbol ${formatter.format(usdVal)} $baseCode",
                                             style = BrexaTypography.labelMedium.copy(
                                                 color = AccentLime,
-                                                fontSize = 10.sp
+                                                fontSize = 12.sp
                                             ),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
@@ -1106,7 +1107,7 @@ fun HomeScreen(
                                 }
                                 Text(
                                     text = subtitle,
-                                    style = BrexaTypography.labelMedium.copy(fontSize = 10.sp),
+                                    style = BrexaTypography.labelMedium.copy(fontSize = 12.sp),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
@@ -1152,7 +1153,7 @@ fun HomeScreen(
                                     text = secondaryLine,
                                     style = BrexaTypography.labelMedium.copy(
                                         color = if (tx.type == "EXCHANGE") IncomeGreen else AccentLime,
-                                        fontSize = 10.sp
+                                        fontSize = 12.sp
                                     ),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
@@ -1291,7 +1292,7 @@ fun HomeScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column {
-                                    Text(text = "ENTREGADO (ORIGEN)", style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 9.sp))
+                                    Text(text = "ENTREGADO (ORIGEN)", style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 12.sp))
                                     Text(
                                         text = "− ${formatter.format(tx.nativeAmount)} ${tx.currencyCode}",
                                         style = BrexaTypography.titleMedium.copy(color = ExpenseRed, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -1299,7 +1300,7 @@ fun HomeScreen(
                                 }
                                 Text(text = "➔", style = BrexaTypography.titleLarge.copy(color = ExchangeBlue, fontSize = 20.sp))
                                 Column(horizontalAlignment = Alignment.End) {
-                                    Text(text = "RECIBIDO (DESTINO)", style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 9.sp))
+                                    Text(text = "RECIBIDO (DESTINO)", style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 12.sp))
                                     Text(
                                         text = "+ ${formatter.format(tx.destinationReceivedAmount)} $destCurrCode",
                                         style = BrexaTypography.titleMedium.copy(color = IncomeGreen, fontWeight = FontWeight.Bold, fontSize = 16.sp)
@@ -1322,7 +1323,7 @@ fun HomeScreen(
                                         style = BrexaTypography.labelMedium.copy(
                                             color = AccentLime,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 11.5.sp
+                                            fontSize = 13.sp
                                         )
                                     )
                                 }
@@ -1331,7 +1332,7 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = "≈ $baseSymbol ${formatter.format(tx.usdEquivalent)} $baseCode",
-                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp)
+                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 12.sp)
                             )
                         }
                     } else {
@@ -1363,7 +1364,7 @@ fun HomeScreen(
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     text = "Tasa de cotización: 1 $baseCode = ${CurrencyFormat.formatRate(tx.exchangeRate)} ${tx.currencyCode}",
-                                    style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp)
+                                    style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 12.sp)
                                 )
                             }
                         }
@@ -1389,12 +1390,12 @@ fun HomeScreen(
                                         style = BrexaTypography.labelSmall.copy(
                                             color = if (adjIsIncrease) IncomeGreen else ExpenseRed,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp
+                                            fontSize = 13.sp
                                         )
                                     )
                                     Text(
                                         text = if (adjIsIncrease) "Toca si en realidad querías restar (−)" else "Toca si en realidad querías sumar (+)",
-                                        style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 9.5.sp)
+                                        style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 12.sp)
                                     )
                                 }
 
@@ -1424,7 +1425,7 @@ fun HomeScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(
                             text = "CONCEPTO // NOTA",
-                            style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp, letterSpacing = 0.5.sp)
+                            style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 12.sp, letterSpacing = 0.5.sp)
                         )
                         Text(
                             text = if (tx.note.isNotEmpty()) tx.note else (cat?.name ?: "Sin descripción"),
@@ -1440,7 +1441,7 @@ fun HomeScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = if (destAcc != null) "ORIGEN ➔ DESTINO" else "CUENTA",
-                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp, letterSpacing = 0.5.sp)
+                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 12.sp, letterSpacing = 0.5.sp)
                             )
                             Text(
                                 text = "${acc?.name ?: "Cuenta"} ${if (destAcc != null) "➔ ${destAcc.name}" else ""}",
@@ -1452,7 +1453,7 @@ fun HomeScreen(
                             Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.End) {
                                 Text(
                                     text = "CATEGORÍA",
-                                    style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp, letterSpacing = 0.5.sp)
+                                    style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 12.sp, letterSpacing = 0.5.sp)
                                 )
                                 Text(
                                     text = cat.name,
@@ -1469,7 +1470,7 @@ fun HomeScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(
                             text = "FECHA Y HORA",
-                            style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp, letterSpacing = 0.5.sp)
+                            style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 12.sp, letterSpacing = 0.5.sp)
                         )
                         Text(
                             text = fullDateFormatter.format(Date(tx.dateTimestamp)),
@@ -1493,7 +1494,7 @@ fun HomeScreen(
                             )
                             Text(
                                 text = "El saldo de ${acc?.name ?: "la cuenta"} se restaurará automáticamente de forma inversa.",
-                                style = BrexaTypography.labelSmall.copy(color = TextPrimary, fontSize = 10.sp)
+                                style = BrexaTypography.labelSmall.copy(color = TextPrimary, fontSize = 12.sp)
                             )
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1605,7 +1606,7 @@ fun HomeScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable { breakdownTab = "CUENTAS" },
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             contentPadding = PaddingValues(vertical = 7.dp)
                         )
 
@@ -1617,7 +1618,7 @@ fun HomeScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable { breakdownTab = "MONEDAS" },
-                            fontSize = 10.sp,
+                            fontSize = 12.sp,
                             contentPadding = PaddingValues(vertical = 7.dp)
                         )
                     }
@@ -1685,7 +1686,7 @@ fun HomeScreen(
                                                     style = BrexaTypography.labelMedium.copy(
                                                         color = TextPrimary,
                                                         fontWeight = FontWeight.Bold,
-                                                        fontSize = 11.5.sp
+                                                        fontSize = 13.sp
                                                     ),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis
@@ -1695,7 +1696,7 @@ fun HomeScreen(
                                                     backgroundColor = BackgroundBase,
                                                     contentColor = barColor,
                                                     borderColor = barColor,
-                                                    fontSize = 8.sp,
+                                                    fontSize = 13.sp,
                                                     contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.5.dp)
                                                 )
                                             }
@@ -1704,7 +1705,7 @@ fun HomeScreen(
                                                 else "Saldo: ${formatter.format(item.nativeBalance)} ${item.currency.code}"
                                             Text(
                                                 text = nativeFormatted,
-                                                style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 10.sp),
+                                                style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 12.sp),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -1723,7 +1724,7 @@ fun HomeScreen(
                                         )
                                         Text(
                                             text = String.format(Locale.US, "%.1f%%", item.percentage),
-                                            style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 9.sp)
+                                            style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 12.sp)
                                         )
                                     }
                                 }
@@ -1779,7 +1780,7 @@ fun HomeScreen(
                                             backgroundColor = SurfaceCard,
                                             contentColor = barColor,
                                             borderColor = barColor,
-                                            fontSize = 10.sp
+                                            fontSize = 12.sp
                                         )
                                         Column {
                                             Text(
@@ -1795,13 +1796,13 @@ fun HomeScreen(
                                             val accountsStr = item.accounts.joinToString(", ") { it.name }
                                             Text(
                                                 text = if (item.accounts.size == 1) "En cuenta: $accountsStr" else "En ${item.accounts.size} cuentas: $accountsStr",
-                                                style = BrexaTypography.bodySmall.copy(color = TextSecondary, fontSize = 9.sp),
+                                                style = BrexaTypography.bodySmall.copy(color = TextSecondary, fontSize = 12.sp),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
                                             Text(
                                                 text = if (isIncognito) "••••••" else "Saldo: ${formatter.format(item.nativeSum)} ${item.currency.code}",
-                                                style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 9.5.sp),
+                                                style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 12.sp),
                                                 maxLines = 1,
                                                 overflow = TextOverflow.Ellipsis
                                             )
@@ -1819,7 +1820,7 @@ fun HomeScreen(
                                         )
                                         Text(
                                             text = String.format(Locale.US, "%.1f%%", item.percentage),
-                                            style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 9.5.sp)
+                                            style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 12.sp)
                                         )
                                     }
                                 }
@@ -1913,7 +1914,7 @@ fun HomeScreen(
                 ) {
                     Text(
                         text = "Estipula cuánto proyectas gastar en el mes. Brexa monitoreará tus compras en tiempo real para mantenerte al tanto:",
-                        style = BrexaTypography.bodySmall.copy(color = TextSecondary, fontSize = 11.5.sp, lineHeight = 16.sp)
+                        style = BrexaTypography.bodySmall.copy(color = TextSecondary, fontSize = 13.sp, lineHeight = 16.sp)
                     )
 
                     // Selector Neobrutalista de Modo: Automático vs Manual
@@ -1961,7 +1962,7 @@ fun HomeScreen(
                                 style = BrexaTypography.labelSmall.copy(
                                     color = AccentLime,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 9.sp
+                                    fontSize = 12.sp
                                 )
                             )
 
@@ -1971,11 +1972,11 @@ fun HomeScreen(
                             ) {
                                 Text(
                                     text = "Gastos Fijos (${budgetInfo.fixedExpensesCount}):",
-                                    style = BrexaTypography.bodySmall.copy(color = TextSecondary, fontSize = 11.sp)
+                                    style = BrexaTypography.bodySmall.copy(color = TextSecondary, fontSize = 13.sp)
                                 )
                                 Text(
                                     text = "$baseSymbol ${formatter.format(budgetInfo.fixedExpensesTotalUsd)} $baseCode",
-                                    style = BrexaTypography.bodySmall.copy(color = AccentPurple, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    style = BrexaTypography.bodySmall.copy(color = AccentPurple, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 )
                             }
 
@@ -1985,11 +1986,11 @@ fun HomeScreen(
                             ) {
                                 Text(
                                     text = "Gastos Variables de este mes (${budgetInfo.variableExpensesCount}):",
-                                    style = BrexaTypography.bodySmall.copy(color = TextSecondary, fontSize = 11.sp)
+                                    style = BrexaTypography.bodySmall.copy(color = TextSecondary, fontSize = 13.sp)
                                 )
                                 Text(
                                     text = "$baseSymbol ${formatter.format(budgetInfo.variableExpensesTotalUsd)} $baseCode",
-                                    style = BrexaTypography.bodySmall.copy(color = AccentLime, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    style = BrexaTypography.bodySmall.copy(color = AccentLime, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 )
                             }
 
@@ -2007,7 +2008,7 @@ fun HomeScreen(
                             ) {
                                 Text(
                                     text = "TOTAL PRESUPUESTO AUTO:",
-                                    style = BrexaTypography.labelSmall.copy(color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                                    style = BrexaTypography.labelSmall.copy(color = TextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 )
                                 Text(
                                     text = "$baseSymbol ${formatter.format(budgetInfo.fixedExpensesTotalUsd + budgetInfo.variableExpensesTotalUsd)} $baseCode",
@@ -2017,7 +2018,7 @@ fun HomeScreen(
 
                             Text(
                                 text = "💡 Se recalcula en vivo si agregas, editas o cambias compromisos fijos o variables para ${budgetInfo.monthName}.",
-                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 9.5.sp)
+                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 12.sp)
                             )
                         }
                     } else {
@@ -2038,7 +2039,7 @@ fun HomeScreen(
 
                             Text(
                                 text = "Escribe el tope de gasto mensual que deseas cumplir. Útil si deseas presupuestar salidas, ocio y compras espontáneas.",
-                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 10.sp, lineHeight = 14.sp)
+                                style = BrexaTypography.labelSmall.copy(color = TextMuted, fontSize = 12.sp, lineHeight = 14.sp)
                             )
                         }
                     }
@@ -2055,7 +2056,7 @@ fun HomeScreen(
                     ) {
                         Text(
                             text = "Gasto real a la fecha:",
-                            style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 11.sp)
+                            style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 13.sp)
                         )
                         Text(
                             text = "$baseSymbol ${formatter.format(budgetInfo.spentThisMonthUsd)} $baseCode",

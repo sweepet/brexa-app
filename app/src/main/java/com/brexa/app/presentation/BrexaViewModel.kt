@@ -3,8 +3,11 @@ package com.brexa.app.presentation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.brexa.app.BrexaApplication
 import com.brexa.app.data.ai.*
 import com.brexa.app.data.local.entity.*
+import com.brexa.app.data.rates.MarketRateItem
+import com.brexa.app.data.rates.MarketRatesManager
 import com.brexa.app.data.repository.BackupPayload
 import com.brexa.app.data.repository.BrexaRepository
 import com.brexa.app.data.repository.CategoryDistribution
@@ -61,6 +64,10 @@ class BrexaViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             repository.repairInconsistentFixedExpenses()
             refreshBrexamanDailyUsage()
+            val ctx = try { BrexaApplication.instance } catch (_: Exception) { null }
+            val cached = repository.marketRatesManager.loadCachedRates(ctx)
+            _marketRates.value = cached
+            refreshMarketRates()
         }
     }
 
@@ -90,6 +97,42 @@ class BrexaViewModel(
     fun setLastBackupTimestamp(timestamp: Long = System.currentTimeMillis()) {
         viewModelScope.launch {
             repository.setLastBackupTimestamp(timestamp)
+        }
+    }
+
+    // --- TASAS CAMBIO FÁCIL REACTIVAS ---
+    private val _marketRates = MutableStateFlow<List<MarketRateItem>>(emptyList())
+    val marketRates: StateFlow<List<MarketRateItem>> = _marketRates.asStateFlow()
+
+    private val _isRefreshingMarketRates = MutableStateFlow(false)
+    val isRefreshingMarketRates: StateFlow<Boolean> = _isRefreshingMarketRates.asStateFlow()
+
+    private val _ratesHeaderDate = MutableStateFlow(
+        try { repository.marketRatesManager.getFormattedHeaderDate() } catch (_: Exception) { "Tasas de Cambio" }
+    )
+    val ratesHeaderDate: StateFlow<String> = _ratesHeaderDate.asStateFlow()
+
+    fun refreshMarketRates(
+        onSuccess: (() -> Unit)? = null,
+        onError: ((String) -> Unit)? = null
+    ) {
+        if (_isRefreshingMarketRates.value) return
+        _isRefreshingMarketRates.value = true
+        _ratesHeaderDate.value = try {
+            repository.marketRatesManager.getFormattedHeaderDate()
+        } catch (_: Exception) { "Tasas de Cambio" }
+
+        viewModelScope.launch {
+            val ctx = try { BrexaApplication.instance } catch (_: Exception) { null }
+            val result = repository.refreshMarketRates(ctx)
+            _isRefreshingMarketRates.value = false
+            result.onSuccess { list ->
+                _marketRates.value = list
+                triggerAutoBackup()
+                onSuccess?.invoke()
+            }.onFailure { err ->
+                onError?.invoke(err.message ?: "No se pudieron obtener las tasas.")
+            }
         }
     }
 

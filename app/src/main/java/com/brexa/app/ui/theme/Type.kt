@@ -17,15 +17,15 @@ val BrexaTypography = Typography(
     displayLarge = TextStyle(
         fontFamily = SpaceMonoFontFamily,
         fontWeight = FontWeight.Bold,
-        fontSize = 34.sp,
-        lineHeight = 40.sp,
+        fontSize = 32.sp,
+        lineHeight = 38.sp,
         color = TextPrimary
     ),
     displayMedium = TextStyle(
         fontFamily = SpaceMonoFontFamily,
         fontWeight = FontWeight.Bold,
-        fontSize = 26.sp,
-        lineHeight = 32.sp,
+        fontSize = 24.sp,
+        lineHeight = 30.sp,
         color = TextPrimary
     ),
     headlineMedium = TextStyle(
@@ -36,17 +36,17 @@ val BrexaTypography = Typography(
         color = TextPrimary
     ),
     titleLarge = TextStyle(
-        fontFamily = SpaceMonoFontFamily,
+        fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Bold,
-        fontSize = 18.sp,
+        fontSize = 19.sp,
         lineHeight = 24.sp,
         color = TextPrimary
     ),
     titleMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Bold,
-        fontSize = 15.sp,
-        lineHeight = 20.sp,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 16.sp,
+        lineHeight = 22.sp,
         color = TextPrimary
     ),
     bodyLarge = TextStyle(
@@ -59,23 +59,31 @@ val BrexaTypography = Typography(
     bodyMedium = TextStyle(
         fontFamily = FontFamily.SansSerif,
         fontWeight = FontWeight.Normal,
-        fontSize = 13.sp,
-        lineHeight = 18.sp,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
         color = TextSecondary
     ),
     labelLarge = TextStyle(
-        fontFamily = SpaceMonoFontFamily,
-        fontWeight = FontWeight.Bold,
-        fontSize = 13.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.5.sp,
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.SemiBold,
+        fontSize = 14.sp,
+        lineHeight = 18.sp,
+        letterSpacing = 0.3.sp,
         color = TextPrimary
     ),
     labelMedium = TextStyle(
-        fontFamily = SpaceMonoFontFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 11.sp,
-        lineHeight = 14.sp,
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.5.sp,
+        lineHeight = 16.sp,
+        letterSpacing = 0.2.sp,
         color = TextSecondary
+    ),
+    labelSmall = TextStyle(
+        fontFamily = FontFamily.SansSerif,
+        fontWeight = FontWeight.Medium,
+        fontSize = 12.sp,
+        lineHeight = 15.sp,
+        color = TextMuted
     )
 )
