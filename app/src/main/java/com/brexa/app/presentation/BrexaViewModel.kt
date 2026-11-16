@@ -60,6 +60,7 @@ class BrexaViewModel(
     init {
         viewModelScope.launch(Dispatchers.IO) {
             repository.repairInconsistentFixedExpenses()
+            refreshBrexamanDailyUsage()
         }
     }
 
@@ -988,6 +989,15 @@ class BrexaViewModel(
     }
 
     // --- BREXAMAN IA ASISTENTE ---
+    val brexamanDailyLimit: Int = BrexamanAiService.DAILY_QUERY_LIMIT
+
+    private val _brexamanQueriesUsedToday = MutableStateFlow(0)
+    val brexamanQueriesUsedToday: StateFlow<Int> = _brexamanQueriesUsedToday.asStateFlow()
+
+    val brexamanDailyQueriesRemaining: StateFlow<Int> = _brexamanQueriesUsedToday.map { used ->
+        (brexamanDailyLimit - used).coerceAtLeast(0)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), brexamanDailyLimit)
+
     private val _brexamanMessages = MutableStateFlow<List<BrexamanChatMessage>>(emptyList())
     val brexamanMessages: StateFlow<List<BrexamanChatMessage>> = _brexamanMessages.asStateFlow()
 
@@ -995,6 +1005,27 @@ class BrexaViewModel(
     val isBrexamanThinking: StateFlow<Boolean> = _isBrexamanThinking.asStateFlow()
 
     private val brexamanAiService = BrexamanAiService()
+
+    fun refreshBrexamanDailyUsageSync() {
+        viewModelScope.launch(Dispatchers.IO) {
+            refreshBrexamanDailyUsage()
+        }
+    }
+
+    private suspend fun refreshBrexamanDailyUsage(): Int {
+        val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(System.currentTimeMillis())
+        val savedDate = repository.getSetting("brexaman_daily_query_date")
+        return if (savedDate != today) {
+            repository.setSetting("brexaman_daily_query_date", today)
+            repository.setSetting("brexaman_daily_query_count", "0")
+            _brexamanQueriesUsedToday.value = 0
+            0
+        } else {
+            val count = repository.getSetting("brexaman_daily_query_count")?.toIntOrNull() ?: 0
+            _brexamanQueriesUsedToday.value = count
+            count
+        }
+    }
 
     fun getBrexamanSnapshot(): BrexamanFinancialSnapshot {
         return BrexamanFinancialAnalyzer.generateSnapshot(
@@ -1014,6 +1045,42 @@ class BrexaViewModel(
 
         viewModelScope.launch {
             _isBrexamanThinking.value = true
+            val currentUsage = refreshBrexamanDailyUsage()
+
+            // 1. Verificación de límite diario de consultas (Protege cuota de la API)
+            if (currentUsage >= BrexamanAiService.DAILY_QUERY_LIMIT) {
+                delay(300)
+                _brexamanMessages.value = _brexamanMessages.value + BrexamanChatMessage(
+                    sender = MessageSender.BREXAMAN,
+                    content = """
+                        ¡Has alcanzado tu límite de ${BrexamanAiService.DAILY_QUERY_LIMIT} consultas diarias de Brexaman por hoy! 🛡️
+                        
+                        Este límite diario garantiza un servicio rápido y disponible para toda la comunidad de usuarios de Brexa sin sobrecargar la API.
+                        
+                        ⏳ Tu cuota se reiniciará automáticamente a las 00:00 (medianoche).
+                        💡 Recuerda que las sugerencias rápidas de arriba (¿Cómo voy este mes?, Gastos top, etc.) son 100% locales y puedes consultarlas todas las veces que quieras.
+                    """.trimIndent()
+                )
+                _isBrexamanThinking.value = false
+                return@launch
+            }
+
+            // 2. Filtro previo inexpugnable para temas ajenos a finanzas (ahorra llamadas a la API)
+            if (BrexamanAiService.isBlatantlyOffTopic(userPrompt)) {
+                delay(300)
+                _brexamanMessages.value = _brexamanMessages.value + BrexamanChatMessage(
+                    sender = MessageSender.BREXAMAN,
+                    content = BrexamanAiService.OFF_TOPIC_REFUSAL_MESSAGE
+                )
+                _isBrexamanThinking.value = false
+                return@launch
+            }
+
+            // Incrementar uso diario registrado
+            val newUsage = currentUsage + 1
+            repository.setSetting("brexaman_daily_query_count", newUsage.toString())
+            _brexamanQueriesUsedToday.value = newUsage
+
             val snapshot = getBrexamanSnapshot()
             val savedApiKey = repository.getSetting("gemini_api_key")
 

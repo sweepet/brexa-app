@@ -86,6 +86,7 @@ class MainActivity : ComponentActivity() {
                 var showBrexamanChat by remember { mutableStateOf(false) }
                 val brexamanMessages by viewModel.brexamanMessages.collectAsState()
                 val isBrexamanThinking by viewModel.isBrexamanThinking.collectAsState()
+                val brexamanQueriesRemaining by viewModel.brexamanDailyQueriesRemaining.collectAsState()
 
                 // Permiso de notificaciones para Android 13+ (API 33+)
                 val notificationPermissionLauncher = rememberLauncherForActivityResult(
@@ -249,6 +250,7 @@ class MainActivity : ComponentActivity() {
                     if (currentScreen == "HOME") {
                         BrexamanOverlay(
                             onOpenAssistant = {
+                                viewModel.refreshBrexamanDailyUsageSync()
                                 showBrexamanChat = true
                             }
                         )
@@ -260,6 +262,8 @@ class MainActivity : ComponentActivity() {
                         onDismiss = { showBrexamanChat = false },
                         messages = brexamanMessages,
                         isThinking = isBrexamanThinking,
+                        queriesRemaining = brexamanQueriesRemaining,
+                        dailyLimit = viewModel.brexamanDailyLimit,
                         onSendMessage = { prompt: String -> viewModel.sendBrexamanMessage(prompt) },
                         onSendQuickPrompt = { promptType: String -> viewModel.sendBrexamanQuickPrompt(promptType) }
                     )

@@ -43,6 +43,8 @@ fun BrexamanChatSheet(
     onDismiss: () -> Unit,
     messages: List<BrexamanChatMessage>,
     isThinking: Boolean,
+    queriesRemaining: Int = 15,
+    dailyLimit: Int = 15,
     onSendMessage: (String) -> Unit,
     onSendQuickPrompt: (String) -> Unit
 ) {
@@ -134,6 +136,22 @@ fun BrexamanChatSheet(
                                     )
                                 )
                             }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = if (queriesRemaining > 0) AccentLime.copy(alpha = 0.15f) else ExpenseRed.copy(alpha = 0.2f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (queriesRemaining > 0) AccentLime.copy(alpha = 0.6f) else ExpenseRed)
+                            ) {
+                                Text(
+                                    text = "$queriesRemaining/$dailyLimit HOY",
+                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                                    style = BrexaTypography.labelSmall.copy(
+                                        color = if (queriesRemaining > 0) AccentLime else ExpenseRed,
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                )
+                            }
                         }
                         Text(
                             text = if (isThinking) "⚡ Analizando tus finanzas..." else "🟢 Conectado al historial Room",
@@ -169,6 +187,32 @@ fun BrexamanChatSheet(
             )
 
             Spacer(modifier = Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "CONSULTAS RÁPIDAS (LOCALES)",
+                    style = BrexaTypography.labelSmall.copy(
+                        color = TextMuted,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.8.sp
+                    )
+                )
+                Text(
+                    text = "Ilimitadas ⚡",
+                    style = BrexaTypography.labelSmall.copy(
+                        color = AccentLime,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
 
             Row(
                 modifier = Modifier
@@ -217,11 +261,13 @@ fun BrexamanChatSheet(
 
             Spacer(modifier = Modifier.height(10.dp))
 
+            val isLimitReached = queriesRemaining <= 0
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(BackgroundBase, RoundedCornerShape(10.dp))
-                    .border(1.dp, BorderSolid, RoundedCornerShape(10.dp))
+                    .border(1.dp, if (isLimitReached) ExpenseRed.copy(alpha = 0.5f) else BorderSolid, RoundedCornerShape(10.dp))
                     .padding(horizontal = 8.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -230,8 +276,11 @@ fun BrexamanChatSheet(
                     onValueChange = { inputText = it },
                     placeholder = {
                         Text(
-                            text = "Pregúntale algo a Brexaman...",
-                            style = BrexaTypography.bodyMedium.copy(color = TextMuted, fontSize = 13.sp)
+                            text = if (isLimitReached) "Límite diario alcanzado ($dailyLimit/$dailyLimit hoy)" else "Pregúntale de finanzas a Brexaman...",
+                            style = BrexaTypography.bodyMedium.copy(
+                                color = if (isLimitReached) ExpenseRed.copy(alpha = 0.8f) else TextMuted,
+                                fontSize = 13.sp
+                            )
                         )
                     },
                     modifier = Modifier.weight(1f),
@@ -269,7 +318,7 @@ fun BrexamanChatSheet(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = "Enviar",
-                        tint = if (inputText.isNotBlank() && !isThinking) AccentLime else TextMuted
+                        tint = if (inputText.isNotBlank() && !isThinking) (if (isLimitReached) ExpenseRed else AccentLime) else TextMuted
                     )
                 }
             }
