@@ -51,7 +51,7 @@ jobs:
         with:
           files: app/build/outputs/apk/release/*.apk
           name: Brexa ${{ github.ref_name }}
-          body: "Mejora en la navegación y retorno con gestos y botón atrás, solución a notas de versión y optimizaciones generales."
+          body: "Pedro picapiedra era un soldado romano de la época de matusalen"
           draft: false
           prerelease: false
-          generate_release_notes: true
+          generate_release_notes: false
