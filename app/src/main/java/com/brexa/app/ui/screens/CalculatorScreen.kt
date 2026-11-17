@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brexa.app.data.rates.MarketRateItem
 import com.brexa.app.presentation.BrexaViewModel
+import com.brexa.app.ui.components.BrutalistBadge
 import com.brexa.app.ui.components.BrutalistButton
 import com.brexa.app.ui.components.BrutalistCard
 import com.brexa.app.ui.components.CardShape
@@ -55,11 +56,11 @@ fun CalculatorScreen(
     val currentRateItem = rates.find { it.id == selectedRateId } ?: rates.firstOrNull()
     val activeRate = currentRateItem?.rate ?: 914.02
 
-    // Modo de dirección: false = USD -> VES/COP, true = VES/COP -> USD
-    var isReversed by remember { mutableStateOf(false) }
+    // Casilla activa para edición: 0 = Moneda Base (USD/EUR/USDT), 1 = Moneda Local (VES/COP)
+    var activeBox by remember { mutableIntStateOf(0) }
 
-    // Estado de la calculadora
-    var displayInput by remember { mutableStateOf("1") }
+    // Texto tipeado en la casilla activa
+    var inputStr by remember { mutableStateOf("1") }
     var operand1 by remember { mutableStateOf<Double?>(null) }
     var pendingOperator by remember { mutableStateOf<String?>(null) }
     var shouldClearOnNextDigit by remember { mutableStateOf(false) }
@@ -72,48 +73,69 @@ fun CalculatorScreen(
         DecimalFormat("#,##0.##", symbols)
     }
 
-    // Evaluación del monto base actual
-    val currentAmount = remember(displayInput) {
-        val sanitized = displayInput.replace(".", "").replace(",", ".")
+    // Monedas de las casillas
+    val baseCurrency = remember(currentRateItem) {
+        when (currentRateItem?.id) {
+            "BCV_EUR" -> "EUR"
+            "USDT" -> "USDT"
+            else -> "USD"
+        }
+    }
+
+    val localCurrency = remember(currentRateItem) {
+        if (currentRateItem?.id == "COP_TRM") "COP" else "VES"
+    }
+
+    // Valor numérico de lo que se tipea en la casilla activa
+    val activeAmount = remember(inputStr) {
+        val sanitized = inputStr.replace(".", "").replace(",", ".")
         sanitized.toDoubleOrNull() ?: 0.0
     }
 
-    // Cálculo del monto convertido
-    val convertedAmount = remember(currentAmount, activeRate, isReversed) {
-        if (isReversed) {
-            if (activeRate > 0) currentAmount / activeRate else 0.0
+    // Cálculo dinámico para la otra casilla
+    val calculatedAmount = remember(activeBox, activeAmount, activeRate) {
+        if (activeBox == 0) {
+            // Se está editando Dólares/Euros -> calcular Bolívares/Pesos
+            activeAmount * activeRate
         } else {
-            currentAmount * activeRate
+            // Se está editando Bolívares/Pesos -> calcular cuántos Dólares/Euros son
+            if (activeRate > 0.0) activeAmount / activeRate else 0.0
         }
     }
 
-    val sourceCurrency = remember(currentRateItem, isReversed) {
-        if (!isReversed) {
-            if (currentRateItem?.id == "BCV_EUR") "EUR" else "USD"
-        } else {
-            if (currentRateItem?.id == "COP_TRM") "COP" else "VES"
-        }
-    }
+    // Valores a mostrar en cada casilla
+    val box0Display = if (activeBox == 0) inputStr else numberFormat.format(calculatedAmount)
+    val box1Display = if (activeBox == 1) inputStr else numberFormat.format(calculatedAmount)
 
-    val targetCurrency = remember(currentRateItem, isReversed) {
-        if (!isReversed) {
-            if (currentRateItem?.id == "COP_TRM") "COP" else "VES"
-        } else {
-            if (currentRateItem?.id == "BCV_EUR") "EUR" else "USD"
+    // Función para cambiar de casilla activa preservando el valor actual
+    fun switchActiveBox(newBox: Int) {
+        if (activeBox != newBox) {
+            // Al cambiar, inicializamos el input de la nueva casilla con el valor calculado actual
+            val nextVal = calculatedAmount
+            inputStr = if (nextVal > 0.0) {
+                // Formatear limpio para edición sin separador de miles
+                String.format(Locale.US, "%.2f", nextVal).replace(".", ",")
+            } else {
+                if (newBox == 0) "1" else "1000"
+            }
+            operand1 = null
+            pendingOperator = null
+            shouldClearOnNextDigit = false
+            activeBox = newBox
         }
     }
 
     // Manejador del teclado
     fun handleDigit(digit: String) {
         if (shouldClearOnNextDigit) {
-            displayInput = digit
+            inputStr = digit
             shouldClearOnNextDigit = false
         } else {
-            if (displayInput == "0" && digit != ",") {
-                displayInput = digit
+            if (inputStr == "0" && digit != ",") {
+                inputStr = digit
             } else {
-                if (displayInput.length < 12) {
-                    displayInput += digit
+                if (inputStr.length < 14) {
+                    inputStr += digit
                 }
             }
         }
@@ -121,24 +143,24 @@ fun CalculatorScreen(
 
     fun handleComma() {
         if (shouldClearOnNextDigit) {
-            displayInput = "0,"
+            inputStr = "0,"
             shouldClearOnNextDigit = false
-        } else if (!displayInput.contains(",")) {
-            displayInput += ","
+        } else if (!inputStr.contains(",")) {
+            inputStr += ","
         }
     }
 
     fun handleBackspace() {
         if (shouldClearOnNextDigit) {
-            displayInput = "0"
+            inputStr = "0"
             shouldClearOnNextDigit = false
         } else {
-            displayInput = if (displayInput.length <= 1) "0" else displayInput.dropLast(1)
+            inputStr = if (inputStr.length <= 1) "0" else inputStr.dropLast(1)
         }
     }
 
     fun handleOperator(op: String) {
-        val num = currentAmount
+        val num = activeAmount
         if (operand1 == null) {
             operand1 = num
         } else if (pendingOperator != null && !shouldClearOnNextDigit) {
@@ -150,7 +172,7 @@ fun CalculatorScreen(
                 else -> num
             }
             operand1 = res
-            displayInput = numberFormat.format(res)
+            inputStr = numberFormat.format(res)
         }
         pendingOperator = op
         shouldClearOnNextDigit = true
@@ -159,7 +181,7 @@ fun CalculatorScreen(
     fun handleEquals() {
         val op = pendingOperator ?: return
         val op1 = operand1 ?: return
-        val num = currentAmount
+        val num = activeAmount
         val res = when (op) {
             "+" -> op1 + num
             "-" -> op1 - num
@@ -169,12 +191,12 @@ fun CalculatorScreen(
         }
         operand1 = null
         pendingOperator = null
-        displayInput = numberFormat.format(res)
+        inputStr = numberFormat.format(res)
         shouldClearOnNextDigit = true
     }
 
     fun handleReset() {
-        displayInput = "1"
+        inputStr = if (activeBox == 0) "1" else "1000"
         operand1 = null
         pendingOperator = null
         shouldClearOnNextDigit = false
@@ -205,29 +227,29 @@ fun CalculatorScreen(
         ) {
             Column {
                 Text(
-                    text = "CAMBIO FÁCIL",
+                    text = "CALCULADORA",
                     style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
                     fontWeight = FontWeight.Black,
                     color = TextPrimary,
                     letterSpacing = 1.sp
                 )
                 Text(
-                    text = "Calculadora multidivisa en tiempo real",
+                    text = "Conversor bidireccional en tiempo real",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
             }
 
-            // Invertir Monedas
+            // Alternar casilla activa rápidamente
             IconButton(
-                onClick = { isReversed = !isReversed },
+                onClick = { switchActiveBox(if (activeBox == 0) 1 else 0) },
                 modifier = Modifier
                     .size(42.dp)
                     .background(SurfaceCardElevated, CircleShape)
             ) {
                 Icon(
                     imageVector = Icons.Default.SwapVert,
-                    contentDescription = "Invertir monedas",
+                    contentDescription = "Invertir casilla activa",
                     tint = AccentGold,
                     modifier = Modifier.size(22.dp)
                 )
@@ -264,12 +286,18 @@ fun CalculatorScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // --- DISPLAY CAJA 1: ENTRADA ---
+        // --- CASILLA 1: MONEDA BASE (USD / EUR / USDT) ---
+        val isBox0Active = activeBox == 0
         Surface(
-            color = SurfaceCard,
+            color = if (isBox0Active) SurfaceCardElevated else SurfaceCard,
             shape = CardShape,
-            border = BorderStroke(1.5.dp, AccentGold.copy(alpha = 0.8f)),
-            modifier = Modifier.fillMaxWidth()
+            border = BorderStroke(
+                if (isBox0Active) 2.dp else 1.dp,
+                if (isBox0Active) AccentGold else BorderSolid
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { switchActiveBox(0) }
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -277,28 +305,44 @@ fun CalculatorScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = sourceCurrency,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
-                        color = TextPrimary
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = baseCurrency,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Black,
+                            color = TextPrimary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        if (isBox0Active) {
+                            BrutalistBadge(
+                                text = "EDITANDO ✎",
+                                backgroundColor = AccentGold,
+                                contentColor = Color(0xFF0D1117)
+                            )
+                        } else {
+                            Text(
+                                text = "Toca para escribir",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextMuted
+                            )
+                        }
+                    }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = displayInput,
-                            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 26.sp),
+                            text = box0Display,
+                            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp),
                             fontWeight = FontWeight.Bold,
-                            color = AccentGold
+                            color = if (isBox0Active) AccentGold else IncomeGreen
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         IconButton(
-                            onClick = { copyToClipboard(displayInput, sourceCurrency) },
+                            onClick = { copyToClipboard(box0Display, baseCurrency) },
                             modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "Copiar entrada",
+                                contentDescription = "Copiar",
                                 tint = TextSecondary,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -308,7 +352,7 @@ fun CalculatorScreen(
 
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "${currentRateItem?.title ?: "Tasa"} = ${currentRateItem?.currencySymbol ?: "Bs."} ${currentRateItem?.formattedRate ?: ""}",
+                    text = "1 $baseCurrency = ${currentRateItem?.currencySymbol ?: "Bs."} ${currentRateItem?.formattedRate ?: ""} $localCurrency",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
@@ -317,12 +361,18 @@ fun CalculatorScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // --- DISPLAY CAJA 2: SALIDA CONVERTIDA ---
+        // --- CASILLA 2: MONEDA LOCAL (VES / COP) ---
+        val isBox1Active = activeBox == 1
         Surface(
-            color = SurfaceCard,
+            color = if (isBox1Active) SurfaceCardElevated else SurfaceCard,
             shape = CardShape,
-            border = BorderStroke(1.dp, BorderSolid),
-            modifier = Modifier.fillMaxWidth()
+            border = BorderStroke(
+                if (isBox1Active) 2.dp else 1.dp,
+                if (isBox1Active) AccentGold else BorderSolid
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { switchActiveBox(1) }
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -330,28 +380,44 @@ fun CalculatorScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = targetCurrency,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
-                        color = TextPrimary
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = localCurrency,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Black,
+                            color = TextPrimary
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        if (isBox1Active) {
+                            BrutalistBadge(
+                                text = "EDITANDO ✎",
+                                backgroundColor = AccentGold,
+                                contentColor = Color(0xFF0D1117)
+                            )
+                        } else {
+                            Text(
+                                text = "Toca para escribir",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextMuted
+                            )
+                        }
+                    }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = numberFormat.format(convertedAmount),
-                            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 26.sp),
+                            text = box1Display,
+                            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp),
                             fontWeight = FontWeight.Bold,
-                            color = IncomeGreen
+                            color = if (isBox1Active) AccentGold else IncomeGreen
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         IconButton(
-                            onClick = { copyToClipboard(numberFormat.format(convertedAmount), targetCurrency) },
+                            onClick = { copyToClipboard(box1Display, localCurrency) },
                             modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "Copiar resultado",
+                                contentDescription = "Copiar",
                                 tint = TextSecondary,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -361,7 +427,11 @@ fun CalculatorScreen(
 
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Equivalente estimado según mercado actual",
+                    text = if (isBox1Active) {
+                        "Ingresando en $localCurrency ➔ Convierte a $baseCurrency"
+                    } else {
+                        "Equivalente en $localCurrency a tasa de mercado"
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
@@ -569,11 +639,12 @@ fun CalculatorScreen(
         }
 
         // --- REGISTRAR EN BREXA ---
-        if (onNavigateToTransactionWithAmount != null && currentAmount > 0.0) {
+        val amountToRegister = if (activeBox == 0) activeAmount else calculatedAmount
+        if (onNavigateToTransactionWithAmount != null && amountToRegister > 0.0) {
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedButton(
                 onClick = {
-                    onNavigateToTransactionWithAmount(currentAmount, activeRate, sourceCurrency)
+                    onNavigateToTransactionWithAmount(amountToRegister, activeRate, baseCurrency)
                 },
                 shape = RoundedCornerShape(12.dp),
                 border = BorderStroke(1.dp, AccentGold),

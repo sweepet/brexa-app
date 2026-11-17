@@ -86,7 +86,7 @@ class MarketRatesManager {
                     rate = bcvUsd,
                     changePercent = pctUsd,
                     formattedRate = formatRate(bcvUsd),
-                    badge = "OFICIAL"
+                    badge = null
                 )
             )
             add(
@@ -98,19 +98,19 @@ class MarketRatesManager {
                     rate = bcvEur,
                     changePercent = pctEur,
                     formattedRate = formatRate(bcvEur),
-                    badge = "OFICIAL"
+                    badge = null
                 )
             )
             add(
                 MarketRateItem(
                     id = "USDT",
                     title = "Promedio USDT",
-                    subtitle = "Binance P2P / Paralelo",
+                    subtitle = "Binance P2P",
                     currencySymbol = "Bs.",
                     rate = usdt,
                     changePercent = pctUsdt,
                     formattedRate = formatRate(usdt),
-                    badge = "PARALELO"
+                    badge = null
                 )
             )
             add(
@@ -122,7 +122,7 @@ class MarketRatesManager {
                     rate = bcvAvg,
                     changePercent = (pctUsd + pctUsdt) / 2.0,
                     formattedRate = formatRate(bcvAvg),
-                    badge = "PROMEDIO"
+                    badge = null
                 )
             )
             add(
@@ -134,7 +134,7 @@ class MarketRatesManager {
                     rate = copTrm,
                     changePercent = pctCop,
                     formattedRate = formatRate(copTrm),
-                    badge = "TRM"
+                    badge = null
                 )
             )
         }
@@ -261,7 +261,7 @@ class MarketRatesManager {
                     rate = finalBcvUsd,
                     changePercent = pctUsd,
                     formattedRate = formatRate(finalBcvUsd),
-                    badge = "OFICIAL"
+                    badge = null
                 ),
                 MarketRateItem(
                     id = "BCV_EUR",
@@ -271,17 +271,17 @@ class MarketRatesManager {
                     rate = finalBcvEur,
                     changePercent = pctEur,
                     formattedRate = formatRate(finalBcvEur),
-                    badge = "OFICIAL"
+                    badge = null
                 ),
                 MarketRateItem(
                     id = "USDT",
                     title = "Promedio USDT",
-                    subtitle = "Binance P2P / Paralelo",
+                    subtitle = "Binance P2P",
                     currencySymbol = "Bs.",
                     rate = finalUsdt,
                     changePercent = pctUsdt,
                     formattedRate = formatRate(finalUsdt),
-                    badge = "PARALELO"
+                    badge = null
                 ),
                 MarketRateItem(
                     id = "BCV_AVG",
@@ -291,7 +291,7 @@ class MarketRatesManager {
                     rate = finalBcvAvg,
                     changePercent = pctAvg,
                     formattedRate = formatRate(finalBcvAvg),
-                    badge = "PROMEDIO"
+                    badge = null
                 ),
                 MarketRateItem(
                     id = "COP_TRM",
@@ -301,7 +301,7 @@ class MarketRatesManager {
                     rate = finalCopTrm,
                     changePercent = pctCop,
                     formattedRate = formatRate(finalCopTrm),
-                    badge = "TRM"
+                    badge = null
                 )
             )
 

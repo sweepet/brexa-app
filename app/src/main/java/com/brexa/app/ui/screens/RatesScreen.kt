@@ -228,22 +228,12 @@ private fun MarketRateCard(
         ) {
             // Lado izquierdo: Título y subtítulo
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                    item.badge?.let { badgeText ->
-                        Spacer(modifier = Modifier.width(8.dp))
-                        BrutalistBadge(
-                            text = badgeText,
-                            backgroundColor = SurfaceCardElevated,
-                            contentColor = AccentGold
-                        )
-                    }
-                }
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
                     text = item.subtitle,

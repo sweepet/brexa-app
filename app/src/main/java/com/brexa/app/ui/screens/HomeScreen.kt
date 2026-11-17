@@ -287,12 +287,14 @@ fun HomeScreen(
                         borderColor = if (isIncognito) ExpenseRed else BorderSolid,
                         modifier = Modifier.clickable { viewModel.toggleIncognito() }
                     )
-                    // Botón Analytics
+                    // Botón Detalles
                     BrutalistBadge(
-                        text = "📊",
+                        text = "📊 DETALLES",
                         backgroundColor = BackgroundBase,
-                        contentColor = TextPrimary,
+                        contentColor = AccentLime,
                         borderColor = BorderSolid,
+                        fontSize = 11.5.sp,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 3.dp),
                         modifier = Modifier.clickable { onOpenAnalytics() }
                     )
                     // Botón Ajustes
@@ -403,7 +405,7 @@ fun HomeScreen(
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                        modifier = Modifier.weight(1f, fill = false)
+                                        modifier = Modifier.weight(1f)
                                     ) {
                                         Box(
                                             modifier = Modifier
@@ -421,12 +423,14 @@ fun HomeScreen(
                                                 color = TextSecondary,
                                                 fontSize = 12.sp,
                                                 fontWeight = FontWeight.Bold,
-                                                letterSpacing = 0.8.sp
+                                                letterSpacing = 0.5.sp
                                             ),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
                                     }
+
+                                    Spacer(modifier = Modifier.width(8.dp))
 
                                     val modeBadgeColor = when {
                                         budgetInfo.budgetAmountUsd <= 0.0 -> TextMuted
@@ -551,60 +555,6 @@ fun HomeScreen(
                             }
                         }
 
-                        // 3. Barra Inferior de Tasas Oficiales (Ordenada, simétrica y con acceso directo)
-                        if (bcvCurrency != null || copCurrency != null) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(1.dp)
-                                    .background(BorderSolid)
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { onOpenAccountsManagement() },
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(
-                                        text = "🏛 OFICIAL:",
-                                        style = BrexaTypography.labelSmall.copy(
-                                            color = TextMuted,
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    )
-                                    if (bcvCurrency != null) {
-                                        Text(
-                                            text = "BCV: ${formatter.format(bcvCurrency.rateToUsd)} Bs",
-                                            style = BrexaTypography.labelSmall.copy(
-                                                color = AccentPurple,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 12.sp
-                                            )
-                                        )
-                                    }
-                                }
-
-                                if (copCurrency != null) {
-                                    Text(
-                                        text = "TRM: ${formatter.format(copCurrency.rateToUsd)} COP",
-                                        style = BrexaTypography.labelSmall.copy(
-                                            color = ExchangeBlue,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 12.sp
-                                        )
-                                    )
-                                }
-                            }
-                        }
-
                         val urgentPendingUsd = projections.total7DaysUsd
                         val hasOverdue = projections.overdueCount > 0
                         val hasDueSoon = projections.count7Days > 0
@@ -652,92 +602,101 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     backgroundColor = SurfaceCard,
                     borderColor = if (hasOverdue) ExpenseRed else BorderSolid,
-                    borderWidth = 1.5.dp,
+                    borderWidth = 1.dp,
                     onClick = onOpenPendingExpenses
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                            .padding(horizontal = 16.dp, vertical = 13.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text(
-                                text = "📋 PAGOS PENDIENTES",
-                                style = BrexaTypography.labelMedium.copy(
-                                    color = if (hasOverdue) ExpenseRed else TextPrimary,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 13.sp
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = "PAGOS PENDIENTES",
+                                    style = BrexaTypography.labelMedium.copy(
+                                        color = if (hasOverdue) ExpenseRed else TextPrimary,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        letterSpacing = 0.5.sp
+                                    )
                                 )
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            when {
-                                hasOverdue -> {
-                                    BrutalistBadge(
-                                        text = "${projections.overdueCount} VENCIDO${if (projections.overdueCount > 1) "S" else ""}",
-                                        backgroundColor = ExpenseRed,
-                                        contentColor = Color.White,
-                                        borderColor = ExpenseRed,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                                hasDueSoon -> {
-                                    BrutalistBadge(
-                                        text = "${projections.count7Days} ESTA SEMANA",
-                                        backgroundColor = BackgroundBase,
-                                        contentColor = AccentLime,
-                                        borderColor = AccentLime,
-                                        fontSize = 12.sp
-                                    )
-                                }
-                                else -> {
-                                    BrutalistBadge(
-                                        text = "AL DÍA ✓",
-                                        backgroundColor = BackgroundBase,
-                                        contentColor = IncomeGreen,
-                                        borderColor = IncomeGreen,
-                                        fontSize = 12.sp
-                                    )
+                                when {
+                                    hasOverdue -> {
+                                        BrutalistBadge(
+                                            text = "${projections.overdueCount} VENCIDO${if (projections.overdueCount > 1) "S" else ""}",
+                                            backgroundColor = ExpenseRed.copy(alpha = 0.15f),
+                                            contentColor = ExpenseRed,
+                                            borderColor = ExpenseRed,
+                                            fontSize = 11.5.sp
+                                        )
+                                    }
+                                    hasDueSoon -> {
+                                        BrutalistBadge(
+                                            text = "${projections.count7Days} PRÓXIMOS",
+                                            backgroundColor = AccentGold.copy(alpha = 0.15f),
+                                            contentColor = AccentGold,
+                                            borderColor = AccentGold,
+                                            fontSize = 11.5.sp
+                                        )
+                                    }
+                                    else -> {
+                                        BrutalistBadge(
+                                            text = "AL DÍA ✓",
+                                            backgroundColor = IncomeGreen.copy(alpha = 0.15f),
+                                            contentColor = IncomeGreen,
+                                            borderColor = IncomeGreen,
+                                            fontSize = 11.5.sp
+                                        )
+                                    }
                                 }
                             }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+                            val nextItem = activePending.minByOrNull { it.dueDateTimestamp }
+                            val subtitleText = when {
+                                hasOverdue -> "${projections.overdueCount} pago(s) vencido(s) por registrar"
+                                nextItem != null -> {
+                                    val nextDateStr = SimpleDateFormat("dd MMM", Locale("es", "ES")).format(Date(nextItem.dueDateTimestamp))
+                                    "Próximo vencimiento: $nextDateStr"
+                                }
+                                else -> "Todos tus compromisos fijos y variables al día"
+                            }
+                            Text(
+                                text = subtitleText,
+                                style = BrexaTypography.bodySmall,
+                                color = TextSecondary,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
                         }
+
+                        Spacer(modifier = Modifier.width(12.dp))
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             if (urgentPendingUsd > 0.0) {
                                 Text(
                                     text = if (isIncognito) "•••••••" else "-$baseSymbol${formatter.format(urgentPendingUsd)}",
                                     style = BrexaTypography.labelMedium.copy(
-                                        color = if (hasOverdue) ExpenseRed else AccentLime,
+                                        color = if (hasOverdue) ExpenseRed else AccentGold,
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 13.sp
+                                        fontSize = 13.5.sp
                                     )
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                            } else if (activePending.isNotEmpty()) {
-                                val nextItem = activePending.minByOrNull { it.dueDateTimestamp }
-                                if (nextItem != null) {
-                                    val nextDateStr = SimpleDateFormat("dd MMM", Locale("es", "ES")).format(Date(nextItem.dueDateTimestamp))
-                                    Text(
-                                        text = "Próx: $nextDateStr",
-                                        style = BrexaTypography.labelSmall.copy(
-                                            color = TextMuted,
-                                            fontSize = 12.sp
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                }
                             }
                             Text(
                                 text = "➔",
                                 style = BrexaTypography.labelMedium.copy(
-                                    color = AccentLime,
+                                    color = AccentGold,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp
+                                    fontSize = 14.sp
                                 )
                             )
                         }

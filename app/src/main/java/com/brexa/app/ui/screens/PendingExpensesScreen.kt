@@ -2,10 +2,12 @@ package com.brexa.app.ui.screens
 
 import android.app.DatePickerDialog
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -33,6 +35,7 @@ import com.brexa.app.ui.components.BrutalistBadge
 import com.brexa.app.ui.components.BrutalistButton
 import com.brexa.app.ui.components.BrutalistCard
 import com.brexa.app.ui.components.BrutalistTextField
+import com.brexa.app.ui.components.CardShape
 import com.brexa.app.ui.theme.*
 import com.brexa.app.ui.util.CurrencyFormat
 import java.text.SimpleDateFormat
@@ -234,38 +237,131 @@ fun PendingExpensesScreen(
         ) {
             Column {
                 Text(
-                    text = "PAGOS PENDIENTES",
-                    style = BrexaTypography.titleLarge.copy(color = AccentLime, fontSize = 16.sp)
+                    text = "PAGOS",
+                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
+                    fontWeight = FontWeight.Black,
+                    color = TextPrimary,
+                    letterSpacing = 1.sp
                 )
                 Text(
-                    text = "COMPROMISOS VARIABLES Y RECURRENTES",
-                    style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontSize = 9.5.sp)
+                    text = "Compromisos variables y fijos",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary
                 )
             }
 
             BrutalistBadge(
-                text = "VOLVER ✕",
-                backgroundColor = BackgroundBase,
-                contentColor = TextPrimary,
-                borderColor = BorderSolid,
-                fontSize = 10.sp,
-                modifier = Modifier.clickable { onBack() }
+                text = "+ NUEVO PAGO",
+                backgroundColor = AccentGold,
+                contentColor = Color(0xFF0D1117),
+                borderColor = AccentGold,
+                fontSize = 12.sp,
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.clickable { showCreateModal = true }
             )
+        }
+
+        // --- 1.1 CARTEL DE ESTADO DE PAGOS (AL DÍA / VENCIDOS) ---
+        val hasOverdue = projections.overdueCount > 0
+        val hasDueSoon = projections.count7Days > 0
+
+        Surface(
+            color = SurfaceCard,
+            shape = CardShape,
+            border = BorderStroke(1.dp, if (hasOverdue) ExpenseRed else BorderSolid),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "ESTADO DE PAGOS",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        when {
+                            hasOverdue -> BrutalistBadge(
+                                text = "${projections.overdueCount} VENCIDO${if (projections.overdueCount > 1) "S" else ""}",
+                                backgroundColor = ExpenseRed.copy(alpha = 0.2f),
+                                contentColor = ExpenseRed,
+                                borderColor = ExpenseRed,
+                                fontSize = 11.5.sp
+                            )
+                            hasDueSoon -> BrutalistBadge(
+                                text = "${projections.count7Days} PRÓXIMOS",
+                                backgroundColor = AccentGold.copy(alpha = 0.2f),
+                                contentColor = AccentGold,
+                                borderColor = AccentGold,
+                                fontSize = 11.5.sp
+                            )
+                            else -> BrutalistBadge(
+                                text = "AL DÍA ✓",
+                                backgroundColor = IncomeGreen.copy(alpha = 0.2f),
+                                contentColor = IncomeGreen,
+                                borderColor = IncomeGreen,
+                                fontSize = 11.5.sp
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    val statusSubtitle = when {
+                        hasOverdue -> "Tienes ${projections.overdueCount} compromiso(s) vencido(s) que requieren registro"
+                        hasDueSoon -> "${projections.count7Days} pago(s) vencen en los próximos 7 días"
+                        else -> "Todos tus compromisos fijos y variables están al día"
+                    }
+                    Text(
+                        text = statusSubtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+
+                if (projections.total7DaysUsd > 0.0) {
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "$baseSymbol ${formatter.format(projections.total7DaysUsd)}",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (hasOverdue) ExpenseRed else AccentGold
+                        )
+                        Text(
+                            text = "Próximos 7 días",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextMuted,
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            }
         }
 
         // --- 2. SELECTOR DE SECCIÓN (VARIABLES VS FIJOS) ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 16.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             val isVar = selectedSection == "VARIABLES"
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .background(if (isVar) AccentLime else SurfaceCard, RectangleShape)
-                    .border(2.dp, if (isVar) AccentLime else BorderSolid, RectangleShape)
+                    .background(if (isVar) AccentGold else SurfaceCard, RoundedCornerShape(12.dp))
+                    .border(1.dp, if (isVar) AccentGold else BorderSolid, RoundedCornerShape(12.dp))
                     .clickable { selectedSection = "VARIABLES" }
                     .padding(vertical = 10.dp, horizontal = 8.dp),
                 contentAlignment = Alignment.Center
@@ -274,16 +370,16 @@ fun PendingExpensesScreen(
                     Text(
                         text = "⚡ VARIABLES (${variableExpenses.size})",
                         style = BrexaTypography.labelMedium.copy(
-                            color = if (isVar) Color.Black else TextPrimary,
+                            color = if (isVar) Color(0xFF0D1117) else TextPrimary,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.5.sp
+                            fontSize = 13.sp
                         )
                     )
                     Text(
                         text = "Puntuales • Se borran al pagar",
                         style = BrexaTypography.labelSmall.copy(
-                            color = if (isVar) Color.Black.copy(alpha = 0.8f) else TextMuted,
-                            fontSize = 8.5.sp
+                            color = if (isVar) Color(0xFF0D1117).copy(alpha = 0.8f) else TextMuted,
+                            fontSize = 11.sp
                         )
                     )
                 }
@@ -293,8 +389,8 @@ fun PendingExpensesScreen(
             Box(
                 modifier = Modifier
                     .weight(1f)
-                    .background(if (isFixed) AccentPurple else SurfaceCard, RectangleShape)
-                    .border(2.dp, if (isFixed) AccentPurple else BorderSolid, RectangleShape)
+                    .background(if (isFixed) AccentGold else SurfaceCard, RoundedCornerShape(12.dp))
+                    .border(1.dp, if (isFixed) AccentGold else BorderSolid, RoundedCornerShape(12.dp))
                     .clickable { selectedSection = "FIJOS" }
                     .padding(vertical = 10.dp, horizontal = 8.dp),
                 contentAlignment = Alignment.Center
@@ -303,16 +399,16 @@ fun PendingExpensesScreen(
                     Text(
                         text = "🔄 FIJOS (${fixedExpenses.size})",
                         style = BrexaTypography.labelMedium.copy(
-                            color = if (isFixed) Color.White else TextPrimary,
+                            color = if (isFixed) Color(0xFF0D1117) else TextPrimary,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.5.sp
+                            fontSize = 13.sp
                         )
                     )
                     Text(
-                        text = "Recurrentes • Mes / Quincena",
+                        text = "Recurrentes • Ruedan de fecha",
                         style = BrexaTypography.labelSmall.copy(
-                            color = if (isFixed) Color.White.copy(alpha = 0.8f) else TextMuted,
-                            fontSize = 8.5.sp
+                            color = if (isFixed) Color(0xFF0D1117).copy(alpha = 0.8f) else TextMuted,
+                            fontSize = 11.sp
                         )
                     )
                 }

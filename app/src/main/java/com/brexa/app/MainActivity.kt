@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.CurrencyExchange
+import androidx.compose.material.icons.filled.PendingActions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -170,7 +171,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                val isMainTabScreen = currentScreen in listOf("HOME", "RATES", "CALCULATOR", "CONTROL")
+                val isMainTabScreen = currentScreen in listOf("HOME", "RATES", "CALCULATOR", "PAYMENTS")
 
                 Scaffold(
                     modifier = Modifier
@@ -193,12 +194,12 @@ class MainActivity : ComponentActivity() {
                                     icon = {
                                         Icon(
                                             imageVector = Icons.Default.AccountBalanceWallet,
-                                            contentDescription = "Billetera"
+                                            contentDescription = "Gastos"
                                         )
                                     },
                                     label = {
                                         Text(
-                                            text = "Billetera",
+                                            text = "Gastos",
                                             style = MaterialTheme.typography.labelSmall,
                                             fontWeight = if (currentScreen == "HOME") FontWeight.Bold else FontWeight.Normal
                                         )
@@ -263,19 +264,19 @@ class MainActivity : ComponentActivity() {
                                 )
 
                                 NavigationBarItem(
-                                    selected = currentScreen == "CONTROL",
-                                    onClick = { currentScreen = "CONTROL" },
+                                    selected = currentScreen == "PAYMENTS",
+                                    onClick = { currentScreen = "PAYMENTS" },
                                     icon = {
                                         Icon(
-                                            imageVector = Icons.Default.Assessment,
-                                            contentDescription = "Control"
+                                            imageVector = Icons.Default.PendingActions,
+                                            contentDescription = "Pagos"
                                         )
                                     },
                                     label = {
                                         Text(
-                                            text = "Control",
+                                            text = "Pagos",
                                             style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = if (currentScreen == "CONTROL") FontWeight.Bold else FontWeight.Normal
+                                            fontWeight = if (currentScreen == "PAYMENTS") FontWeight.Bold else FontWeight.Normal
                                         )
                                     },
                                     colors = NavigationBarItemDefaults.colors(
@@ -318,17 +319,14 @@ class MainActivity : ComponentActivity() {
                                     },
                                     onOpenAccountsManagement = { currentScreen = "ACCOUNTS" },
                                     onOpenAnalytics = {
-                                        controlInitialTab = 2
-                                        currentScreen = "CONTROL"
+                                        currentScreen = "ANALYTICS"
                                     },
                                     onOpenSettings = { currentScreen = "SETTINGS" },
                                     onOpenPendingExpenses = {
-                                        controlInitialTab = 0
-                                        currentScreen = "CONTROL"
+                                        currentScreen = "PAYMENTS"
                                     },
                                     onOpenTransactionHistory = {
-                                        controlInitialTab = 1
-                                        currentScreen = "CONTROL"
+                                        currentScreen = "TRANSACTION_HISTORY"
                                     },
                                     forceStartTour = shouldForceTour,
                                     onTourDismissed = { shouldForceTour = false }
@@ -353,29 +351,22 @@ class MainActivity : ComponentActivity() {
                                     }
                                 )
                             }
-                            "CONTROL" -> {
-                                ControlScreen(
+                            "PAYMENTS", "PENDING_EXPENSES", "CONTROL" -> {
+                                PendingExpensesScreen(
                                     viewModel = viewModel,
-                                    initialTab = controlInitialTab,
-                                    onNavigateToWallet = { currentScreen = "HOME" }
+                                    onBack = { currentScreen = "HOME" }
                                 )
                             }
                             "TRANSACTION_HISTORY" -> {
                                 TransactionHistoryScreen(
                                     viewModel = viewModel,
-                                    onBack = { currentScreen = "CONTROL" }
-                                )
-                            }
-                            "PENDING_EXPENSES" -> {
-                                PendingExpensesScreen(
-                                    viewModel = viewModel,
-                                    onBack = { currentScreen = "CONTROL" }
+                                    onBack = { currentScreen = "HOME" }
                                 )
                             }
                             "ANALYTICS" -> {
                                 AnalyticsScreen(
                                     viewModel = viewModel,
-                                    onBack = { currentScreen = "CONTROL" }
+                                    onBack = { currentScreen = "HOME" }
                                 )
                             }
                             "TRANSACTION_FORM" -> {
