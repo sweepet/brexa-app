@@ -337,9 +337,9 @@ fun RatesScreen(
                         onClick = { onNavigateToCalculatorWithRate(item) },
                         onCopy = {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("Tasa ${item.title}", "${item.currencySymbol} ${item.formattedRate}")
+                            val clip = ClipData.newPlainText("Tasa ${item.title}", item.formattedRate)
                             clipboard.setPrimaryClip(clip)
-                            Toast.makeText(context, "${item.title} copiada: ${item.formattedRate}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "${item.title} copiada: ${item.currencySymbol} ${item.formattedRate}", Toast.LENGTH_SHORT).show()
                         }
                     )
                 }
@@ -370,19 +370,23 @@ private fun MarketRateCard(
         color = SurfaceCard,
         shape = CardShape,
         border = BorderStroke(1.dp, BorderSolid),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
+        modifier = Modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .height(IntrinsicSize.Min),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Lado izquierdo: Título y subtítulo limpio
-            Column(modifier = Modifier.weight(1f)) {
+            // Mitad izquierda: Al presionar lleva a la Calculadora
+            Column(
+                modifier = Modifier
+                    .weight(1.1f)
+                    .fillMaxHeight()
+                    .clickable(onClick = onClick)
+                    .padding(start = 16.dp, top = 14.dp, bottom = 14.dp, end = 8.dp),
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text(
                     text = item.title,
                     style = MaterialTheme.typography.titleMedium,
@@ -397,10 +401,16 @@ private fun MarketRateCard(
                 )
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
-
-            // Lado derecho: Valor numérico y porcentaje de variación
-            Column(horizontalAlignment = Alignment.End) {
+            // Mitad derecha: Al presionar el monto o la ficha derecha copia la tasa
+            Column(
+                modifier = Modifier
+                    .weight(0.9f)
+                    .fillMaxHeight()
+                    .clickable(onClick = onCopy)
+                    .padding(start = 8.dp, top = 14.dp, bottom = 14.dp, end = 16.dp),
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text(
                     text = "${item.currencySymbol} ${item.formattedRate}",
                     style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
@@ -409,8 +419,7 @@ private fun MarketRateCard(
                 )
                 Spacer(modifier = Modifier.height(3.dp))
                 Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { onCopy() }
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     val isPositive = item.changePercent >= 0
                     val icon = if (isPositive) Icons.Default.ArrowDropUp else Icons.Default.ArrowDropDown

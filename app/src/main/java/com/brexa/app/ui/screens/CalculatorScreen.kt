@@ -6,6 +6,7 @@ import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -29,6 +30,8 @@ import com.brexa.app.presentation.BrexaViewModel
 import com.brexa.app.ui.components.BrutalistBadge
 import com.brexa.app.ui.components.CardShape
 import com.brexa.app.ui.theme.*
+import com.brexa.app.ui.util.ConversionShareHelper
+import com.brexa.app.ui.util.ShareConversionRow
 import java.text.DecimalFormat
 import java.text.DecimalFormatSymbols
 import java.util.Locale
@@ -41,6 +44,7 @@ fun CalculatorScreen(
     modifier: Modifier = Modifier
 ) {
     val rates by viewModel.marketRates.collectAsState()
+    val ratesHeaderDate by viewModel.ratesHeaderDate.collectAsState()
     val context = LocalContext.current
 
     // Lista de IDs de tasas activas para conversión (por defecto solo 1 tasa para máxima comodidad sin scroll)
@@ -213,7 +217,7 @@ fun CalculatorScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "CALCULADORA",
                     style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
@@ -228,22 +232,61 @@ fun CalculatorScreen(
                 )
             }
 
-            IconButton(
-                onClick = {
-                    // Alternar entre Base USD y la primera tasa activa
-                    val firstRate = activeRateIds.firstOrNull() ?: "BCV_USD"
-                    if (activeBoxId == "BASE") switchActiveBox(firstRate) else switchActiveBox("BASE")
-                },
-                modifier = Modifier
-                    .size(42.dp)
-                    .background(SurfaceCardElevated, CircleShape)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.SwapVert,
-                    contentDescription = "Invertir casilla activa",
-                    tint = AccentTurquoise,
-                    modifier = Modifier.size(22.dp)
-                )
+                // Botón Invertir
+                IconButton(
+                    onClick = {
+                        val firstRate = activeRateIds.firstOrNull() ?: "BCV_USD"
+                        if (activeBoxId == "BASE") switchActiveBox(firstRate) else switchActiveBox("BASE")
+                    },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(SurfaceCardElevated, CircleShape)
+                        .border(1.dp, BorderSolid, CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SwapVert,
+                        contentDescription = "Invertir casilla activa",
+                        tint = AccentTurquoise,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // Botón Compartir Ficha Limpia
+                IconButton(
+                    onClick = {
+                        val baseFormatted = "$ ${numberFormat.format(normalizedUsdAmount)} USD"
+                        val shareRows = activeRateIds.mapNotNull { rId ->
+                            val rItem = rates.find { it.id == rId } ?: return@mapNotNull null
+                            val localAmt = normalizedUsdAmount * rItem.rate
+                            ShareConversionRow(
+                                title = rItem.title,
+                                amountFormatted = "${rItem.currencySymbol} ${numberFormat.format(localAmt)}",
+                                rateFormatted = "1 USD = ${rItem.currencySymbol} ${rItem.formattedRate}"
+                            )
+                        }
+                        ConversionShareHelper.shareConversion(
+                            context = context,
+                            baseAmountFormatted = baseFormatted,
+                            conversions = shareRows,
+                            dateHeader = ratesHeaderDate
+                        )
+                    },
+                    modifier = Modifier
+                        .size(40.dp)
+                        .background(SurfaceCardElevated, CircleShape)
+                        .border(1.dp, BorderSolid, CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "Compartir conversión",
+                        tint = AccentTurquoise,
+                        modifier = Modifier.size(19.dp)
+                    )
+                }
             }
         }
 
