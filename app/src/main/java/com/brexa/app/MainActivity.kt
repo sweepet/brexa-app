@@ -184,9 +184,10 @@ class MainActivity : ComponentActivity() {
                     bottomBar = {
                         if (isMainTabScreen) {
                             NavigationBar(
-                                containerColor = SurfaceCard,
+                                containerColor = BackgroundBase,
                                 contentColor = TextSecondary,
-                                tonalElevation = 6.dp
+                                tonalElevation = 0.dp,
+                                modifier = Modifier.border(width = 0.8.dp, color = BorderSolid)
                             ) {
                                 NavigationBarItem(
                                     selected = currentScreen == "HOME",
@@ -201,13 +202,13 @@ class MainActivity : ComponentActivity() {
                                         Text(
                                             text = "Gastos",
                                             style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = if (currentScreen == "HOME") FontWeight.Bold else FontWeight.Normal
+                                            fontWeight = if (currentScreen == "HOME") FontWeight.Bold else FontWeight.Medium
                                         )
                                     },
                                     colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = AccentGold,
-                                        selectedTextColor = AccentGold,
-                                        indicatorColor = AccentGold.copy(alpha = 0.18f),
+                                        selectedIconColor = AccentTurquoiseDark,
+                                        selectedTextColor = TextPrimary,
+                                        indicatorColor = AccentTurquoise.copy(alpha = 0.16f),
                                         unselectedIconColor = TextSecondary,
                                         unselectedTextColor = TextSecondary
                                     )
@@ -226,13 +227,13 @@ class MainActivity : ComponentActivity() {
                                         Text(
                                             text = "Tasas",
                                             style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = if (currentScreen == "RATES") FontWeight.Bold else FontWeight.Normal
+                                            fontWeight = if (currentScreen == "RATES") FontWeight.Bold else FontWeight.Medium
                                         )
                                     },
                                     colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = AccentGold,
-                                        selectedTextColor = AccentGold,
-                                        indicatorColor = AccentGold.copy(alpha = 0.18f),
+                                        selectedIconColor = AccentTurquoiseDark,
+                                        selectedTextColor = TextPrimary,
+                                        indicatorColor = AccentTurquoise.copy(alpha = 0.16f),
                                         unselectedIconColor = TextSecondary,
                                         unselectedTextColor = TextSecondary
                                     )
@@ -251,13 +252,13 @@ class MainActivity : ComponentActivity() {
                                         Text(
                                             text = "Calculadora",
                                             style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = if (currentScreen == "CALCULATOR") FontWeight.Bold else FontWeight.Normal
+                                            fontWeight = if (currentScreen == "CALCULATOR") FontWeight.Bold else FontWeight.Medium
                                         )
                                     },
                                     colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = AccentGold,
-                                        selectedTextColor = AccentGold,
-                                        indicatorColor = AccentGold.copy(alpha = 0.18f),
+                                        selectedIconColor = AccentTurquoiseDark,
+                                        selectedTextColor = TextPrimary,
+                                        indicatorColor = AccentTurquoise.copy(alpha = 0.16f),
                                         unselectedIconColor = TextSecondary,
                                         unselectedTextColor = TextSecondary
                                     )
@@ -276,13 +277,13 @@ class MainActivity : ComponentActivity() {
                                         Text(
                                             text = "Pagos",
                                             style = MaterialTheme.typography.labelSmall,
-                                            fontWeight = if (currentScreen == "PAYMENTS") FontWeight.Bold else FontWeight.Normal
+                                            fontWeight = if (currentScreen == "PAYMENTS") FontWeight.Bold else FontWeight.Medium
                                         )
                                     },
                                     colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = AccentGold,
-                                        selectedTextColor = AccentGold,
-                                        indicatorColor = AccentGold.copy(alpha = 0.18f),
+                                        selectedIconColor = AccentTurquoiseDark,
+                                        selectedTextColor = TextPrimary,
+                                        indicatorColor = AccentTurquoise.copy(alpha = 0.16f),
                                         unselectedIconColor = TextSecondary,
                                         unselectedTextColor = TextSecondary
                                     )

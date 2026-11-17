@@ -250,7 +250,7 @@ private fun MarketRateCard(
                     text = "${item.currencySymbol} ${item.formattedRate}",
                     style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
                     fontWeight = FontWeight.Bold,
-                    color = AccentGold
+                    color = TextPrimary
                 )
                 Spacer(modifier = Modifier.height(3.dp))
                 Row(

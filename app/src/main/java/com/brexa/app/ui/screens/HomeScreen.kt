@@ -10,7 +10,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -239,12 +241,12 @@ fun HomeScreen(
                 .fillMaxSize()
                 .background(BackgroundBase)
         ) {
-            // --- 1. BARRA SUPERIOR TERMINAL (100% RESPONSIVE) ---
+            // --- 1. BARRA SUPERIOR ESTILO BINANCE ---
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(SurfaceCard)
-                    .border(width = 1.dp, color = BorderSolid)
+                    .background(BackgroundBase)
+                    .border(width = 0.8.dp, color = BorderSolid)
                     .padding(horizontal = 14.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
@@ -256,9 +258,9 @@ fun HomeScreen(
                     Box(
                         modifier = Modifier
                             .size(34.dp)
-                            .background(BackgroundBase, RectangleShape)
-                            .border(1.5.dp, AccentLime, RectangleShape)
-                            .padding(4.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF0E1116))
+                            .padding(2.dp)
                     ) {
                         Image(
                             painter = painterResource(id = R.drawable.logo_brexa),
@@ -266,10 +268,15 @@ fun HomeScreen(
                             modifier = Modifier.fillMaxSize()
                         )
                     }
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "BREXA // TERMINAL",
-                        style = BrexaTypography.labelLarge.copy(color = AccentLime, fontSize = 12.sp),
+                        text = "BREXA",
+                        style = BrexaTypography.titleLarge.copy(
+                            color = TextPrimary,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 18.sp,
+                            letterSpacing = 1.sp
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
@@ -282,27 +289,30 @@ fun HomeScreen(
                     // Botón Incógnito
                     BrutalistBadge(
                         text = if (isIncognito) "👁 OCULTO" else "👁 VISIBLE",
-                        backgroundColor = if (isIncognito) ExpenseRed else BackgroundBase,
-                        contentColor = if (isIncognito) Color.Black else TextPrimary,
-                        borderColor = if (isIncognito) ExpenseRed else BorderSolid,
+                        backgroundColor = if (isIncognito) ExpenseRed.copy(alpha = 0.12f) else SurfaceCard,
+                        contentColor = if (isIncognito) ExpenseRed else TextSecondary,
+                        borderColor = if (isIncognito) ExpenseRed.copy(alpha = 0.3f) else BorderSolid,
+                        shape = RoundedCornerShape(20.dp),
                         modifier = Modifier.clickable { viewModel.toggleIncognito() }
                     )
                     // Botón Detalles
                     BrutalistBadge(
                         text = "📊 DETALLES",
-                        backgroundColor = BackgroundBase,
-                        contentColor = AccentLime,
+                        backgroundColor = SurfaceCard,
+                        contentColor = TextPrimary,
                         borderColor = BorderSolid,
+                        shape = RoundedCornerShape(20.dp),
                         fontSize = 11.5.sp,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 3.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                         modifier = Modifier.clickable { onOpenAnalytics() }
                     )
                     // Botón Ajustes
                     BrutalistBadge(
                         text = "⚙",
-                        backgroundColor = BackgroundBase,
+                        backgroundColor = SurfaceCard,
                         contentColor = TextPrimary,
                         borderColor = BorderSolid,
+                        shape = CircleShape,
                         modifier = Modifier.clickable { onOpenSettings() }
                     )
                 }
@@ -330,28 +340,32 @@ fun HomeScreen(
                             }
                         },
                     backgroundColor = SurfaceCard,
-                    borderColor = AccentLime,
-                    borderWidth = 2.dp,
-                    shadowColor = AccentLime,
-                    shadowOffset = 4.dp
+                    borderColor = BorderSolid,
+                    borderWidth = 1.dp,
+                    shadowColor = Color.Transparent,
+                    shadowOffset = 0.dp,
+                    shape = RoundedCornerShape(16.dp)
                 ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
+                    Column(modifier = Modifier.padding(18.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
                                 text = "DINERO TOTAL",
                                 style = BrexaTypography.labelMedium.copy(
                                     color = TextSecondary,
-                                    letterSpacing = 1.sp
+                                    letterSpacing = 0.8.sp,
+                                    fontWeight = FontWeight.SemiBold
                                 )
                             )
                             BrutalistBadge(
                                 text = "$baseCode BASE",
                                 backgroundColor = BackgroundBase,
-                                contentColor = AccentLime,
-                                borderColor = AccentLime
+                                contentColor = TextSecondary,
+                                borderColor = BorderSolid,
+                                shape = RoundedCornerShape(20.dp)
                             )
                         }
 
@@ -369,7 +383,7 @@ fun HomeScreen(
                         Text(
                             text = balanceDisplay,
                             style = BrexaTypography.displayLarge.copy(
-                                color = AccentLime,
+                                color = TextPrimary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = if (balanceDisplay.length > 13) 24.sp else 30.sp
                             ),
@@ -717,14 +731,15 @@ fun HomeScreen(
                                 }
                             }
                         },
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    // Botón Gasto
+                    // Botón Gasto (Rojo suave Binance con texto claro)
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp)
-                            .background(ExpenseRed, RoundedCornerShape(12.dp))
+                            .background(ExpenseRed.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                            .border(1.dp, ExpenseRed.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
                             .clickable { onOpenTransactionForm("EXPENSE") }
                             .padding(horizontal = 4.dp),
                         contentAlignment = Alignment.Center
@@ -732,7 +747,7 @@ fun HomeScreen(
                         Text(
                             text = "− GASTAR",
                             style = BrexaTypography.labelLarge.copy(
-                                color = Color.White,
+                                color = ExpenseRed,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.5.sp,
                                 textAlign = TextAlign.Center
@@ -742,12 +757,12 @@ fun HomeScreen(
                         )
                     }
 
-                    // Botón Ingreso
+                    // Botón Ingreso (Color de Marca Turquesa Neón #00E5FF con texto oscuro)
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp)
-                            .background(IncomeGreen, RoundedCornerShape(12.dp))
+                            .background(AccentTurquoise, RoundedCornerShape(12.dp))
                             .clickable { onOpenTransactionForm("INCOME") }
                             .padding(horizontal = 4.dp),
                         contentAlignment = Alignment.Center
@@ -755,7 +770,7 @@ fun HomeScreen(
                         Text(
                             text = "+ INGRESAR",
                             style = BrexaTypography.labelLarge.copy(
-                                color = Color.White,
+                                color = TextOnAccent,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.5.sp,
                                 textAlign = TextAlign.Center
@@ -765,12 +780,13 @@ fun HomeScreen(
                         )
                     }
 
-                    // Botón Exchange
+                    // Botón Transferir (Superficie suave Binance)
                     Box(
                         modifier = Modifier
                             .weight(1f)
                             .height(48.dp)
-                            .background(ExchangeBlue, RoundedCornerShape(12.dp))
+                            .background(SurfaceCard, RoundedCornerShape(12.dp))
+                            .border(1.dp, BorderSolid, RoundedCornerShape(12.dp))
                             .clickable { onOpenTransactionForm("EXCHANGE") }
                             .padding(horizontal = 4.dp),
                         contentAlignment = Alignment.Center
@@ -778,7 +794,7 @@ fun HomeScreen(
                         Text(
                             text = "⇄ TRANSFERIR",
                             style = BrexaTypography.labelLarge.copy(
-                                color = Color.White,
+                                color = TextPrimary,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.5.sp,
                                 textAlign = TextAlign.Center
