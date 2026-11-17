@@ -831,7 +831,7 @@ fun SettingsScreen(
                         val notes = if (update.releaseNotes.isNotBlank() && !update.releaseNotes.trim().equals("null", ignoreCase = true)) {
                             update.releaseNotes
                         } else {
-                            "Mejora en la navegación y retorno con gestos, optimizaciones generales en ${update.versionName}."
+                            "Pedro picapiedra era un soldado romano de la época de matusalen"
                         }
                         Box(
                             modifier = Modifier

@@ -443,7 +443,7 @@ class MainActivity : ComponentActivity() {
                                     val notes = if (update.releaseNotes.isNotBlank() && !update.releaseNotes.trim().equals("null", ignoreCase = true)) {
                                         update.releaseNotes
                                     } else {
-                                        "Mejora en la navegación y retorno con gestos, optimizaciones de estabilidad y rendimiento."
+                                        "Pedro picapiedra era un soldado romano de la época de matusalen"
                                     }
                                     Box(
                                         modifier = Modifier

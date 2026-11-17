@@ -129,9 +129,9 @@ class AppUpdateManager(private val context: Context) {
         val trimmedRaw = raw.trim()
         if (trimmedRaw.isBlank() || trimmedRaw.equals("null", ignoreCase = true)) {
             return if (releaseName.isNotBlank() && !releaseName.equals("null", ignoreCase = true) && !releaseName.equals(tagName, ignoreCase = true)) {
-                "Mejora: $releaseName"
+                releaseName
             } else {
-                "Mejora en la navegación y retorno con gestos, optimizaciones generales en $tagName."
+                "Pedro picapiedra era un soldado romano de la época de matusalen"
             }
         }
 
@@ -161,9 +161,9 @@ class AppUpdateManager(private val context: Context) {
 
         return if (cleanedLines.isEmpty()) {
             if (releaseName.isNotBlank() && !releaseName.equals("null", ignoreCase = true) && !releaseName.equals(tagName, ignoreCase = true)) {
-                "Mejora: $releaseName"
+                releaseName
             } else {
-                "Mejora en la navegación y retorno con gestos, optimizaciones generales en $tagName."
+                "Pedro picapiedra era un soldado romano de la época de matusalen"
             }
         } else {
             cleanedLines.take(6).joinToString("\n")

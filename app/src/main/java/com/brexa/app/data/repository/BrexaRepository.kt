@@ -18,7 +18,7 @@ import java.util.UUID
 
 data class BackupPayload(
     val exportTimestamp: Long = System.currentTimeMillis(),
-    val appVersion: String = "1.0.35",
+    val appVersion: String = "1.2.5",
     val currencies: List<CurrencyEntity> = emptyList(),
     val accounts: List<AccountEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
@@ -220,6 +220,21 @@ class BrexaRepository(private val db: BrexaDatabase) {
             }
         }
 
+        // 3. Actualizar monedas atadas a Binance USDT, BCV Euro y Promedio BCV
+        try {
+            val cachedRates = marketRatesManager.loadCachedRates(null)
+            for (curr in allCurrencies) {
+                val binding = curr.getOfficialBinding() ?: continue
+                if (binding == "USDT" || binding == "BCV_EUR" || binding == "BCV_AVG") {
+                    val mRate = cachedRates.find { it.id == binding }
+                    if (mRate != null && mRate.rate > 0.0) {
+                        updateCurrencyRate(curr.id, mRate.rate)
+                        updatedList.add("${mRate.title} (${curr.code}): ${String.format(java.util.Locale.US, "%.2f", mRate.rate)}")
+                    }
+                }
+            }
+        } catch (_: Exception) { }
+
         return if (updatedList.isNotEmpty()) {
             Result.success(updatedList.joinToString(" • "))
         } else if (result.errorMessage != null) {
@@ -297,9 +312,10 @@ class BrexaRepository(private val db: BrexaDatabase) {
         accountDao.updateBalance(accountId, newBalance)
 
         val currency = currencyDao.getCurrencyByIdSync(account.currencyId)
-        val rate = currency?.rateToUsd ?: 1.0
+        val rawRate = currency?.rateToUsd ?: 1.0
+        val safeRate = if (rawRate > 0.0 && !rawRate.isNaN() && !rawRate.isInfinite()) rawRate else 1.0
         val diffUsd = BigDecimal(Math.abs(diff))
-            .divide(BigDecimal(rate), 2, RoundingMode.HALF_EVEN)
+            .divide(BigDecimal(safeRate), 2, RoundingMode.HALF_EVEN)
             .toDouble()
 
         val isIncrease = diff >= 0
@@ -313,7 +329,7 @@ class BrexaRepository(private val db: BrexaDatabase) {
             accountId = accountId,
             nativeAmount = Math.abs(diff),
             currencyCode = currency?.code ?: "USD",
-            exchangeRate = rate,
+            exchangeRate = safeRate,
             usdEquivalent = diffUsd,
             destinationReceivedAmount = if (isIncrease) 1.0 else -1.0,
             note = "$reason ($sign): $actionText (saldo fijado en $newBalance ${currency?.code ?: ""})".trim()
@@ -607,7 +623,8 @@ class BrexaRepository(private val db: BrexaDatabase) {
             targetReceivedAmount
         } else {
             val srcRate = sourceCurrency?.rateToUsd ?: 1.0
-            BigDecimal(sourceAmount).divide(BigDecimal(srcRate), 2, RoundingMode.HALF_EVEN).toDouble()
+            val safeSrcRate = if (srcRate > 0.0 && !srcRate.isNaN() && !srcRate.isInfinite()) srcRate else 1.0
+            BigDecimal(sourceAmount).divide(BigDecimal(safeSrcRate), 2, RoundingMode.HALF_EVEN).toDouble()
         }
 
         val tx = TransactionEntity(
@@ -686,8 +703,9 @@ class BrexaRepository(private val db: BrexaDatabase) {
             for (acc in accounts) {
                 val curr = currencyMap[acc.currencyId]
                 val rate = curr?.rateToUsd ?: 1.0
-                if (rate > 0.0) {
-                    val converted = BigDecimal(acc.currentBalance).divide(BigDecimal(rate), 2, RoundingMode.HALF_EVEN)
+                val bal = acc.currentBalance
+                if (rate > 0.0 && !rate.isNaN() && !rate.isInfinite() && !bal.isNaN() && !bal.isInfinite()) {
+                    val converted = BigDecimal(bal).divide(BigDecimal(rate), 2, RoundingMode.HALF_EVEN)
                     totalUsd = totalUsd.add(converted)
                 }
             }
@@ -1048,6 +1066,48 @@ class BrexaRepository(private val db: BrexaDatabase) {
 
                 // Si el respaldo contiene datos mínimos, limpiamos e insertamos en orden de dependencias
                 if (currencies.isNotEmpty() || accounts.isNotEmpty() || categories.isNotEmpty() || transactions.isNotEmpty() || pending.isNotEmpty()) {
+                    // Sanitización e integridad referencial previa a la inserción para evitar fallos por esquemas antiguos
+                    val cleanCurrencies = currencies.map { c ->
+                        c.copy(
+                            iconId = if (c.iconId.isNullOrBlank()) "ic_curr_custom" else c.iconId,
+                            rateToUsd = if (c.rateToUsd <= 0.0 || c.rateToUsd.isNaN() || c.rateToUsd.isInfinite()) 1.0 else c.rateToUsd
+                        )
+                    }
+                    val validCurrencyIds = cleanCurrencies.map { it.id }.toSet()
+                    val fallbackCurrencyId = cleanCurrencies.firstOrNull { it.isBase }?.id
+                        ?: cleanCurrencies.firstOrNull()?.id ?: "USD"
+
+                    val cleanAccounts = accounts.map { a ->
+                        a.copy(
+                            currencyId = if (a.currencyId in validCurrencyIds) a.currencyId else fallbackCurrencyId,
+                            colorHex = if (a.colorHex.isNullOrBlank()) "#00E5FF" else a.colorHex,
+                            iconType = if (a.iconType.isNullOrBlank()) "GENERAL" else a.iconType
+                        )
+                    }
+                    val validAccountIds = cleanAccounts.map { it.id }.toSet()
+                    val validCategoryIds = categories.map { it.id }.toSet()
+
+                    val cleanTransactions = transactions.map { t ->
+                        t.copy(
+                            destinationAccountId = if (t.destinationAccountId != null && t.destinationAccountId in validAccountIds) t.destinationAccountId else null,
+                            categoryId = if (t.categoryId != null && t.categoryId in validCategoryIds) t.categoryId else null,
+                            note = t.note ?: "",
+                            currencyCode = if (t.currencyCode.isNullOrBlank()) "USD" else t.currencyCode
+                        )
+                    }
+                    val validTransactionIds = cleanTransactions.map { it.id }.toSet()
+
+                    val cleanPending = pending.map { p ->
+                        p.copy(
+                            accountId = if (p.accountId != null && p.accountId in validAccountIds) p.accountId else null,
+                            categoryId = if (p.categoryId != null && p.categoryId in validCategoryIds) p.categoryId else null,
+                            transactionId = if (p.transactionId != null && p.transactionId in validTransactionIds) p.transactionId else null,
+                            expenseType = if (p.expenseType.isNullOrBlank()) "VARIABLE" else p.expenseType,
+                            note = p.note ?: "",
+                            currencyCode = if (p.currencyCode.isNullOrBlank()) "USD" else p.currencyCode
+                        )
+                    }
+
                     pendingExpenseDao.deleteAllPendingExpensesSync()
                     transactionDao.deleteAllTransactionsSync()
                     exchangeRateHistoryDao.deleteAllHistorySync()
@@ -1055,11 +1115,11 @@ class BrexaRepository(private val db: BrexaDatabase) {
                     categoryDao.deleteAllCategoriesSync()
                     currencyDao.deleteAllCurrenciesSync()
 
-                    if (currencies.isNotEmpty()) currencyDao.insertAll(currencies)
+                    if (cleanCurrencies.isNotEmpty()) currencyDao.insertAll(cleanCurrencies)
                     if (categories.isNotEmpty()) categoryDao.insertAll(categories)
-                    if (accounts.isNotEmpty()) accountDao.insertAll(accounts)
-                    if (transactions.isNotEmpty()) transactionDao.insertAll(transactions)
-                    if (pending.isNotEmpty()) pendingExpenseDao.insertAll(pending)
+                    if (cleanAccounts.isNotEmpty()) accountDao.insertAll(cleanAccounts)
+                    if (cleanTransactions.isNotEmpty()) transactionDao.insertAll(cleanTransactions)
+                    if (cleanPending.isNotEmpty()) pendingExpenseDao.insertAll(cleanPending)
                     if (history.isNotEmpty()) exchangeRateHistoryDao.insertAll(history)
                     if (settings.isNotEmpty()) appSettingDao.insertAll(settings)
                 }
