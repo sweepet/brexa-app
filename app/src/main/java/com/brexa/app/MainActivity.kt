@@ -206,9 +206,9 @@ class MainActivity : ComponentActivity() {
                                         )
                                     },
                                     colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = AccentTurquoiseDark,
-                                        selectedTextColor = TextPrimary,
-                                        indicatorColor = AccentTurquoise.copy(alpha = 0.16f),
+                                        selectedIconColor = AccentTurquoise,
+                                        selectedTextColor = AccentTurquoise,
+                                        indicatorColor = AccentTurquoise.copy(alpha = 0.15f),
                                         unselectedIconColor = TextSecondary,
                                         unselectedTextColor = TextSecondary
                                     )
@@ -231,9 +231,9 @@ class MainActivity : ComponentActivity() {
                                         )
                                     },
                                     colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = AccentTurquoiseDark,
-                                        selectedTextColor = TextPrimary,
-                                        indicatorColor = AccentTurquoise.copy(alpha = 0.16f),
+                                        selectedIconColor = AccentTurquoise,
+                                        selectedTextColor = AccentTurquoise,
+                                        indicatorColor = AccentTurquoise.copy(alpha = 0.15f),
                                         unselectedIconColor = TextSecondary,
                                         unselectedTextColor = TextSecondary
                                     )
@@ -256,9 +256,9 @@ class MainActivity : ComponentActivity() {
                                         )
                                     },
                                     colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = AccentTurquoiseDark,
-                                        selectedTextColor = TextPrimary,
-                                        indicatorColor = AccentTurquoise.copy(alpha = 0.16f),
+                                        selectedIconColor = AccentTurquoise,
+                                        selectedTextColor = AccentTurquoise,
+                                        indicatorColor = AccentTurquoise.copy(alpha = 0.15f),
                                         unselectedIconColor = TextSecondary,
                                         unselectedTextColor = TextSecondary
                                     )
@@ -281,9 +281,9 @@ class MainActivity : ComponentActivity() {
                                         )
                                     },
                                     colors = NavigationBarItemDefaults.colors(
-                                        selectedIconColor = AccentTurquoiseDark,
-                                        selectedTextColor = TextPrimary,
-                                        indicatorColor = AccentTurquoise.copy(alpha = 0.16f),
+                                        selectedIconColor = AccentTurquoise,
+                                        selectedTextColor = AccentTurquoise,
+                                        indicatorColor = AccentTurquoise.copy(alpha = 0.15f),
                                         unselectedIconColor = TextSecondary,
                                         unselectedTextColor = TextSecondary
                                     )
