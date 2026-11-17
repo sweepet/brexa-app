@@ -43,19 +43,21 @@ fun CalculatorScreen(
     val rates by viewModel.marketRates.collectAsState()
     val context = LocalContext.current
 
-    // Lista de IDs de tasas activas para conversión simultánea
+    // Lista de IDs de tasas activas para conversión (por defecto solo 1 tasa para máxima comodidad sin scroll)
     val activeRateIds = remember {
         mutableStateListOf<String>().apply {
             val initial = preselectedRateId ?: "BCV_USD"
             add(initial)
-            if (initial != "USDT") add("USDT") else add("BCV_AVG")
         }
     }
 
-    // Asegurar que si cambian las tasas o entra un preselectedRateId nuevo, se active
+    // Asegurar que si cambia la tasa preseleccionada desde otra pantalla, se active
     LaunchedEffect(preselectedRateId) {
-        if (preselectedRateId != null && !activeRateIds.contains(preselectedRateId)) {
-            activeRateIds.add(0, preselectedRateId)
+        if (preselectedRateId != null) {
+            if (!activeRateIds.contains(preselectedRateId)) {
+                activeRateIds.clear()
+                activeRateIds.add(preselectedRateId)
+            }
         }
     }
 
@@ -192,7 +194,7 @@ fun CalculatorScreen(
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText(label, text)
         clipboard.setPrimaryClip(clip)
-        Toast.makeText(context, "$label copiado: $text", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Monto copiado: $text", Toast.LENGTH_SHORT).show()
     }
 
     Column(
@@ -317,54 +319,17 @@ fun CalculatorScreen(
                 .clickable { switchActiveBox("BASE") }
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
-                // Fila 1: Título de la moneda base e indicador de edición
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(
-                            text = "USD",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Black,
-                            color = TextPrimary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        if (isBox0Active) {
-                            BrutalistBadge(
-                                text = "EDITANDO ✎",
-                                backgroundColor = AccentTurquoise,
-                                contentColor = Color(0xFF0E1116)
-                            )
-                        } else {
-                            Text(
-                                text = "Toca para escribir",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = TextMuted
-                            )
-                        }
-                    }
-
-                    IconButton(
-                        onClick = { copyToClipboard(box0Display, "USD") },
-                        modifier = Modifier.size(32.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.ContentCopy,
-                            contentDescription = "Copiar",
-                            tint = TextSecondary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                }
+                // Fila 1: Título limpio de la moneda base
+                Text(
+                    text = "USD",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Black,
+                    color = TextPrimary
+                )
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Fila 2: Monto numérico en renglón propio (sin colisiones con títulos)
+                // Fila 2: Monto numérico (tocar el monto copia al portapapeles)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -383,7 +348,8 @@ fun CalculatorScreen(
                         ),
                         fontWeight = FontWeight.Bold,
                         color = if (isBox0Active) AccentTurquoise else IncomeGreen,
-                        maxLines = 1
+                        maxLines = 1,
+                        modifier = Modifier.clickable { copyToClipboard(box0Display, "USD") }
                     )
                 }
 
@@ -400,7 +366,7 @@ fun CalculatorScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // --- CASILLAS MULTI-TASA SIMULTÁNEAS (BCV, USDT, COP, ETC.) ---
+        // --- CASILLAS DE TASAS (PREDETERMINADA 1 SOLA TASA, OTRAS OPCIONALES) ---
         activeRateIds.forEach { rateId ->
             val rateItem = rates.find { it.id == rateId }
             if (rateItem != null) {
@@ -421,71 +387,42 @@ fun CalculatorScreen(
                         .clickable { switchActiveBox(rateItem.id) }
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
-                        // Fila 1: Título de la tasa y botones de acción
+                        // Fila 1: Título de la tasa y botón cerrar solo si hay múltiples tasas
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text(
-                                    text = rateItem.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
-                                )
-                                if (isThisBoxActive) {
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    BrutalistBadge(
-                                        text = "EDITANDO ✎",
-                                        backgroundColor = AccentTurquoise,
-                                        contentColor = Color(0xFF0E1116)
-                                    )
-                                }
-                            }
+                            Text(
+                                text = rateItem.title,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
 
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
+                            if (activeRateIds.size > 1) {
                                 IconButton(
-                                    onClick = { copyToClipboard(displayAmount, rateItem.title) },
-                                    modifier = Modifier.size(30.dp)
+                                    onClick = {
+                                        if (activeBoxId == rateItem.id) {
+                                            activeBoxId = "BASE"
+                                        }
+                                        activeRateIds.remove(rateItem.id)
+                                    },
+                                    modifier = Modifier.size(26.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.ContentCopy,
-                                        contentDescription = "Copiar",
-                                        tint = TextSecondary,
-                                        modifier = Modifier.size(17.dp)
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Quitar casilla",
+                                        tint = TextMuted,
+                                        modifier = Modifier.size(16.dp)
                                     )
-                                }
-                                if (activeRateIds.size > 1) {
-                                    IconButton(
-                                        onClick = {
-                                            if (activeBoxId == rateItem.id) {
-                                                activeBoxId = "BASE"
-                                            }
-                                            activeRateIds.remove(rateItem.id)
-                                        },
-                                        modifier = Modifier.size(30.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Close,
-                                            contentDescription = "Quitar casilla",
-                                            tint = TextMuted,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
                                 }
                             }
                         }
 
                         Spacer(modifier = Modifier.height(6.dp))
 
-                        // Fila 2: Monto numérico en renglón propio (espacio completo, sin colisión)
+                        // Fila 2: Monto numérico (tocar el monto copia al portapapeles)
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -504,13 +441,14 @@ fun CalculatorScreen(
                                 ),
                                 fontWeight = FontWeight.Bold,
                                 color = if (isThisBoxActive) AccentTurquoise else TextPrimary,
-                                maxLines = 1
+                                maxLines = 1,
+                                modifier = Modifier.clickable { copyToClipboard(displayAmount, rateItem.title) }
                             )
                         }
 
                         Spacer(modifier = Modifier.height(4.dp))
 
-                        // Fila 3: Subtítulo limpio y sintético
+                        // Fila 3: Subtítulo limpio
                         Text(
                             text = "1 USD = ${rateItem.currencySymbol} ${rateItem.formattedRate}",
                             style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
