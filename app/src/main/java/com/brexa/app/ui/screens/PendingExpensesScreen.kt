@@ -363,26 +363,17 @@ fun PendingExpensesScreen(
                     .background(if (isVar) AccentGold else SurfaceCard, RoundedCornerShape(12.dp))
                     .border(1.dp, if (isVar) AccentGold else BorderSolid, RoundedCornerShape(12.dp))
                     .clickable { selectedSection = "VARIABLES" }
-                    .padding(vertical = 10.dp, horizontal = 8.dp),
+                    .padding(vertical = 12.dp, horizontal = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "⚡ VARIABLES (${variableExpenses.size})",
-                        style = BrexaTypography.labelMedium.copy(
-                            color = if (isVar) Color(0xFF0D1117) else TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
+                Text(
+                    text = "⚡ VARIABLES (${variableExpenses.size})",
+                    style = BrexaTypography.labelMedium.copy(
+                        color = if (isVar) Color(0xFF0D1117) else TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
                     )
-                    Text(
-                        text = "Puntuales • Se borran al pagar",
-                        style = BrexaTypography.labelSmall.copy(
-                            color = if (isVar) Color(0xFF0D1117).copy(alpha = 0.8f) else TextMuted,
-                            fontSize = 11.sp
-                        )
-                    )
-                }
+                )
             }
 
             val isFixed = selectedSection == "FIJOS"
@@ -392,26 +383,17 @@ fun PendingExpensesScreen(
                     .background(if (isFixed) AccentGold else SurfaceCard, RoundedCornerShape(12.dp))
                     .border(1.dp, if (isFixed) AccentGold else BorderSolid, RoundedCornerShape(12.dp))
                     .clickable { selectedSection = "FIJOS" }
-                    .padding(vertical = 10.dp, horizontal = 8.dp),
+                    .padding(vertical = 12.dp, horizontal = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        text = "🔄 FIJOS (${fixedExpenses.size})",
-                        style = BrexaTypography.labelMedium.copy(
-                            color = if (isFixed) Color(0xFF0D1117) else TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp
-                        )
+                Text(
+                    text = "🔄 FIJOS (${fixedExpenses.size})",
+                    style = BrexaTypography.labelMedium.copy(
+                        color = if (isFixed) Color(0xFF0D1117) else TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
                     )
-                    Text(
-                        text = "Recurrentes • Ruedan de fecha",
-                        style = BrexaTypography.labelSmall.copy(
-                            color = if (isFixed) Color(0xFF0D1117).copy(alpha = 0.8f) else TextMuted,
-                            fontSize = 11.sp
-                        )
-                    )
-                }
+                )
             }
         }
 
@@ -433,18 +415,21 @@ fun PendingExpensesScreen(
                     shadowColor = if (selectedSection == "VARIABLES") (if (projections.overdueCount > 0) ExpenseRed else AccentLime) else AccentPurple,
                     shadowOffset = 4.dp
                 ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = if (selectedSection == "VARIABLES") "TOTAL VARIABLES POR PAGAR" else "TOTAL FIJOS ESTIMADO / MES",
+                                text = if (selectedSection == "VARIABLES") "TOTAL POR PAGAR" else "ESTIMADO MENSUAL",
                                 style = BrexaTypography.labelMedium.copy(
                                     color = TextSecondary,
-                                    letterSpacing = 1.sp
-                                )
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    letterSpacing = 0.5.sp
+                                ),
+                                modifier = Modifier.weight(1f, fill = false)
                             )
 
                             if (selectedSection == "VARIABLES") {
@@ -453,14 +438,24 @@ fun PendingExpensesScreen(
                                         text = "🔴 ${projections.overdueCount} VENCIDO${if (projections.overdueCount > 1) "S" else ""}",
                                         backgroundColor = ExpenseRed,
                                         contentColor = Color.White,
-                                        borderColor = ExpenseRed
+                                        borderColor = ExpenseRed,
+                                        fontSize = 9.sp
+                                    )
+                                } else if (variableExpenses.isEmpty()) {
+                                    BrutalistBadge(
+                                        text = "AL DÍA ✓",
+                                        backgroundColor = BackgroundBase,
+                                        contentColor = IncomeGreen,
+                                        borderColor = IncomeGreen,
+                                        fontSize = 9.sp
                                     )
                                 } else {
                                     BrutalistBadge(
                                         text = "${variableExpenses.size} PENDIENTE${if (variableExpenses.size != 1) "S" else ""}",
                                         backgroundColor = BackgroundBase,
                                         contentColor = AccentLime,
-                                        borderColor = AccentLime
+                                        borderColor = AccentLime,
+                                        fontSize = 9.sp
                                     )
                                 }
                             } else {
@@ -468,7 +463,8 @@ fun PendingExpensesScreen(
                                     text = "${fixedExpenses.size} PROGRAMADO${if (fixedExpenses.size != 1) "S" else ""}",
                                     backgroundColor = BackgroundBase,
                                     contentColor = AccentPurple,
-                                    borderColor = AccentPurple
+                                    borderColor = AccentPurple,
+                                    fontSize = 9.sp
                                 )
                             }
                         }
@@ -521,14 +517,14 @@ fun PendingExpensesScreen(
                                     )
                                 )
                             }
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(3.dp))
                             Text(
-                                text = "Dinero en cuentas totalmente libre para gastar ($baseSymbol${formatter.format(totalUsd)})",
-                                style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 10.5.sp)
+                                text = "Disponible libre de compromisos pendientes",
+                                style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 11.sp)
                             )
                         } else {
                             Text(
-                                text = "💡 Compromisos periódicos recurrentes (internet, alquiler, servicios, suscripciones). Al registrar su pago, el gasto se anota en el historial y su fecha avanza automáticamente.",
+                                text = "💡 Compromisos periódicos recurrentes (internet, alquiler, suscripciones). Al registrar su pago, su fecha avanza automáticamente.",
                                 style = BrexaTypography.bodySmall.copy(color = TextMuted, fontSize = 10.5.sp, lineHeight = 14.sp)
                             )
                         }
@@ -545,7 +541,7 @@ fun PendingExpensesScreen(
                     if (selectedSection == "VARIABLES") {
                         val varTabs = listOf(
                             Pair("TODOS", "TODOS (${variableExpenses.size})"),
-                            Pair("7_DIAS", "PRÓX. 7 DÍAS"),
+                            Pair("7_DIAS", "7 DÍAS"),
                             Pair("15_DIAS", "QUINCENA"),
                             Pair("ESTE_MES", "ESTE MES")
                         )
@@ -616,15 +612,19 @@ fun PendingExpensesScreen(
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Text(
-                                text = if (selectedSection == "VARIABLES") "¡SIN GASTOS VARIABLES PENDIENTES!" else "¡SIN GASTOS FIJOS REGISTRADOS!",
-                                style = BrexaTypography.titleLarge.copy(color = if (selectedSection == "VARIABLES") AccentLime else AccentPurple, fontSize = 16.sp),
+                                text = if (selectedSection == "VARIABLES") "Sin compromisos pendientes" else "Sin gastos fijos registrados",
+                                style = BrexaTypography.titleLarge.copy(
+                                    color = if (selectedSection == "VARIABLES") AccentLime else AccentPurple,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold
+                                ),
                                 textAlign = TextAlign.Center
                             )
                             Text(
                                 text = if (selectedSection == "VARIABLES")
-                                    "No tienes compromisos puntuales anotados. Usa el botón de abajo para anotar uno y se descontará cuando lo pagues."
+                                    "No tienes compromisos puntuales anotados. Usa el botón de abajo para registrar uno."
                                 else
-                                    "Guarda tus pagos fijos como internet, alquiler, condominio o suscripciones con su fecha de cobro recurrente.",
+                                    "Guarda tus pagos fijos como internet, alquiler o suscripciones con su cobro recurrente.",
                                 style = BrexaTypography.bodyMedium.copy(color = TextSecondary, fontSize = 12.sp, lineHeight = 16.sp),
                                 textAlign = TextAlign.Center
                             )
@@ -669,8 +669,8 @@ fun PendingExpensesScreen(
                                 if (isFixedItem) {
                                     val freqLabel = when (item.recurrencePeriod) {
                                         "WEEKLY" -> "SEMANAL"
-                                        "BIWEEKLY" -> "CADA 15 DÍAS"
-                                        else -> "TODOS LOS ${item.recurrenceDay ?: 1} DE CADA MES"
+                                        "BIWEEKLY" -> "QUINCENAL"
+                                        else -> "MENSUAL (DÍA ${item.recurrenceDay ?: 1})"
                                     }
                                     BrutalistBadge(
                                         text = freqLabel,

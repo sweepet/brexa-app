@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,9 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brexa.app.R
-import com.brexa.app.data.local.entity.AccountEntity
-import com.brexa.app.data.local.entity.CategoryEntity
-import com.brexa.app.data.local.entity.CurrencyEntity
+import com.brexa.app.data.local.entity.*
 import com.brexa.app.presentation.BrexaViewModel
 import com.brexa.app.ui.components.BrutalistBadge
 import com.brexa.app.ui.components.BrutalistButton
@@ -73,6 +72,7 @@ fun AccountsCurrenciesScreen(
     val baseCurrency by viewModel.baseCurrency.collectAsState()
     val expenseCategories by viewModel.expenseCategories.collectAsState()
     val incomeCategories by viewModel.incomeCategories.collectAsState()
+    val marketRates by viewModel.marketRates.collectAsState()
     val isSyncingRates by viewModel.isSyncingOfficialRates.collectAsState()
 
     var activeTab by remember { mutableStateOf("ACCOUNTS") } // "ACCOUNTS", "CURRENCIES", "CATEGORIES"
@@ -313,10 +313,10 @@ fun AccountsCurrenciesScreen(
                 BrutalistButton(
                     text = "+ CREAR NUEVA MONEDA",
                     onClick = { showCreateCurrencyDialog = true },
-                    containerColor = AccentPurple,
-                    contentColor = Color.Black,
+                    containerColor = AccentTurquoise,
+                    contentColor = Color(0xFF0E1116),
                     enabled = currencies.size < 11,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().height(46.dp)
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
@@ -325,14 +325,14 @@ fun AccountsCurrenciesScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(currencies) { curr ->
+                    items(currencies, key = { it.id }) { curr ->
                         BrutalistCard(
                             modifier = Modifier.fillMaxWidth(),
                             backgroundColor = SurfaceCard,
-                            borderColor = if (curr.isBase) AccentLime else BorderSolid
+                            borderColor = if (curr.isBase) AccentTurquoise else BorderSolid
                         ) {
                             Column(modifier = Modifier.padding(14.dp)) {
-                                // Fila 1: Moneda (Sigla + Nombre) a la izquierda, Botones a la derecha
+                                // Fila 1: Moneda (Sigla + Nombre) con ancho garantizado sin truncar
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -340,18 +340,21 @@ fun AccountsCurrenciesScreen(
                                 ) {
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.weight(1f, fill = false)
+                                        modifier = Modifier.weight(1f)
                                     ) {
                                         BrutalistBadge(
                                             text = curr.code,
                                             backgroundColor = BackgroundBase,
-                                            contentColor = if (curr.isBase) AccentLime else AccentPurple,
-                                            borderColor = if (curr.isBase) AccentLime else AccentPurple
+                                            contentColor = if (curr.isBase) AccentTurquoise else TextPrimary,
+                                            borderColor = if (curr.isBase) AccentTurquoise else BorderSolid
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
                                             text = curr.name.uppercase(),
-                                            style = BrexaTypography.labelLarge.copy(color = TextPrimary),
+                                            style = BrexaTypography.labelLarge.copy(
+                                                color = TextPrimary,
+                                                fontWeight = FontWeight.Bold
+                                            ),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -364,32 +367,18 @@ fun AccountsCurrenciesScreen(
                                             BrutalistBadge(
                                                 text = "EDITAR ✎",
                                                 backgroundColor = BackgroundBase,
-                                                contentColor = AccentLime,
-                                                borderColor = AccentLime,
+                                                contentColor = AccentTurquoise,
+                                                borderColor = AccentTurquoise,
                                                 modifier = Modifier.clickable { showEditBaseCurrencyDialog = true }
                                             )
                                         } else {
-                                            val isOfficial = curr.code.equals("Bs", ignoreCase = true) ||
-                                                    curr.code.equals("VES", ignoreCase = true) ||
-                                                    curr.code.equals("COP", ignoreCase = true)
-
                                             BrutalistBadge(
                                                 text = "EDITAR ✎",
                                                 backgroundColor = BackgroundBase,
-                                                contentColor = AccentLime,
-                                                borderColor = AccentLime,
+                                                contentColor = AccentTurquoise,
+                                                borderColor = AccentTurquoise,
                                                 modifier = Modifier.clickable { editingCurrency = curr }
                                             )
-
-                                            if (!isOfficial) {
-                                                BrutalistBadge(
-                                                    text = "TASA ✎",
-                                                    backgroundColor = BackgroundBase,
-                                                    contentColor = AccentPurple,
-                                                    borderColor = AccentPurple,
-                                                    modifier = Modifier.clickable { editingRateCurrency = curr }
-                                                )
-                                            }
 
                                             BrutalistBadge(
                                                 text = "BORRAR ✕",
@@ -404,7 +393,7 @@ fun AccountsCurrenciesScreen(
 
                                 Spacer(modifier = Modifier.height(10.dp))
 
-                                // Fila 2: Tasa simplificada que nunca se corta + Insignia Oficial
+                                // Fila 2: Tasa y Badge Oficial
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -420,31 +409,23 @@ fun AccountsCurrenciesScreen(
                                     Text(
                                         text = rateString,
                                         style = BrexaTypography.labelMedium.copy(
-                                            color = if (curr.isBase) AccentLime else TextSecondary,
+                                            color = if (curr.isBase) AccentTurquoise else TextSecondary,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 11.5.sp
+                                            fontSize = 12.sp
                                         ),
                                         modifier = Modifier.weight(1f, fill = false),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
 
-                                    if (curr.code.equals("Bs", ignoreCase = true) || curr.code.equals("VES", ignoreCase = true)) {
+                                    val officialBadge = curr.getOfficialBadgeTitle()
+                                    if (officialBadge != null) {
                                         Spacer(modifier = Modifier.width(6.dp))
                                         BrutalistBadge(
-                                            text = "OFICIAL BCV 🏛",
+                                            text = officialBadge,
                                             backgroundColor = BackgroundBase,
-                                            contentColor = AccentLime,
-                                            borderColor = AccentLime,
-                                            fontSize = 8.5.sp
-                                        )
-                                    } else if (curr.code.equals("COP", ignoreCase = true)) {
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        BrutalistBadge(
-                                            text = "OFICIAL TRM 🏛",
-                                            backgroundColor = BackgroundBase,
-                                            contentColor = ExchangeBlue,
-                                            borderColor = ExchangeBlue,
+                                            contentColor = AccentTurquoise,
+                                            borderColor = AccentTurquoise,
                                             fontSize = 8.5.sp
                                         )
                                     }
@@ -870,6 +851,7 @@ fun AccountsCurrenciesScreen(
         var codeText by remember { mutableStateOf("") }
         var nameText by remember { mutableStateOf("") }
         var rateText by remember { mutableStateOf("") }
+        var selectedBinding by remember { mutableStateOf(OfficialRateBindings.MANUAL) }
         var dialogError by remember { mutableStateOf<String?>(null) }
 
         AlertDialog(
@@ -877,10 +859,83 @@ fun AccountsCurrenciesScreen(
             shape = RectangleShape,
             containerColor = SurfaceCard,
             title = {
-                Text(text = "NUEVA MONEDA", style = BrexaTypography.titleLarge.copy(color = AccentPurple))
+                Text(text = "NUEVA MONEDA", style = BrexaTypography.titleLarge.copy(color = AccentTurquoise))
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "VINCULAR A TASA OFICIAL (SE ACTUALIZA SOLA):",
+                        style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        OfficialRateBindings.AVAILABLE_BINDINGS.forEach { (bindingKey, bindingLabel) ->
+                            val isSel = selectedBinding == bindingKey
+                            Surface(
+                                color = if (isSel) AccentTurquoise.copy(alpha = 0.2f) else BackgroundBase,
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (isSel) AccentTurquoise else BorderSolid),
+                                modifier = Modifier.clickable {
+                                    selectedBinding = bindingKey
+                                    when (bindingKey) {
+                                        OfficialRateBindings.BCV_USD -> {
+                                            if (codeText.isBlank()) codeText = "Bs"
+                                            if (nameText.isBlank()) nameText = "Bolívar (BCV)"
+                                            val r = marketRates.find { it.id == "BCV_USD" }?.rate ?: 915.75
+                                            rateText = CurrencyFormat.formatForInput(r)
+                                        }
+                                        OfficialRateBindings.USDT -> {
+                                            if (codeText.isBlank()) codeText = "USDT"
+                                            if (nameText.isBlank()) nameText = "Tether USDT"
+                                            val r = marketRates.find { it.id == "USDT" }?.rate ?: 1075.10
+                                            rateText = CurrencyFormat.formatForInput(r)
+                                        }
+                                        OfficialRateBindings.BCV_EUR -> {
+                                            if (codeText.isBlank()) codeText = "EUR"
+                                            if (nameText.isBlank()) nameText = "Euro Oficial"
+                                            val r = marketRates.find { it.id == "BCV_EUR" }?.rate ?: 1008.31
+                                            rateText = CurrencyFormat.formatForInput(r)
+                                        }
+                                        OfficialRateBindings.BCV_AVG -> {
+                                            if (codeText.isBlank()) codeText = "Bs"
+                                            if (nameText.isBlank()) nameText = "Bolívar Promedio"
+                                            val r = marketRates.find { it.id == "BCV_AVG" }?.rate ?: 995.43
+                                            rateText = CurrencyFormat.formatForInput(r)
+                                        }
+                                        OfficialRateBindings.COP_TRM -> {
+                                            if (codeText.isBlank()) codeText = "COP"
+                                            if (nameText.isBlank()) nameText = "Peso Colombiano"
+                                            val r = marketRates.find { it.id == "COP_TRM" }?.rate ?: 3316.70
+                                            rateText = CurrencyFormat.formatForInput(r)
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    text = bindingLabel,
+                                    style = BrexaTypography.labelSmall.copy(
+                                        color = if (isSel) AccentTurquoise else TextPrimary,
+                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                        fontSize = 11.sp
+                                    ),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (selectedBinding != OfficialRateBindings.MANUAL) {
+                        Text(
+                            text = "✓ Esta moneda se actualizará automáticamente con la cotización de mercado.",
+                            style = BrexaTypography.labelSmall.copy(color = IncomeGreen, fontSize = 11.sp)
+                        )
+                    }
+
                     BrutalistTextField(
                         value = codeText,
                         onValueChange = { if (it.length <= 4) codeText = it.uppercase() },
@@ -911,9 +966,9 @@ fun AccountsCurrenciesScreen(
             confirmButton = {
                 BrutalistBadge(
                     text = "GUARDAR MONEDA",
-                    backgroundColor = AccentPurple,
-                    contentColor = Color.Black,
-                    borderColor = AccentPurple,
+                    backgroundColor = AccentTurquoise,
+                    contentColor = Color(0xFF0E1116),
+                    borderColor = AccentTurquoise,
                     modifier = Modifier.clickable {
                         val rate = CurrencyFormat.parseNumber(rateText) ?: 1.0
                         viewModel.addCustomCurrency(
@@ -921,7 +976,7 @@ fun AccountsCurrenciesScreen(
                             name = nameText,
                             symbol = codeText,
                             rateToUsd = rate,
-                            iconId = "ic_account_bank",
+                            iconId = selectedBinding,
                             onSuccess = { showCreateCurrencyDialog = false },
                             onError = { dialogError = it }
                         )
@@ -997,14 +1052,21 @@ fun AccountsCurrenciesScreen(
     // Modal: Editar Moneda Secundaria / Personalizada
     if (editingCurrency != null) {
         val curr = editingCurrency!!
-        val isOfficial = curr.code.equals("Bs", ignoreCase = true) ||
-                curr.code.equals("VES", ignoreCase = true) ||
-                curr.code.equals("COP", ignoreCase = true)
 
         var codeText by remember { mutableStateOf(curr.code) }
         var nameText by remember { mutableStateOf(curr.name) }
         var symbolText by remember { mutableStateOf(curr.symbol) }
         var rateText by remember { mutableStateOf(CurrencyFormat.formatForInput(curr.rateToUsd)) }
+        var selectedBinding by remember {
+            mutableStateOf(
+                when {
+                    curr.iconId.startsWith("OFFICIAL_") -> curr.iconId
+                    curr.code.equals("Bs", true) || curr.code.equals("VES", true) -> OfficialRateBindings.BCV_USD
+                    curr.code.equals("COP", true) -> OfficialRateBindings.COP_TRM
+                    else -> OfficialRateBindings.MANUAL
+                }
+            )
+        }
         var dialogError by remember { mutableStateOf<String?>(null) }
 
         AlertDialog(
@@ -1014,11 +1076,74 @@ fun AccountsCurrenciesScreen(
             title = {
                 Text(
                     text = "EDITAR MONEDA // ${curr.code}",
-                    style = BrexaTypography.titleLarge.copy(color = AccentPurple)
+                    style = BrexaTypography.titleLarge.copy(color = AccentTurquoise)
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        text = "VINCULAR A TASA OFICIAL (SE ACTUALIZA SOLA):",
+                        style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    )
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        OfficialRateBindings.AVAILABLE_BINDINGS.forEach { (bindingKey, bindingLabel) ->
+                            val isSel = selectedBinding == bindingKey
+                            Surface(
+                                color = if (isSel) AccentTurquoise.copy(alpha = 0.2f) else BackgroundBase,
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (isSel) AccentTurquoise else BorderSolid),
+                                modifier = Modifier.clickable {
+                                    selectedBinding = bindingKey
+                                    when (bindingKey) {
+                                        OfficialRateBindings.BCV_USD -> {
+                                            val r = marketRates.find { it.id == "BCV_USD" }?.rate ?: 915.75
+                                            rateText = CurrencyFormat.formatForInput(r)
+                                        }
+                                        OfficialRateBindings.USDT -> {
+                                            val r = marketRates.find { it.id == "USDT" }?.rate ?: 1075.10
+                                            rateText = CurrencyFormat.formatForInput(r)
+                                        }
+                                        OfficialRateBindings.BCV_EUR -> {
+                                            val r = marketRates.find { it.id == "BCV_EUR" }?.rate ?: 1008.31
+                                            rateText = CurrencyFormat.formatForInput(r)
+                                        }
+                                        OfficialRateBindings.BCV_AVG -> {
+                                            val r = marketRates.find { it.id == "BCV_AVG" }?.rate ?: 995.43
+                                            rateText = CurrencyFormat.formatForInput(r)
+                                        }
+                                        OfficialRateBindings.COP_TRM -> {
+                                            val r = marketRates.find { it.id == "COP_TRM" }?.rate ?: 3316.70
+                                            rateText = CurrencyFormat.formatForInput(r)
+                                        }
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    text = bindingLabel,
+                                    style = BrexaTypography.labelSmall.copy(
+                                        color = if (isSel) AccentTurquoise else TextPrimary,
+                                        fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                        fontSize = 11.sp
+                                    ),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (selectedBinding != OfficialRateBindings.MANUAL) {
+                        Text(
+                            text = "✓ Esta moneda se actualizará automáticamente con la cotización de mercado.",
+                            style = BrexaTypography.labelSmall.copy(color = IncomeGreen, fontSize = 11.sp)
+                        )
+                    }
+
                     BrutalistTextField(
                         value = nameText,
                         onValueChange = { nameText = it },
@@ -1026,29 +1151,21 @@ fun AccountsCurrenciesScreen(
                         placeholder = "ej. Binance, Tether USD, Euro"
                     )
 
-                    if (!isOfficial) {
-                        BrutalistTextField(
-                            value = codeText,
-                            onValueChange = { if (it.length <= 4) codeText = it.uppercase() },
-                            label = "SIGLA (HASTA 4 LETRAS)",
-                            placeholder = "ej. USDT, EUR"
-                        )
+                    BrutalistTextField(
+                        value = codeText,
+                        onValueChange = { if (it.length <= 4) codeText = it.uppercase() },
+                        label = "SIGLA (HASTA 4 LETRAS)",
+                        placeholder = "ej. USDT, EUR"
+                    )
 
-                        val baseCode = baseCurrency?.code ?: "USD"
-                        BrutalistTextField(
-                            value = rateText,
-                            onValueChange = { rateText = it },
-                            label = "TASA DE CAMBIO: 1 $baseCode = [ X ] $codeText",
-                            placeholder = "ej. 1.00",
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
-                        )
-                    } else {
-                        val officialSource = if (curr.code.equals("COP", ignoreCase = true)) "TRM Colombia" else "BCV Venezuela"
-                        Text(
-                            text = "ℹ La tasa de cambio de esta moneda está vinculada a la cotización oficial de $officialSource y se actualiza de forma automática.",
-                            style = BrexaTypography.labelSmall.copy(color = AccentLime, fontSize = 10.5.sp)
-                        )
-                    }
+                    val baseCode = baseCurrency?.code ?: "USD"
+                    BrutalistTextField(
+                        value = rateText,
+                        onValueChange = { rateText = it },
+                        label = "TASA DE CAMBIO: 1 $baseCode = [ X ] $codeText",
+                        placeholder = "ej. 1.00",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    )
 
                     if (dialogError != null) {
                         Text(text = "⚠️ $dialogError", style = BrexaTypography.labelMedium.copy(color = ExpenseRed))
@@ -1058,50 +1175,40 @@ fun AccountsCurrenciesScreen(
             confirmButton = {
                 BrutalistBadge(
                     text = "GUARDAR CAMBIOS",
-                    backgroundColor = AccentPurple,
-                    contentColor = Color.White,
-                    borderColor = AccentPurple,
+                    backgroundColor = AccentTurquoise,
+                    contentColor = Color(0xFF0E1116),
+                    borderColor = AccentTurquoise,
                     modifier = Modifier.clickable {
                         val cleanName = nameText.trim()
                         if (cleanName.isEmpty()) {
                             dialogError = "El nombre de la moneda no puede estar vacío."
                             return@clickable
                         }
-                        if (!isOfficial) {
-                            val newRate = CurrencyFormat.parseNumber(rateText) ?: curr.rateToUsd
-                            if (newRate <= 0.0) {
-                                dialogError = "Ingresa una tasa válida mayor a 0."
-                                return@clickable
-                            }
-                            viewModel.updateCurrency(
-                                currencyId = curr.id,
-                                name = cleanName,
-                                code = codeText,
-                                symbol = symbolText,
-                                onSuccess = {
-                                    if (newRate != curr.rateToUsd) {
-                                        viewModel.updateCurrencyRate(
-                                            currencyId = curr.id,
-                                            newRate = newRate,
-                                            onSuccess = { editingCurrency = null },
-                                            onError = { dialogError = it }
-                                        )
-                                    } else {
-                                        editingCurrency = null
-                                    }
-                                },
-                                onError = { dialogError = it }
-                            )
-                        } else {
-                            viewModel.updateCurrency(
-                                currencyId = curr.id,
-                                name = cleanName,
-                                code = curr.code,
-                                symbol = curr.symbol,
-                                onSuccess = { editingCurrency = null },
-                                onError = { dialogError = it }
-                            )
+                        val newRate = CurrencyFormat.parseNumber(rateText) ?: curr.rateToUsd
+                        if (newRate <= 0.0) {
+                            dialogError = "Ingresa una tasa válida mayor a 0."
+                            return@clickable
                         }
+                        viewModel.updateCurrency(
+                            currencyId = curr.id,
+                            name = cleanName,
+                            code = codeText,
+                            symbol = symbolText,
+                            iconId = selectedBinding,
+                            onSuccess = {
+                                if (newRate != curr.rateToUsd) {
+                                    viewModel.updateCurrencyRate(
+                                        currencyId = curr.id,
+                                        newRate = newRate,
+                                        onSuccess = { editingCurrency = null },
+                                        onError = { dialogError = it }
+                                    )
+                                } else {
+                                    editingCurrency = null
+                                }
+                            },
+                            onError = { dialogError = it }
+                        )
                     }
                 )
             },

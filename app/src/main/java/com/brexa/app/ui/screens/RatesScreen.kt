@@ -240,7 +240,7 @@ fun RatesScreen(
                 }
             }
         } else {
-            // Banner Normal con fecha actual y selector de fecha
+            // Banner Normal simplificado y con aire (estilo limpio)
             Surface(
                 color = SurfaceCardElevated.copy(alpha = 0.7f),
                 shape = RoundedCornerShape(12.dp),
@@ -252,7 +252,7 @@ fun RatesScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -267,20 +267,13 @@ fun RatesScreen(
                             modifier = Modifier.size(16.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Column {
-                            Text(
-                                text = headerDate.uppercase(Locale.getDefault()),
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = TextPrimary,
-                                letterSpacing = 0.5.sp
-                            )
-                            Text(
-                                text = "${viewModel.getRatesLastSyncTimeAgo()} • BCV lun-vie ~5:00 PM",
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                                color = TextSecondary
-                            )
-                        }
+                        Text(
+                            text = headerDate.uppercase(Locale.getDefault()),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            letterSpacing = 0.5.sp
+                        )
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -350,45 +343,6 @@ fun RatesScreen(
                         }
                     )
                 }
-
-                item {
-                    // Tarjeta informativa con tips de actualización
-                    Surface(
-                        color = SurfaceCard.copy(alpha = 0.6f),
-                        shape = CardShape,
-                        border = BorderStroke(1.dp, BorderSolid),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(14.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = null,
-                                    tint = AccentTurquoise,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Dinámica de Actualización",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            Text(
-                                text = "• BCV (Oficial): Se publica de lunes a viernes entre 4:30 PM y 5:30 PM (válida para el día hábil siguiente).\n• Binance P2P: Se actualiza de forma horaria y continua según el mercado.\n• TRM Colombia: Regulada por Banco de la República en días hábiles.",
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
-                                color = TextSecondary,
-                                lineHeight = 16.sp
-                            )
-                        }
-                    }
-                }
             }
         }
     }
@@ -400,6 +354,18 @@ private fun MarketRateCard(
     onClick: () -> Unit,
     onCopy: () -> Unit
 ) {
+    // Contador sutil a la próxima hora para la tasa de Binance P2P (USDT)
+    val subtitleText = remember(item.id, item.subtitle) {
+        if (item.id == "USDT") {
+            val cal = Calendar.getInstance()
+            val minLeft = 59 - cal.get(Calendar.MINUTE)
+            val secLeft = 59 - cal.get(Calendar.SECOND)
+            "Binance P2P • Próxima tasa en ${String.format(Locale.US, "%02d:%02d", minLeft, secLeft)}"
+        } else {
+            item.subtitle
+        }
+    }
+
     Surface(
         color = SurfaceCard,
         shape = CardShape,
@@ -425,7 +391,7 @@ private fun MarketRateCard(
                 )
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = item.subtitle,
+                    text = subtitleText,
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )

@@ -316,13 +316,17 @@ fun CalculatorScreen(
                 .fillMaxWidth()
                 .clickable { switchActiveBox("BASE") }
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                // Fila 1: Título de la moneda base e indicador de edición
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
                         Text(
                             text = "USD",
                             style = MaterialTheme.typography.titleLarge,
@@ -338,36 +342,54 @@ fun CalculatorScreen(
                             )
                         } else {
                             Text(
-                                text = "Toca para editar",
+                                text = "Toca para escribir",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = TextMuted
                             )
                         }
                     }
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "$ $box0Display",
-                            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp),
-                            fontWeight = FontWeight.Bold,
-                            color = if (isBox0Active) AccentTurquoise else IncomeGreen
+                    IconButton(
+                        onClick = { copyToClipboard(box0Display, "USD") },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = "Copiar",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(18.dp)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        IconButton(
-                            onClick = { copyToClipboard(box0Display, "USD") },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "Copiar",
-                                tint = TextSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
                     }
                 }
 
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Fila 2: Monto numérico en renglón propio (sin colisiones con títulos)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "$",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = TextSecondary
+                    )
+                    Text(
+                        text = box0Display,
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontSize = if (box0Display.length > 10) 20.sp else 24.sp
+                        ),
+                        fontWeight = FontWeight.Bold,
+                        color = if (isBox0Active) AccentTurquoise else IncomeGreen,
+                        maxLines = 1
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(4.dp))
+
+                // Fila 3: Subtítulo limpio
                 Text(
                     text = "Dólar estadounidense (moneda base)",
                     style = MaterialTheme.typography.bodySmall,
@@ -398,7 +420,8 @@ fun CalculatorScreen(
                         .padding(bottom = 10.dp)
                         .clickable { switchActiveBox(rateItem.id) }
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        // Fila 1: Título de la tasa y botones de acción
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -406,7 +429,7 @@ fun CalculatorScreen(
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f, fill = false)
+                                modifier = Modifier.weight(1f)
                             ) {
                                 Text(
                                     text = rateItem.title,
@@ -414,8 +437,8 @@ fun CalculatorScreen(
                                     fontWeight = FontWeight.Bold,
                                     color = TextPrimary
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
                                 if (isThisBoxActive) {
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     BrutalistBadge(
                                         text = "EDITANDO ✎",
                                         backgroundColor = AccentTurquoise,
@@ -424,17 +447,13 @@ fun CalculatorScreen(
                                 }
                             }
 
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "${rateItem.currencySymbol} $displayAmount",
-                                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp),
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isThisBoxActive) AccentTurquoise else TextPrimary
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
                                 IconButton(
                                     onClick = { copyToClipboard(displayAmount, rateItem.title) },
-                                    modifier = Modifier.size(28.dp)
+                                    modifier = Modifier.size(30.dp)
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.ContentCopy,
@@ -451,7 +470,7 @@ fun CalculatorScreen(
                                             }
                                             activeRateIds.remove(rateItem.id)
                                         },
-                                        modifier = Modifier.size(28.dp)
+                                        modifier = Modifier.size(30.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Close,
@@ -464,10 +483,37 @@ fun CalculatorScreen(
                             }
                         }
 
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Fila 2: Monto numérico en renglón propio (espacio completo, sin colisión)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = rateItem.currencySymbol,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = TextSecondary
+                            )
+                            Text(
+                                text = displayAmount,
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontSize = if (displayAmount.length > 10) 20.sp else 24.sp
+                                ),
+                                fontWeight = FontWeight.Bold,
+                                color = if (isThisBoxActive) AccentTurquoise else TextPrimary,
+                                maxLines = 1
+                            )
+                        }
+
                         Spacer(modifier = Modifier.height(4.dp))
+
+                        // Fila 3: Subtítulo limpio y sintético
                         Text(
-                            text = "Tasa: 1 USD = ${rateItem.currencySymbol} ${rateItem.formattedRate} (${rateItem.subtitle})",
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                            text = "1 USD = ${rateItem.currencySymbol} ${rateItem.formattedRate}",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                             color = TextSecondary
                         )
                     }

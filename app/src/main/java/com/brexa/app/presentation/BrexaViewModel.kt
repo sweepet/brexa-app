@@ -836,11 +836,12 @@ class BrexaViewModel(
         name: String,
         code: String? = null,
         symbol: String? = null,
+        iconId: String? = null,
         onSuccess: () -> Unit = {},
         onError: (String) -> Unit = {}
     ) {
         viewModelScope.launch {
-            val result = repository.updateCurrency(currencyId, name, code, symbol)
+            val result = repository.updateCurrency(currencyId, name, code, symbol, iconId)
             result.onSuccess {
                 triggerAutoBackup()
                 onSuccess()

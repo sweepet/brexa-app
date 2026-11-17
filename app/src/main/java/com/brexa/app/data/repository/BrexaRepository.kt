@@ -74,7 +74,8 @@ class BrexaRepository(private val db: BrexaDatabase) {
         currencyId: String,
         name: String,
         code: String? = null,
-        symbol: String? = null
+        symbol: String? = null,
+        iconId: String? = null
     ): Result<Unit> {
         val currency = currencyDao.getCurrencyByIdSync(currencyId)
             ?: return Result.failure(IllegalArgumentException("Moneda no encontrada."))
@@ -89,11 +90,14 @@ class BrexaRepository(private val db: BrexaDatabase) {
 
         val cleanSymbol = symbol?.trim()?.ifEmpty { cleanCode } ?: currency.symbol
 
-        currencyDao.updateBaseCurrencyDetails(
-            id = currencyId,
-            code = cleanCode,
-            name = cleanName,
-            symbol = cleanSymbol
+        currencyDao.updateCurrency(
+            currency.copy(
+                name = cleanName,
+                code = cleanCode,
+                symbol = cleanSymbol,
+                iconId = iconId ?: currency.iconId,
+                updatedAt = System.currentTimeMillis()
+            )
         )
         return Result.success(Unit)
     }
@@ -181,16 +185,14 @@ class BrexaRepository(private val db: BrexaDatabase) {
         val result = marketRatesManager.fetchLiveRates(context)
         result.onSuccess { items ->
             val allCurrencies = currencyDao.getAllCurrenciesSync()
-            items.find { it.id == "BCV_USD" }?.let { bcvItem ->
-                val vesCurr = allCurrencies.find { it.code.equals("Bs", ignoreCase = true) || it.code.equals("VES", ignoreCase = true) }
-                if (vesCurr != null) {
-                    updateCurrencyRate(vesCurr.id, bcvItem.rate)
-                }
-            }
-            items.find { it.id == "COP_TRM" }?.let { copItem ->
-                val copCurr = allCurrencies.find { it.code.equals("COP", ignoreCase = true) }
-                if (copCurr != null) {
-                    updateCurrencyRate(copCurr.id, copItem.rate)
+            for (curr in allCurrencies) {
+                if (curr.isBase) continue
+                val binding = curr.getOfficialBinding()
+                if (binding != null) {
+                    val rateItem = items.find { it.id == binding }
+                    if (rateItem != null && rateItem.rate > 0.0) {
+                        updateCurrencyRate(curr.id, rateItem.rate)
+                    }
                 }
             }
         }
@@ -202,21 +204,19 @@ class BrexaRepository(private val db: BrexaDatabase) {
         val allCurrencies = currencyDao.getAllCurrenciesSync()
         val updatedList = mutableListOf<String>()
 
-        // 1. Actualizar BCV (Bs / VES) si se obtuvo
+        // 1. Actualizar monedas atadas a BCV
         result.bcvRate?.let { bcvRate ->
-            val vesCurr = allCurrencies.find { it.code.equals("Bs", ignoreCase = true) || it.code.equals("VES", ignoreCase = true) }
-            if (vesCurr != null) {
-                updateCurrencyRate(vesCurr.id, bcvRate)
-                updatedList.add("BCV: ${String.format(java.util.Locale.US, "%.2f", bcvRate)} Bs")
+            allCurrencies.filter { it.getOfficialBinding() == "BCV_USD" }.forEach { curr ->
+                updateCurrencyRate(curr.id, bcvRate)
+                updatedList.add("BCV (${curr.code}): ${String.format(java.util.Locale.US, "%.2f", bcvRate)}")
             }
         }
 
-        // 2. Actualizar TRM (COP) si se obtuvo
+        // 2. Actualizar monedas atadas a TRM
         result.copRate?.let { copRate ->
-            val copCurr = allCurrencies.find { it.code.equals("COP", ignoreCase = true) }
-            if (copCurr != null) {
-                updateCurrencyRate(copCurr.id, copRate)
-                updatedList.add("TRM: ${String.format(java.util.Locale.US, "%.2f", copRate)} $")
+            allCurrencies.filter { it.getOfficialBinding() == "COP_TRM" }.forEach { curr ->
+                updateCurrencyRate(curr.id, copRate)
+                updatedList.add("TRM (${curr.code}): ${String.format(java.util.Locale.US, "%.2f", copRate)}")
             }
         }
 
