@@ -136,6 +136,60 @@ class BrexaViewModel(
         }
     }
 
+    // --- CONSULTA HISTÓRICA DE TASAS ---
+    private val _isHistoricalMode = MutableStateFlow(false)
+    val isHistoricalMode: StateFlow<Boolean> = _isHistoricalMode.asStateFlow()
+
+    private val _historicalDisplayDate = MutableStateFlow<String?>(null)
+    val historicalDisplayDate: StateFlow<String?> = _historicalDisplayDate.asStateFlow()
+
+    private val _historicalRates = MutableStateFlow<List<MarketRateItem>>(emptyList())
+    val historicalRates: StateFlow<List<MarketRateItem>> = _historicalRates.asStateFlow()
+
+    private val _isLoadingHistorical = MutableStateFlow(false)
+    val isLoadingHistorical: StateFlow<Boolean> = _isLoadingHistorical.asStateFlow()
+
+    fun loadHistoricalRates(
+        year: Int,
+        month: Int,
+        day: Int,
+        onSuccess: (() -> Unit)? = null,
+        onError: ((String) -> Unit)? = null
+    ) {
+        if (_isLoadingHistorical.value) return
+        _isLoadingHistorical.value = true
+        viewModelScope.launch {
+            val result = repository.marketRatesManager.fetchHistoricalRates(year, month, day)
+            _isLoadingHistorical.value = false
+            result.onSuccess { (dateStr, list) ->
+                _historicalDisplayDate.value = dateStr
+                _historicalRates.value = list
+                _isHistoricalMode.value = true
+                onSuccess?.invoke()
+            }.onFailure { err ->
+                onError?.invoke(err.message ?: "No se pudieron obtener las tasas históricas.")
+            }
+        }
+    }
+
+    fun clearHistoricalMode() {
+        _isHistoricalMode.value = false
+        _historicalDisplayDate.value = null
+        _historicalRates.value = emptyList()
+    }
+
+    fun getRatesLastSyncTimeAgo(): String {
+        val ctx = try { BrexaApplication.instance } catch (_: Exception) { null }
+        return repository.marketRatesManager.getLastSyncTimeAgo(ctx)
+    }
+
+    fun checkAndAutoRefreshRates() {
+        val ctx = try { BrexaApplication.instance } catch (_: Exception) { null }
+        if (repository.marketRatesManager.shouldAutoRefresh(ctx)) {
+            refreshMarketRates()
+        }
+    }
+
     // --- ESTADO REACTIVO ---
     private val _isSyncingOfficialRates = MutableStateFlow(false)
     val isSyncingOfficialRates: StateFlow<Boolean> = _isSyncingOfficialRates.asStateFlow()

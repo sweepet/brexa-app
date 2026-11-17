@@ -879,7 +879,7 @@ fun HomeScreen(
                                 .width(180.dp)
                                 .height(130.dp),
                             backgroundColor = SurfaceCard,
-                            borderColor = if (account.isDefault) AccentTurquoise else BorderSolid,
+                            borderColor = BorderSolid,
                             borderWidth = 1.dp
                         ) {
                             Column(
@@ -896,7 +896,7 @@ fun HomeScreen(
                                     Icon(
                                         painter = painterResource(id = iconRes),
                                         contentDescription = account.name,
-                                        tint = if (account.isDefault) AccentTurquoise else TextSecondary,
+                                        tint = TextSecondary,
                                         modifier = Modifier.size(20.dp)
                                     )
                                     BrutalistBadge(

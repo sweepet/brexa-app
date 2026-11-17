@@ -22,14 +22,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brexa.app.data.rates.MarketRateItem
 import com.brexa.app.presentation.BrexaViewModel
 import com.brexa.app.ui.components.BrutalistBadge
-import com.brexa.app.ui.components.BrutalistButton
-import com.brexa.app.ui.components.BrutalistCard
 import com.brexa.app.ui.components.CardShape
 import com.brexa.app.ui.theme.*
 import java.text.DecimalFormat
@@ -44,26 +41,32 @@ fun CalculatorScreen(
     modifier: Modifier = Modifier
 ) {
     val rates by viewModel.marketRates.collectAsState()
-    val headerDate by viewModel.ratesHeaderDate.collectAsState()
     val context = LocalContext.current
 
-    // Tasa seleccionada actualmente
-    var selectedRateId by remember(rates, preselectedRateId) {
-        val initialId = preselectedRateId ?: "BCV_USD"
-        mutableStateOf(if (rates.any { it.id == initialId }) initialId else (rates.firstOrNull()?.id ?: "BCV_USD"))
+    // Lista de IDs de tasas activas para conversión simultánea
+    val activeRateIds = remember {
+        mutableStateListOf<String>().apply {
+            val initial = preselectedRateId ?: "BCV_USD"
+            add(initial)
+            if (initial != "USDT") add("USDT") else add("BCV_AVG")
+        }
     }
 
-    val currentRateItem = rates.find { it.id == selectedRateId } ?: rates.firstOrNull()
-    val activeRate = currentRateItem?.rate ?: 914.02
+    // Asegurar que si cambian las tasas o entra un preselectedRateId nuevo, se active
+    LaunchedEffect(preselectedRateId) {
+        if (preselectedRateId != null && !activeRateIds.contains(preselectedRateId)) {
+            activeRateIds.add(0, preselectedRateId)
+        }
+    }
 
-    // Casilla activa para edición: 0 = Moneda Base (USD/EUR/USDT), 1 = Moneda Local (VES/COP)
-    var activeBox by remember { mutableIntStateOf(0) }
+    // Casilla activa: "BASE" para USD o el ID de la tasa respectiva (ej: "BCV_USD", "USDT")
+    var activeBoxId by remember { mutableStateOf("BASE") }
 
-    // Texto tipeado en la casilla activa
+    // Estado del teclado: INICIA EN TRUE para que al tipear un número reemplace el valor por defecto directamente
     var inputStr by remember { mutableStateOf("1") }
     var operand1 by remember { mutableStateOf<Double?>(null) }
     var pendingOperator by remember { mutableStateOf<String?>(null) }
-    var shouldClearOnNextDigit by remember { mutableStateOf(false) }
+    var shouldClearOnNextDigit by remember { mutableStateOf(true) }
 
     val numberFormat = remember {
         val symbols = DecimalFormatSymbols(Locale("es", "VE")).apply {
@@ -73,59 +76,44 @@ fun CalculatorScreen(
         DecimalFormat("#,##0.##", symbols)
     }
 
-    // Monedas de las casillas
-    val baseCurrency = remember(currentRateItem) {
-        when (currentRateItem?.id) {
-            "BCV_EUR" -> "EUR"
-            "USDT" -> "USDT"
-            else -> "USD"
-        }
-    }
-
-    val localCurrency = remember(currentRateItem) {
-        if (currentRateItem?.id == "COP_TRM") "COP" else "VES"
-    }
-
-    // Valor numérico de lo que se tipea en la casilla activa
+    // Valor numérico actualmente escrito
     val activeAmount = remember(inputStr) {
         val sanitized = inputStr.replace(".", "").replace(",", ".")
         sanitized.toDoubleOrNull() ?: 0.0
     }
 
-    // Cálculo dinámico para la otra casilla
-    val calculatedAmount = remember(activeBox, activeAmount, activeRate) {
-        if (activeBox == 0) {
-            // Se está editando Dólares/Euros -> calcular Bolívares/Pesos
-            activeAmount * activeRate
+    // Monto equivalente normalizado en USD (pivote para todas las casillas simultáneas)
+    val normalizedUsdAmount = remember(activeBoxId, activeAmount, rates) {
+        if (activeBoxId == "BASE") {
+            activeAmount
         } else {
-            // Se está editando Bolívares/Pesos -> calcular cuántos Dólares/Euros son
-            if (activeRate > 0.0) activeAmount / activeRate else 0.0
+            val editingRate = rates.find { it.id == activeBoxId }?.rate ?: 1.0
+            if (editingRate > 0.0) activeAmount / editingRate else 0.0
         }
     }
 
-    // Valores a mostrar en cada casilla
-    val box0Display = if (activeBox == 0) inputStr else numberFormat.format(calculatedAmount)
-    val box1Display = if (activeBox == 1) inputStr else numberFormat.format(calculatedAmount)
-
-    // Función para cambiar de casilla activa preservando el valor actual
-    fun switchActiveBox(newBox: Int) {
-        if (activeBox != newBox) {
-            // Al cambiar, inicializamos el input de la nueva casilla con el valor calculado actual
-            val nextVal = calculatedAmount
-            inputStr = if (nextVal > 0.0) {
-                // Formatear limpio para edición sin separador de miles
-                String.format(Locale.US, "%.2f", nextVal).replace(".", ",")
+    // Función para cambiar de casilla activa
+    fun switchActiveBox(newBoxId: String) {
+        if (activeBoxId != newBoxId) {
+            val newAmount = if (newBoxId == "BASE") {
+                normalizedUsdAmount
             } else {
-                if (newBox == 0) "1" else "1000"
+                val targetRate = rates.find { it.id == newBoxId }?.rate ?: 1.0
+                normalizedUsdAmount * targetRate
+            }
+            inputStr = if (newAmount > 0.0) {
+                String.format(Locale.US, "%.2f", newAmount).replace(".", ",")
+            } else {
+                if (newBoxId == "BASE") "1" else "1000"
             }
             operand1 = null
             pendingOperator = null
-            shouldClearOnNextDigit = false
-            activeBox = newBox
+            shouldClearOnNextDigit = true // Reemplaza en la siguiente pulsación
+            activeBoxId = newBoxId
         }
     }
 
-    // Manejador del teclado
+    // Manejo de pulsaciones de dígitos
     fun handleDigit(digit: String) {
         if (shouldClearOnNextDigit) {
             inputStr = digit
@@ -133,10 +121,8 @@ fun CalculatorScreen(
         } else {
             if (inputStr == "0" && digit != ",") {
                 inputStr = digit
-            } else {
-                if (inputStr.length < 14) {
-                    inputStr += digit
-                }
+            } else if (inputStr.length < 14) {
+                inputStr += digit
             }
         }
     }
@@ -196,10 +182,10 @@ fun CalculatorScreen(
     }
 
     fun handleReset() {
-        inputStr = if (activeBox == 0) "1" else "1000"
+        inputStr = if (activeBoxId == "BASE") "1" else "1000"
         operand1 = null
         pendingOperator = null
-        shouldClearOnNextDigit = false
+        shouldClearOnNextDigit = true // Al reiniciar, el siguiente número reemplaza sin tener que borrar
     }
 
     fun copyToClipboard(text: String, label: String) {
@@ -234,15 +220,18 @@ fun CalculatorScreen(
                     letterSpacing = 1.sp
                 )
                 Text(
-                    text = "Conversor bidireccional en tiempo real",
+                    text = "Conversor multidivisa simultáneo",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
             }
 
-            // Alternar casilla activa rápidamente
             IconButton(
-                onClick = { switchActiveBox(if (activeBox == 0) 1 else 0) },
+                onClick = {
+                    // Alternar entre Base USD y la primera tasa activa
+                    val firstRate = activeRateIds.firstOrNull() ?: "BCV_USD"
+                    if (activeBoxId == "BASE") switchActiveBox(firstRate) else switchActiveBox("BASE")
+                },
                 modifier = Modifier
                     .size(42.dp)
                     .background(SurfaceCardElevated, CircleShape)
@@ -250,7 +239,7 @@ fun CalculatorScreen(
                 Icon(
                     imageVector = Icons.Default.SwapVert,
                     contentDescription = "Invertir casilla activa",
-                    tint = AccentGold,
+                    tint = AccentTurquoise,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -258,7 +247,16 @@ fun CalculatorScreen(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // --- SELECTOR DE TASAS RÁPIDO (CHIPS DESLIZABLES) ---
+        // --- SELECTOR DE TASAS SIMULTÁNEAS (CHIPS INTERACTIVOS) ---
+        Text(
+            text = "TASAS ACTIVAS EN PANTALLA",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = TextSecondary,
+            letterSpacing = 0.5.sp
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -266,38 +264,57 @@ fun CalculatorScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             rates.forEach { rateItem ->
-                val isSelected = rateItem.id == selectedRateId
+                val isShown = activeRateIds.contains(rateItem.id)
                 Surface(
-                    color = if (isSelected) AccentGold else SurfaceCard,
+                    color = if (isShown) AccentTurquoise.copy(alpha = 0.15f) else SurfaceCard,
                     shape = RoundedCornerShape(20.dp),
-                    border = BorderStroke(1.dp, if (isSelected) AccentGold else BorderSolid),
-                    modifier = Modifier.clickable { selectedRateId = rateItem.id }
+                    border = BorderStroke(1.dp, if (isShown) AccentTurquoise else BorderSolid),
+                    modifier = Modifier.clickable {
+                        if (isShown) {
+                            if (activeRateIds.size > 1) {
+                                if (activeBoxId == rateItem.id) {
+                                    activeBoxId = "BASE"
+                                }
+                                activeRateIds.remove(rateItem.id)
+                            } else {
+                                Toast.makeText(context, "Debe quedar al menos una tasa activa", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            activeRateIds.add(rateItem.id)
+                        }
+                    }
                 ) {
-                    Text(
-                        text = rateItem.title,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) Color(0xFF0D1117) else TextPrimary,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                    )
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (isShown) "✓  ${rateItem.title}" else "+  ${rateItem.title}",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = if (isShown) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isShown) AccentTurquoise else TextPrimary
+                        )
+                    }
                 }
             }
         }
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // --- CASILLA 1: MONEDA BASE (USD / EUR / USDT) ---
-        val isBox0Active = activeBox == 0
+        // --- CASILLA 0: MONEDA BASE (USD) ---
+        val isBox0Active = activeBoxId == "BASE"
+        val box0Display = if (isBox0Active) inputStr else numberFormat.format(normalizedUsdAmount)
+
         Surface(
             color = if (isBox0Active) SurfaceCardElevated else SurfaceCard,
             shape = CardShape,
             border = BorderStroke(
                 if (isBox0Active) 2.dp else 1.dp,
-                if (isBox0Active) AccentGold else BorderSolid
+                if (isBox0Active) AccentTurquoise else BorderSolid
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { switchActiveBox(0) }
+                .clickable { switchActiveBox("BASE") }
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(
@@ -307,7 +324,7 @@ fun CalculatorScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = baseCurrency,
+                            text = "USD",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Black,
                             color = TextPrimary
@@ -316,12 +333,12 @@ fun CalculatorScreen(
                         if (isBox0Active) {
                             BrutalistBadge(
                                 text = "EDITANDO ✎",
-                                backgroundColor = AccentGold,
-                                contentColor = Color(0xFF0D1117)
+                                backgroundColor = AccentTurquoise,
+                                contentColor = Color(0xFF0E1116)
                             )
                         } else {
                             Text(
-                                text = "Toca para escribir",
+                                text = "Toca para editar",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = TextMuted
                             )
@@ -330,14 +347,14 @@ fun CalculatorScreen(
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = box0Display,
+                            text = "$ $box0Display",
                             style = MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp),
                             fontWeight = FontWeight.Bold,
-                            color = if (isBox0Active) AccentGold else IncomeGreen
+                            color = if (isBox0Active) AccentTurquoise else IncomeGreen
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         IconButton(
-                            onClick = { copyToClipboard(box0Display, baseCurrency) },
+                            onClick = { copyToClipboard(box0Display, "USD") },
                             modifier = Modifier.size(28.dp)
                         ) {
                             Icon(
@@ -352,7 +369,7 @@ fun CalculatorScreen(
 
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "1 $baseCurrency = ${currentRateItem?.currencySymbol ?: "Bs."} ${currentRateItem?.formattedRate ?: ""} $localCurrency",
+                    text = "Dólar estadounidense (moneda base)",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
@@ -361,91 +378,111 @@ fun CalculatorScreen(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // --- CASILLA 2: MONEDA LOCAL (VES / COP) ---
-        val isBox1Active = activeBox == 1
-        Surface(
-            color = if (isBox1Active) SurfaceCardElevated else SurfaceCard,
-            shape = CardShape,
-            border = BorderStroke(
-                if (isBox1Active) 2.dp else 1.dp,
-                if (isBox1Active) AccentGold else BorderSolid
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { switchActiveBox(1) }
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = localCurrency,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Black,
-                            color = TextPrimary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        if (isBox1Active) {
-                            BrutalistBadge(
-                                text = "EDITANDO ✎",
-                                backgroundColor = AccentGold,
-                                contentColor = Color(0xFF0D1117)
-                            )
-                        } else {
-                            Text(
-                                text = "Toca para escribir",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = TextMuted
-                            )
-                        }
-                    }
+        // --- CASILLAS MULTI-TASA SIMULTÁNEAS (BCV, USDT, COP, ETC.) ---
+        activeRateIds.forEach { rateId ->
+            val rateItem = rates.find { it.id == rateId }
+            if (rateItem != null) {
+                val isThisBoxActive = activeBoxId == rateItem.id
+                val calculatedForThisRate = normalizedUsdAmount * rateItem.rate
+                val displayAmount = if (isThisBoxActive) inputStr else numberFormat.format(calculatedForThisRate)
 
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = box1Display,
-                            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp),
-                            fontWeight = FontWeight.Bold,
-                            color = if (isBox1Active) AccentGold else IncomeGreen
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        IconButton(
-                            onClick = { copyToClipboard(box1Display, localCurrency) },
-                            modifier = Modifier.size(28.dp)
+                Surface(
+                    color = if (isThisBoxActive) SurfaceCardElevated else SurfaceCard,
+                    shape = CardShape,
+                    border = BorderStroke(
+                        if (isThisBoxActive) 2.dp else 1.dp,
+                        if (isThisBoxActive) AccentTurquoise else BorderSolid
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 10.dp)
+                        .clickable { switchActiveBox(rateItem.id) }
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = "Copiar",
-                                tint = TextSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
+                                Text(
+                                    text = rateItem.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                if (isThisBoxActive) {
+                                    BrutalistBadge(
+                                        text = "EDITANDO ✎",
+                                        backgroundColor = AccentTurquoise,
+                                        contentColor = Color(0xFF0E1116)
+                                    )
+                                }
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "${rateItem.currencySymbol} $displayAmount",
+                                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 22.sp),
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isThisBoxActive) AccentTurquoise else TextPrimary
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                IconButton(
+                                    onClick = { copyToClipboard(displayAmount, rateItem.title) },
+                                    modifier = Modifier.size(28.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = "Copiar",
+                                        tint = TextSecondary,
+                                        modifier = Modifier.size(17.dp)
+                                    )
+                                }
+                                if (activeRateIds.size > 1) {
+                                    IconButton(
+                                        onClick = {
+                                            if (activeBoxId == rateItem.id) {
+                                                activeBoxId = "BASE"
+                                            }
+                                            activeRateIds.remove(rateItem.id)
+                                        },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Quitar casilla",
+                                            tint = TextMuted,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Tasa: 1 USD = ${rateItem.currencySymbol} ${rateItem.formattedRate} (${rateItem.subtitle})",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
+                            color = TextSecondary
+                        )
                     }
                 }
-
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = if (isBox1Active) {
-                        "Ingresando en $localCurrency ➔ Convierte a $baseCurrency"
-                    } else {
-                        "Equivalente en $localCurrency a tasa de mercado"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = TextSecondary
-                )
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(4.dp))
 
-        // --- BOTÓN ANCHO REINICIAR ---
+        // --- BOTÓN REINICIAR ---
         Button(
             onClick = { handleReset() },
             colors = ButtonDefaults.buttonColors(
-                containerColor = AccentGold,
-                contentColor = Color(0xFF0D1117)
+                containerColor = AccentTurquoise,
+                contentColor = Color(0xFF0E1116)
             ),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier
@@ -514,7 +551,7 @@ fun CalculatorScreen(
                 onClick = { handleOperator("÷") },
                 modifier = Modifier.weight(1f),
                 containerColor = SurfaceCardElevated,
-                contentColor = AccentGold
+                contentColor = AccentTurquoise
             )
         }
 
@@ -533,7 +570,7 @@ fun CalculatorScreen(
                 onClick = { handleOperator("×") },
                 modifier = Modifier.weight(1f),
                 containerColor = SurfaceCardElevated,
-                contentColor = AccentGold
+                contentColor = AccentTurquoise
             )
         }
 
@@ -552,19 +589,19 @@ fun CalculatorScreen(
                 onClick = { handleOperator("-") },
                 modifier = Modifier.weight(1f),
                 containerColor = SurfaceCardElevated,
-                contentColor = AccentGold
+                contentColor = AccentTurquoise
             )
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Fila 4: ,, 0, ⌫, +
+        // Fila 4: 0, ,, ⌫, +
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            KeyButton(text = ",", onClick = { handleComma() }, modifier = Modifier.weight(1f))
             KeyButton(text = "0", onClick = { handleDigit("0") }, modifier = Modifier.weight(1f))
+            KeyButton(text = ",", onClick = { handleComma() }, modifier = Modifier.weight(1f))
             KeyButton(
                 text = "",
                 onClick = { handleBackspace() },
@@ -573,8 +610,8 @@ fun CalculatorScreen(
                     Icon(
                         imageVector = Icons.Default.Backspace,
                         contentDescription = "Borrar",
-                        tint = ExpenseRed,
-                        modifier = Modifier.size(22.dp)
+                        tint = TextSecondary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             )
@@ -583,75 +620,45 @@ fun CalculatorScreen(
                 onClick = { handleOperator("+") },
                 modifier = Modifier.weight(1f),
                 containerColor = SurfaceCardElevated,
-                contentColor = AccentGold
+                contentColor = AccentTurquoise
             )
         }
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Fila 5: =
-        Button(
-            onClick = { handleEquals() },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = SurfaceCardElevated,
-                contentColor = AccentGold
-            ),
-            shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, BorderSolid),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp)
+        // Fila 5: Botón Igual (=)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text(
+            KeyButton(
                 text = "=",
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp),
-                fontWeight = FontWeight.Black
+                onClick = { handleEquals() },
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = SurfaceCardElevated,
+                contentColor = AccentTurquoise
             )
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // --- SUBHEADER FECHA ---
-        Surface(
-            color = SurfaceCardElevated.copy(alpha = 0.5f),
-            shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Schedule,
-                    contentDescription = null,
-                    tint = TextSecondary,
-                    modifier = Modifier.size(15.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = headerDate,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextSecondary
-                )
-            }
-        }
-
         // --- REGISTRAR EN BREXA ---
-        val amountToRegister = if (activeBox == 0) activeAmount else calculatedAmount
+        val amountToRegister = normalizedUsdAmount
+        val activeRateItem = rates.find { it.id == activeBoxId } ?: rates.firstOrNull()
+        val activeRateVal = activeRateItem?.rate ?: 1.0
+
         if (onNavigateToTransactionWithAmount != null && amountToRegister > 0.0) {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             OutlinedButton(
                 onClick = {
-                    onNavigateToTransactionWithAmount(amountToRegister, activeRate, baseCurrency)
+                    onNavigateToTransactionWithAmount(amountToRegister, activeRateVal, "USD")
                 },
                 shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, AccentGold),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = AccentGold),
+                border = BorderStroke(1.dp, AccentTurquoise),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = AccentTurquoise
+                ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(46.dp)
+                    .height(48.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.AddCircleOutline,
@@ -660,13 +667,13 @@ fun CalculatorScreen(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "REGISTRAR OPERACIÓN EN BREXA",
-                    style = MaterialTheme.typography.titleSmall,
+                    text = "REGISTRAR MOVIMIENTO CON ESTE MONTO",
+                    style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(28.dp))
     }
 }

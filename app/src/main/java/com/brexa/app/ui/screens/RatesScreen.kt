@@ -1,5 +1,6 @@
 package com.brexa.app.ui.screens
 
+import android.app.DatePickerDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -30,6 +31,7 @@ import com.brexa.app.presentation.BrexaViewModel
 import com.brexa.app.ui.components.BrutalistBadge
 import com.brexa.app.ui.components.CardShape
 import com.brexa.app.ui.theme.*
+import java.util.Calendar
 import java.util.Locale
 
 @Composable
@@ -38,15 +40,54 @@ fun RatesScreen(
     onNavigateToCalculatorWithRate: (MarketRateItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val rates by viewModel.marketRates.collectAsState()
+    val liveRates by viewModel.marketRates.collectAsState()
     val isRefreshing by viewModel.isRefreshingMarketRates.collectAsState()
     val headerDate by viewModel.ratesHeaderDate.collectAsState()
+
+    val isHistoricalMode by viewModel.isHistoricalMode.collectAsState()
+    val historicalDateStr by viewModel.historicalDisplayDate.collectAsState()
+    val historicalRates by viewModel.historicalRates.collectAsState()
+    val isLoadingHistorical by viewModel.isLoadingHistorical.collectAsState()
+
     val context = LocalContext.current
+
+    // Auto-refresh silencioso si las tasas tienen más de 60 minutos
+    LaunchedEffect(Unit) {
+        viewModel.checkAndAutoRefreshRates()
+    }
+
+    // Configurar DatePickerDialog nativo para consultar días pasados
+    val calendar = remember { Calendar.getInstance() }
+    val datePickerDialog = remember {
+        DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                viewModel.loadHistoricalRates(
+                    year = year,
+                    month = month + 1,
+                    day = dayOfMonth,
+                    onSuccess = {
+                        Toast.makeText(context, "Tasas históricas cargadas", Toast.LENGTH_SHORT).show()
+                    },
+                    onError = { err ->
+                        Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                    }
+                )
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).apply {
+            datePicker.maxDate = System.currentTimeMillis()
+        }
+    }
 
     val rotationAngle by animateFloatAsState(
         targetValue = if (isRefreshing) 360f else 0f,
         label = "refresh_rotation"
     )
+
+    val currentDisplayRates = if (isHistoricalMode) historicalRates else liveRates
 
     Column(
         modifier = modifier
@@ -72,35 +113,62 @@ fun RatesScreen(
                     letterSpacing = 1.sp
                 )
                 Text(
-                    text = "Cotizaciones en tiempo real",
+                    text = if (isHistoricalMode) "Historial consultado" else "Cotizaciones del mercado",
                     style = MaterialTheme.typography.bodySmall,
                     color = TextSecondary
                 )
             }
 
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Botón selector de fecha histórica
+                IconButton(
+                    onClick = { datePickerDialog.show() },
+                    modifier = Modifier
+                        .size(42.dp)
+                        .background(
+                            if (isHistoricalMode) AccentTurquoise.copy(alpha = 0.2f) else SurfaceCardElevated,
+                            CircleShape
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CalendarMonth,
+                        contentDescription = "Consultar fecha pasada",
+                        tint = if (isHistoricalMode) AccentTurquoise else TextPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // Botón refrescar (o volver a hoy si estamos en histórico)
                 IconButton(
                     onClick = {
-                        viewModel.refreshMarketRates(
-                            onSuccess = {
-                                Toast.makeText(context, "Tasas actualizadas", Toast.LENGTH_SHORT).show()
-                            },
-                            onError = { err ->
-                                Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
-                            }
-                        )
+                        if (isHistoricalMode) {
+                            viewModel.clearHistoricalMode()
+                            Toast.makeText(context, "Regresando a tasas de hoy", Toast.LENGTH_SHORT).show()
+                        } else {
+                            viewModel.refreshMarketRates(
+                                onSuccess = {
+                                    Toast.makeText(context, "Tasas actualizadas", Toast.LENGTH_SHORT).show()
+                                },
+                                onError = { err ->
+                                    Toast.makeText(context, err, Toast.LENGTH_SHORT).show()
+                                }
+                            )
+                        }
                     },
                     modifier = Modifier
                         .size(42.dp)
                         .background(SurfaceCardElevated, CircleShape)
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Refresh,
-                        contentDescription = "Actualizar tasas",
-                        tint = AccentGold,
+                        imageVector = if (isHistoricalMode) Icons.Default.Close else Icons.Default.Refresh,
+                        contentDescription = if (isHistoricalMode) "Volver a hoy" else "Actualizar tasas",
+                        tint = AccentTurquoise,
                         modifier = Modifier
                             .size(20.dp)
-                            .rotate(rotationAngle)
+                            .rotate(if (!isHistoricalMode) rotationAngle else 0f)
                     )
                 }
             }
@@ -108,46 +176,159 @@ fun RatesScreen(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        // --- DATE SUBHEADER (ESTILO CAMBIO FÁCIL) ---
-        Surface(
-            color = SurfaceCardElevated.copy(alpha = 0.6f),
-            shape = RoundedCornerShape(10.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Row(
+        // --- SUBHEADER BANNER: FECHA Y FRECUENCIA DE ACTUALIZACIÓN ---
+        if (isHistoricalMode) {
+            // Banner de Consulta Histórica Activa
+            Surface(
+                color = SurfaceCardElevated,
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, AccentTurquoise),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.History,
+                            contentDescription = null,
+                            tint = AccentTurquoise,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "HISTORIAL CONSULTADO",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Black,
+                                color = AccentTurquoise,
+                                letterSpacing = 0.5.sp
+                            )
+                            Text(
+                                text = historicalDateStr ?: "Fecha pasada",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+                    }
+
+                    // Botón para salir del modo histórico
+                    Surface(
+                        color = AccentTurquoise,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.clickable {
+                            viewModel.clearHistoricalMode()
+                            Toast.makeText(context, "Tasas actuales", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Text(
+                            text = "HOY ✕",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Black,
+                            color = Color(0xFF0E1116),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+            }
+        } else {
+            // Banner Normal con fecha actual y selector de fecha
+            Surface(
+                color = SurfaceCardElevated.copy(alpha = 0.7f),
+                shape = RoundedCornerShape(12.dp),
+                border = BorderStroke(1.dp, BorderSolid),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .clickable { datePickerDialog.show() }
             ) {
-                Icon(
-                    imageVector = Icons.Default.Schedule,
-                    contentDescription = null,
-                    tint = TextSecondary,
-                    modifier = Modifier.size(15.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = headerDate.uppercase(Locale.getDefault()),
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    color = TextSecondary,
-                    letterSpacing = 0.5.sp
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Schedule,
+                            contentDescription = null,
+                            tint = AccentTurquoise,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = headerDate.uppercase(Locale.getDefault()),
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextPrimary,
+                                letterSpacing = 0.5.sp
+                            )
+                            Text(
+                                text = "${viewModel.getRatesLastSyncTimeAgo()} • BCV lun-vie ~5:00 PM",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                color = TextSecondary
+                            )
+                        }
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "FECHA",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = AccentTurquoise
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = AccentTurquoise,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(14.dp))
 
         // --- LISTA DE TASAS ---
-        if (rates.isEmpty()) {
+        if (isLoadingHistorical) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                CircularProgressIndicator(color = AccentGold)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = AccentTurquoise, modifier = Modifier.size(36.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Consultando tasas históricas...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary
+                    )
+                }
+            }
+        } else if (currentDisplayRates.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = AccentTurquoise)
             }
         } else {
             LazyColumn(
@@ -157,7 +338,7 @@ fun RatesScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 contentPadding = PaddingValues(bottom = 24.dp)
             ) {
-                items(rates, key = { it.id }) { item ->
+                items(currentDisplayRates, key = { it.id }) { item ->
                     MarketRateCard(
                         item = item,
                         onClick = { onNavigateToCalculatorWithRate(item) },
@@ -171,29 +352,37 @@ fun RatesScreen(
                 }
 
                 item {
-                    // Tarjeta informativa / tip
+                    // Tarjeta informativa con tips de actualización
                     Surface(
-                        color = SurfaceCard.copy(alpha = 0.5f),
+                        color = SurfaceCard.copy(alpha = 0.6f),
                         shape = CardShape,
-                        border = BorderStroke(1.dp, BorderSolid.copy(alpha = 0.6f)),
+                        border = BorderStroke(1.dp, BorderSolid),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Row(
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(14.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Lightbulb,
-                                contentDescription = null,
-                                tint = AccentGold,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = AccentTurquoise,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Dinámica de Actualización",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = "Toca cualquier tasa para abrir la Calculadora multidivisa con ese valor predeterminado.",
-                                style = MaterialTheme.typography.bodySmall,
+                                text = "• BCV (Oficial): Se publica de lunes a viernes entre 4:30 PM y 5:30 PM (válida para el día hábil siguiente).\n• Binance P2P: Se actualiza de forma horaria y continua según el mercado.\n• TRM Colombia: Regulada por Banco de la República en días hábiles.",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp),
                                 color = TextSecondary,
                                 lineHeight = 16.sp
                             )
@@ -226,7 +415,7 @@ private fun MarketRateCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Lado izquierdo: Título y subtítulo
+            // Lado izquierdo: Título y subtítulo limpio
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = item.title,
@@ -270,7 +459,7 @@ private fun MarketRateCard(
                     Text(
                         text = "${if (isPositive) "+" else ""}${String.format(Locale.US, "%.4f", item.changePercent)}%",
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Bold,
                         color = changeColor
                     )
                 }
