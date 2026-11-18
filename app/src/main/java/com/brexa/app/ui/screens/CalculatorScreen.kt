@@ -667,40 +667,6 @@ fun CalculatorScreen(
             )
         }
 
-        // --- REGISTRAR EN BREXA ---
-        val amountToRegister = normalizedUsdAmount
-        val activeRateItem = rates.find { it.id == activeBoxId } ?: rates.firstOrNull()
-        val activeRateVal = activeRateItem?.rate ?: 1.0
-
-        if (onNavigateToTransactionWithAmount != null && amountToRegister > 0.0) {
-            Spacer(modifier = Modifier.height(14.dp))
-            OutlinedButton(
-                onClick = {
-                    onNavigateToTransactionWithAmount(amountToRegister, activeRateVal, "USD")
-                },
-                shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, AccentTurquoise),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = AccentTurquoise
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.AddCircleOutline,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "REGISTRAR MOVIMIENTO CON ESTE MONTO",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
         Spacer(modifier = Modifier.height(28.dp))
     }
 }
