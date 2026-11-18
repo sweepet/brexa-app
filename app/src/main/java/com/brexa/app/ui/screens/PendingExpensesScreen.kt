@@ -1487,13 +1487,13 @@ fun CreateOrEditPendingExpenseDialog(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .background(if (isVar) AccentLime else BackgroundBase, RectangleShape)
-                                .border(1.5.dp, if (isVar) AccentLime else BorderSolid, RectangleShape)
+                                .background(if (isVar) AccentLime else BackgroundBase, RoundedCornerShape(8.dp))
+                                .border(1.5.dp, if (isVar) AccentLime else BorderSolid, RoundedCornerShape(8.dp))
                                 .clickable {
                                     expenseType = "VARIABLE"
                                     dueTimestamp = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, 3) }.timeInMillis
                                 }
-                                .padding(vertical = 8.dp),
+                                .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
@@ -1502,7 +1502,8 @@ fun CreateOrEditPendingExpenseDialog(
                                     color = if (isVar) Color.Black else TextPrimary,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.sp
-                                )
+                                ),
+                                maxLines = 1
                             )
                         }
 
@@ -1510,22 +1511,23 @@ fun CreateOrEditPendingExpenseDialog(
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .background(if (isFix) AccentPurple else BackgroundBase, RectangleShape)
-                                .border(1.5.dp, if (isFix) AccentPurple else BorderSolid, RectangleShape)
+                                .background(if (isFix) AccentPurple else BackgroundBase, RoundedCornerShape(8.dp))
+                                .border(1.5.dp, if (isFix) AccentPurple else BorderSolid, RoundedCornerShape(8.dp))
                                 .clickable {
                                     expenseType = "FIXED"
                                     dueTimestamp = computeFixedDueDate(recurrencePeriod, recurrenceDay, isCurrentMonthPaid)
                                 }
-                                .padding(vertical = 8.dp),
+                                .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "🔄 FIJO (RECURRENTE)",
+                                text = "🔄 FIJO",
                                 style = BrexaTypography.labelMedium.copy(
                                     color = if (isFix) Color.White else TextPrimary,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 11.sp
-                                )
+                                ),
+                                maxLines = 1
                             )
                         }
                     }
@@ -1552,13 +1554,13 @@ fun CreateOrEditPendingExpenseDialog(
                                 Box(
                                     modifier = Modifier
                                         .weight(1f)
-                                        .background(if (isSel) AccentPurple else BackgroundBase, RectangleShape)
-                                        .border(1.5.dp, if (isSel) AccentPurple else BorderSolid, RectangleShape)
+                                        .background(if (isSel) AccentPurple else BackgroundBase, RoundedCornerShape(8.dp))
+                                        .border(1.5.dp, if (isSel) AccentPurple else BorderSolid, RoundedCornerShape(8.dp))
                                         .clickable {
                                             recurrencePeriod = pKey
                                             dueTimestamp = computeFixedDueDate(pKey, recurrenceDay, isCurrentMonthPaid)
                                         }
-                                        .padding(vertical = 7.dp),
+                                        .padding(vertical = 8.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(

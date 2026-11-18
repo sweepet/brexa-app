@@ -26,8 +26,8 @@ android {
         applicationId = "com.brexa.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 56
-        versionName = "1.2.7"
+        versionCode = 57
+        versionName = "1.2.8"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
