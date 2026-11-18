@@ -175,7 +175,7 @@ fun PendingExpensesScreen(
                 item.amount / rate
             } else item.amount
             when (item.recurrencePeriod) {
-                "WEEKLY" -> baseAmt * 4.33
+                "WEEKLY" -> baseAmt * 4.0
                 "BIWEEKLY" -> baseAmt * 2.0
                 else -> baseAmt
             }
