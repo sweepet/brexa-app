@@ -802,14 +802,14 @@ fun PendingExpensesScreen(
                                         .background(if (isFixedItem) AccentPurple else AccentLime, RectangleShape)
                                         .border(1.5.dp, BorderBright, RectangleShape)
                                         .clickable { itemToPay = item }
-                                        .padding(horizontal = 14.dp, vertical = 7.dp)
+                                        .padding(horizontal = 10.dp, vertical = 7.dp)
                                 ) {
                                     Text(
                                         text = if (isFixedItem) "✓ REGISTRAR PAGO ➔" else "✓ PAGAR AHORA ➔",
                                         style = BrexaTypography.labelMedium.copy(
                                             color = if (isFixedItem) Color.White else Color.Black,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 11.sp
+                                            fontSize = 10.5.sp
                                         )
                                     )
                                 }

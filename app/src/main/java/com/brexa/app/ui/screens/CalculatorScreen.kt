@@ -209,7 +209,7 @@ fun CalculatorScreen(
             .padding(horizontal = 16.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         // --- TOP BAR ---
         Row(
@@ -220,14 +220,14 @@ fun CalculatorScreen(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "CALCULADORA",
-                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 22.sp),
+                    style = MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp),
                     fontWeight = FontWeight.Black,
                     color = TextPrimary,
                     letterSpacing = 1.sp
                 )
                 Text(
                     text = "Conversor multidivisa simultáneo",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
                     color = TextSecondary
                 )
             }
@@ -243,7 +243,7 @@ fun CalculatorScreen(
                         if (activeBoxId == "BASE") switchActiveBox(firstRate) else switchActiveBox("BASE")
                     },
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(36.dp)
                         .background(SurfaceCardElevated, CircleShape)
                         .border(1.dp, BorderSolid, CircleShape)
                 ) {
@@ -251,7 +251,7 @@ fun CalculatorScreen(
                         imageVector = Icons.Default.SwapVert,
                         contentDescription = "Invertir casilla activa",
                         tint = AccentTurquoise,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
 
@@ -276,7 +276,7 @@ fun CalculatorScreen(
                         )
                     },
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(36.dp)
                         .background(SurfaceCardElevated, CircleShape)
                         .border(1.dp, BorderSolid, CircleShape)
                 ) {
@@ -284,35 +284,26 @@ fun CalculatorScreen(
                         imageVector = Icons.Default.Share,
                         contentDescription = "Compartir conversión",
                         tint = AccentTurquoise,
-                        modifier = Modifier.size(19.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // --- SELECTOR DE TASAS SIMULTÁNEAS (CHIPS INTERACTIVOS) ---
-        Text(
-            text = "TASAS ACTIVAS EN PANTALLA",
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Bold,
-            color = TextSecondary,
-            letterSpacing = 0.5.sp
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-
+        // --- SELECTOR DE TASAS SIMULTÁNEAS (CHIPS INTERACTIVOS COMPACTOS) ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             rates.forEach { rateItem ->
                 val isShown = activeRateIds.contains(rateItem.id)
                 Surface(
                     color = if (isShown) AccentTurquoise.copy(alpha = 0.15f) else SurfaceCard,
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(16.dp),
                     border = BorderStroke(1.dp, if (isShown) AccentTurquoise else BorderSolid),
                     modifier = Modifier.clickable {
                         if (isShown) {
@@ -330,12 +321,12 @@ fun CalculatorScreen(
                     }
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = if (isShown) "✓  ${rateItem.title}" else "+  ${rateItem.title}",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
                             fontWeight = if (isShown) FontWeight.Bold else FontWeight.Medium,
                             color = if (isShown) AccentTurquoise else TextPrimary
                         )
@@ -344,9 +335,9 @@ fun CalculatorScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-        // --- CASILLA 0: MONEDA BASE (USD) ---
+        // --- CASILLA 0: MONEDA BASE (USD) (DISEÑO ULTRA-COMPACTO) ---
         val isBox0Active = activeBoxId == "BASE"
         val box0Display = if (isBox0Active) inputStr else numberFormat.format(normalizedUsdAmount)
 
@@ -354,40 +345,39 @@ fun CalculatorScreen(
             color = if (isBox0Active) SurfaceCardElevated else SurfaceCard,
             shape = CardShape,
             border = BorderStroke(
-                if (isBox0Active) 2.dp else 1.dp,
+                if (isBox0Active) 1.5.dp else 1.dp,
                 if (isBox0Active) AccentTurquoise else BorderSolid
             ),
             modifier = Modifier
                 .fillMaxWidth()
                 .clickable { switchActiveBox("BASE") }
         ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                // Fila 1: Título limpio de la moneda base
-                Text(
-                    text = "USD",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Black,
-                    color = TextPrimary
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Fila 2: Monto numérico (tocar el monto copia al portapapeles)
+            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "USD",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Black,
+                            color = TextPrimary
+                        )
+                        if (isBox0Active) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(AccentTurquoise, CircleShape)
+                            )
+                        }
+                    }
                     Text(
-                        text = "$",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = TextSecondary
-                    )
-                    Text(
-                        text = box0Display,
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontSize = if (box0Display.length > 10) 20.sp else 24.sp
+                        text = "$ $box0Display",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontSize = if (box0Display.length > 10) 18.sp else 22.sp
                         ),
                         fontWeight = FontWeight.Bold,
                         color = if (isBox0Active) AccentTurquoise else IncomeGreen,
@@ -395,19 +385,16 @@ fun CalculatorScreen(
                         modifier = Modifier.clickable { copyToClipboard(box0Display, "USD") }
                     )
                 }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Fila 3: Subtítulo limpio
+                Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = "Dólar estadounidense (moneda base)",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                     color = TextSecondary
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         // --- CASILLAS DE TASAS (PREDETERMINADA 1 SOLA TASA, OTRAS OPCIONALES) ---
         activeRateIds.forEach { rateId ->
@@ -421,66 +408,63 @@ fun CalculatorScreen(
                     color = if (isThisBoxActive) SurfaceCardElevated else SurfaceCard,
                     shape = CardShape,
                     border = BorderStroke(
-                        if (isThisBoxActive) 2.dp else 1.dp,
+                        if (isThisBoxActive) 1.5.dp else 1.dp,
                         if (isThisBoxActive) AccentTurquoise else BorderSolid
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 10.dp)
+                        .padding(bottom = 6.dp)
                         .clickable { switchActiveBox(rateItem.id) }
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        // Fila 1: Título de la tasa y botón cerrar solo si hay múltiples tasas
+                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = rateItem.title,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-
-                            if (activeRateIds.size > 1) {
-                                IconButton(
-                                    onClick = {
-                                        if (activeBoxId == rateItem.id) {
-                                            activeBoxId = "BASE"
-                                        }
-                                        activeRateIds.remove(rateItem.id)
-                                    },
-                                    modifier = Modifier.size(26.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Close,
-                                        contentDescription = "Quitar casilla",
-                                        tint = TextMuted,
-                                        modifier = Modifier.size(16.dp)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f, fill = false)
+                            ) {
+                                Text(
+                                    text = rateItem.title,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary,
+                                    maxLines = 1
+                                )
+                                if (isThisBoxActive) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .background(AccentTurquoise, CircleShape)
                                     )
                                 }
+                                if (activeRateIds.size > 1) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    IconButton(
+                                        onClick = {
+                                            if (activeBoxId == rateItem.id) {
+                                                activeBoxId = "BASE"
+                                            }
+                                            activeRateIds.remove(rateItem.id)
+                                        },
+                                        modifier = Modifier.size(20.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Quitar casilla",
+                                            tint = TextMuted,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                    }
+                                }
                             }
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-
-                        // Fila 2: Monto numérico (tocar el monto copia al portapapeles)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
                             Text(
-                                text = rateItem.currencySymbol,
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = TextSecondary
-                            )
-                            Text(
-                                text = displayAmount,
-                                style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontSize = if (displayAmount.length > 10) 20.sp else 24.sp
+                                text = "${rateItem.currencySymbol} $displayAmount",
+                                style = MaterialTheme.typography.titleLarge.copy(
+                                    fontSize = if (displayAmount.length > 10) 18.sp else 22.sp
                                 ),
                                 fontWeight = FontWeight.Bold,
                                 color = if (isThisBoxActive) AccentTurquoise else TextPrimary,
@@ -488,13 +472,10 @@ fun CalculatorScreen(
                                 modifier = Modifier.clickable { copyToClipboard(displayAmount, rateItem.title) }
                             )
                         }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // Fila 3: Subtítulo limpio
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "1 USD = ${rateItem.currencySymbol} ${rateItem.formattedRate}",
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
                             color = TextSecondary
                         )
                     }
@@ -502,33 +483,12 @@ fun CalculatorScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
-        // --- BOTÓN REINICIAR ---
-        Button(
-            onClick = { handleReset() },
-            colors = ButtonDefaults.buttonColors(
-                containerColor = AccentTurquoise,
-                contentColor = Color(0xFF0E1116)
-            ),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(46.dp)
-        ) {
-            Text(
-                text = "REINICIAR",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Black,
-                letterSpacing = 1.sp
-            )
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // --- TECLADO NUMÉRICO TÁCTIL PERSONALIZADO ---
-        val buttonHeight = 52.dp
-        val buttonShape = RoundedCornerShape(12.dp)
+        // --- TECLADO NUMÉRICO TÁCTIL PERSONALIZADO (DISTRIBUCIÓN 5 FILAS ULTRA-EFICIENTE) ---
+        val buttonHeight = 44.dp
+        val buttonShape = RoundedCornerShape(10.dp)
+        val rowSpacing = 6.dp
 
         @Composable
         fun KeyButton(
@@ -556,7 +516,7 @@ fun CalculatorScreen(
                     } else {
                         Text(
                             text = text,
-                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp),
+                            style = MaterialTheme.typography.titleMedium.copy(fontSize = 19.sp),
                             fontWeight = FontWeight.Bold,
                             color = contentColor
                         )
@@ -565,14 +525,18 @@ fun CalculatorScreen(
             }
         }
 
-        // Fila 1: 7, 8, 9, ÷
+        // Fila 1: REINICIAR (3 col) + ÷ (1 col)
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(rowSpacing)
         ) {
-            KeyButton(text = "7", onClick = { handleDigit("7") }, modifier = Modifier.weight(1f))
-            KeyButton(text = "8", onClick = { handleDigit("8") }, modifier = Modifier.weight(1f))
-            KeyButton(text = "9", onClick = { handleDigit("9") }, modifier = Modifier.weight(1f))
+            KeyButton(
+                text = "REINICIAR",
+                onClick = { handleReset() },
+                modifier = Modifier.weight(3f),
+                containerColor = AccentTurquoise,
+                contentColor = Color(0xFF0E1116)
+            )
             KeyButton(
                 text = "÷",
                 onClick = { handleOperator("÷") },
@@ -582,16 +546,16 @@ fun CalculatorScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(rowSpacing))
 
-        // Fila 2: 4, 5, 6, ×
+        // Fila 2: 7, 8, 9, ×
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(rowSpacing)
         ) {
-            KeyButton(text = "4", onClick = { handleDigit("4") }, modifier = Modifier.weight(1f))
-            KeyButton(text = "5", onClick = { handleDigit("5") }, modifier = Modifier.weight(1f))
-            KeyButton(text = "6", onClick = { handleDigit("6") }, modifier = Modifier.weight(1f))
+            KeyButton(text = "7", onClick = { handleDigit("7") }, modifier = Modifier.weight(1f))
+            KeyButton(text = "8", onClick = { handleDigit("8") }, modifier = Modifier.weight(1f))
+            KeyButton(text = "9", onClick = { handleDigit("9") }, modifier = Modifier.weight(1f))
             KeyButton(
                 text = "×",
                 onClick = { handleOperator("×") },
@@ -601,18 +565,18 @@ fun CalculatorScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(rowSpacing))
 
-        // Fila 3: 1, 2, 3, -
+        // Fila 3: 4, 5, 6, −
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(rowSpacing)
         ) {
-            KeyButton(text = "1", onClick = { handleDigit("1") }, modifier = Modifier.weight(1f))
-            KeyButton(text = "2", onClick = { handleDigit("2") }, modifier = Modifier.weight(1f))
-            KeyButton(text = "3", onClick = { handleDigit("3") }, modifier = Modifier.weight(1f))
+            KeyButton(text = "4", onClick = { handleDigit("4") }, modifier = Modifier.weight(1f))
+            KeyButton(text = "5", onClick = { handleDigit("5") }, modifier = Modifier.weight(1f))
+            KeyButton(text = "6", onClick = { handleDigit("6") }, modifier = Modifier.weight(1f))
             KeyButton(
-                text = "-",
+                text = "−",
                 onClick = { handleOperator("-") },
                 modifier = Modifier.weight(1f),
                 containerColor = SurfaceCardElevated,
@@ -620,12 +584,31 @@ fun CalculatorScreen(
             )
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(rowSpacing))
 
-        // Fila 4: 0, ,, ⌫, +
+        // Fila 4: 1, 2, 3, +
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(rowSpacing)
+        ) {
+            KeyButton(text = "1", onClick = { handleDigit("1") }, modifier = Modifier.weight(1f))
+            KeyButton(text = "2", onClick = { handleDigit("2") }, modifier = Modifier.weight(1f))
+            KeyButton(text = "3", onClick = { handleDigit("3") }, modifier = Modifier.weight(1f))
+            KeyButton(
+                text = "+",
+                onClick = { handleOperator("+") },
+                modifier = Modifier.weight(1f),
+                containerColor = SurfaceCardElevated,
+                contentColor = AccentTurquoise
+            )
+        }
+
+        Spacer(modifier = Modifier.height(rowSpacing))
+
+        // Fila 5: 0, ,, ⌫, =
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(rowSpacing)
         ) {
             KeyButton(text = "0", onClick = { handleDigit("0") }, modifier = Modifier.weight(1f))
             KeyButton(text = ",", onClick = { handleComma() }, modifier = Modifier.weight(1f))
@@ -638,35 +621,19 @@ fun CalculatorScreen(
                         imageVector = Icons.Default.Backspace,
                         contentDescription = "Borrar",
                         tint = TextSecondary,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             )
             KeyButton(
-                text = "+",
-                onClick = { handleOperator("+") },
+                text = "=",
+                onClick = { handleEquals() },
                 modifier = Modifier.weight(1f),
-                containerColor = SurfaceCardElevated,
-                contentColor = AccentTurquoise
+                containerColor = AccentTurquoise,
+                contentColor = Color(0xFF0E1116)
             )
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-
-        // Fila 5: Botón Igual (=)
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            KeyButton(
-                text = "=",
-                onClick = { handleEquals() },
-                modifier = Modifier.fillMaxWidth(),
-                containerColor = SurfaceCardElevated,
-                contentColor = AccentTurquoise
-            )
-        }
-
-        Spacer(modifier = Modifier.height(28.dp))
     }
 }

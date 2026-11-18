@@ -568,7 +568,7 @@ fun AnalyticsScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(max = 340.dp)
+                                    .heightIn(max = 240.dp)
                             ) {
                                 LazyColumn(
                                     verticalArrangement = Arrangement.spacedBy(8.dp),

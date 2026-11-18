@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -581,7 +582,12 @@ fun AccountsCurrenciesScreen(
                 Text(text = "NUEVA CUENTA", style = BrexaTypography.titleLarge.copy(color = AccentLime))
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     BrutalistTextField(
                         value = accountName,
                         onValueChange = { accountName = it },
@@ -696,7 +702,12 @@ fun AccountsCurrenciesScreen(
                 Text(text = "EDITAR CUENTA", style = BrexaTypography.titleLarge.copy(color = AccentPurple))
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     BrutalistTextField(
                         value = editName,
                         onValueChange = { editName = it },
@@ -862,7 +873,12 @@ fun AccountsCurrenciesScreen(
                 Text(text = "NUEVA MONEDA", style = BrexaTypography.titleLarge.copy(color = AccentTurquoise))
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     Text(
                         text = "VINCULAR A TASA OFICIAL (SE ACTUALIZA SOLA):",
                         style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
@@ -1080,7 +1096,12 @@ fun AccountsCurrenciesScreen(
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     Text(
                         text = "VINCULAR A TASA OFICIAL (SE ACTUALIZA SOLA):",
                         style = BrexaTypography.labelSmall.copy(color = TextSecondary, fontWeight = FontWeight.Bold, fontSize = 11.sp)
@@ -1238,7 +1259,12 @@ fun AccountsCurrenciesScreen(
                 Text(text = "ACTUALIZAR TASA // ${curr.code}", style = BrexaTypography.titleLarge.copy(color = AccentLime))
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     val baseCode = baseCurrency?.code ?: "USD"
                     Text(
                         text = "Introduce cuántas unidades de ${curr.code} equivalen a 1 $baseCode hoy:",
@@ -1340,7 +1366,12 @@ fun AccountsCurrenciesScreen(
                 Text(text = "CONFIGURAR MONEDA BASE", style = BrexaTypography.titleLarge.copy(color = AccentLime))
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     Text(
                         text = "La moneda base es la ancla contable para calcular el patrimonio total consolidado y registrar el valor histórico de todas las operaciones.",
                         style = BrexaTypography.bodyMedium.copy(color = TextSecondary, fontSize = 11.sp)
@@ -1415,7 +1446,12 @@ fun AccountsCurrenciesScreen(
                 Text(text = "AJUSTAR SALDO REAL", style = BrexaTypography.titleLarge.copy(color = AccentLime))
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     Text(
                         text = "Indica el saldo real que tienes en ${acc.name}. Brexa creará un movimiento de conciliación automática:",
                         style = BrexaTypography.bodyMedium.copy(color = TextPrimary)
@@ -1516,7 +1552,12 @@ fun AccountsCurrenciesScreen(
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     // Selector Gasto vs Ingreso
                     Row(
                         modifier = Modifier

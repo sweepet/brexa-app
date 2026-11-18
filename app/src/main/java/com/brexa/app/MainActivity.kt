@@ -435,7 +435,12 @@ class MainActivity : ComponentActivity() {
                                 )
                             },
                             text = {
-                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
                                     Text(
                                         text = "Hay una nueva actualización disponible en GitHub con mejoras y correcciones.",
                                         style = BrexaTypography.bodyMedium.copy(color = TextPrimary)
