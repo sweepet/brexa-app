@@ -103,7 +103,7 @@ object DailyReminderManager {
                 "Avisos de Pagos Pendientes",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Aviso matutino único el día exacto que vence un pago fijo o variable"
+                description = "Aviso matutino el día de vencimiento y 1 día después"
                 enableVibration(true)
             }
             manager.createNotificationChannel(duePaymentsChannel)
@@ -237,8 +237,9 @@ object DailyReminderManager {
     }
 
     /**
-     * Revisa en segundo plano si hay gastos (fijos o variables) que vencen HOY.
+     * Revisa en segundo plano si hay gastos (fijos o variables) que vencen HOY o vencieron AYER (1 día después).
      * Se asegura de notificar MÁXIMO 1 VEZ AL DÍA para evitar spam o molestias al usuario.
+     * Si un pago tiene 2 o más días de vencido, NO se notifica más para evitar molestias.
      */
     fun checkAndNotifyDuePayments(context: Context, isManualTest: Boolean = false) {
         createNotificationChannel(context)
@@ -261,29 +262,33 @@ object DailyReminderManager {
 
                 if (unpaid.isEmpty() && !isManualTest) return@launch
 
-                val calNow = Calendar.getInstance().apply {
+                val calTodayStart = Calendar.getInstance().apply {
                     set(Calendar.HOUR_OF_DAY, 0)
                     set(Calendar.MINUTE, 0)
                     set(Calendar.SECOND, 0)
                     set(Calendar.MILLISECOND, 0)
                 }
-                val calTomorrow = Calendar.getInstance().apply {
-                    timeInMillis = calNow.timeInMillis
+                val calTomorrowStart = Calendar.getInstance().apply {
+                    timeInMillis = calTodayStart.timeInMillis
                     add(Calendar.DAY_OF_YEAR, 1)
                 }
+                val calYesterdayStart = Calendar.getInstance().apply {
+                    timeInMillis = calTodayStart.timeInMillis
+                    add(Calendar.DAY_OF_YEAR, -1)
+                }
 
-                // Filtrar compromisos que vencen exactamente hoy
+                // 1. Filtrar compromisos que vencen exactamente hoy
                 val dueToday = unpaid.filter { item ->
-                    item.dueDateTimestamp >= calNow.timeInMillis && item.dueDateTimestamp < calTomorrow.timeInMillis
+                    item.dueDateTimestamp >= calTodayStart.timeInMillis && item.dueDateTimestamp < calTomorrowStart.timeInMillis
                 }
 
-                // Filtrar compromisos atrasados pendientes
-                val overdue = unpaid.filter { item ->
-                    item.dueDateTimestamp < calNow.timeInMillis
+                // 2. Filtrar compromisos que vencieron exactamente ayer (1 día después)
+                val dueYesterday = unpaid.filter { item ->
+                    item.dueDateTimestamp >= calYesterdayStart.timeInMillis && item.dueDateTimestamp < calTodayStart.timeInMillis
                 }
 
-                if (dueToday.isEmpty() && overdue.isEmpty() && !isManualTest) {
-                    // No hay compromisos para hoy ni atrasados: Cero molestias
+                // Pagos vencidos hace 2 o más días NO se notifican para evitar molestias
+                if (dueToday.isEmpty() && dueYesterday.isEmpty() && !isManualTest) {
                     return@launch
                 }
 
@@ -291,7 +296,12 @@ object DailyReminderManager {
                 val title: String
                 val text: String
 
-                if (dueToday.isNotEmpty()) {
+                if (dueToday.isNotEmpty() && dueYesterday.isNotEmpty()) {
+                    title = "BREXA // RECORDATORIO DE PAGOS 🔔"
+                    val todaySummary = dueToday.take(2).joinToString(", ") { "${it.title} (${decimalFormat.format(it.amount)} ${it.currencyCode})" }
+                    val yesterdaySummary = dueYesterday.take(1).joinToString(", ") { "${it.title} (${decimalFormat.format(it.amount)} ${it.currencyCode})" }
+                    text = "Hoy vence: $todaySummary. Y ayer venció: $yesterdaySummary. Toca para registrar tus pagos."
+                } else if (dueToday.isNotEmpty()) {
                     if (dueToday.size == 1) {
                         val item = dueToday[0]
                         title = "BREXA // PAGO PENDIENTE HOY 🔔"
@@ -306,13 +316,23 @@ object DailyReminderManager {
                         val extra = if (dueToday.size > 2) " y ${dueToday.size - 2} más" else ""
                         text = "Hoy debes pagar: $summary$extra. Toca para revisar y confirmar tus pagos."
                     }
-                } else if (overdue.isNotEmpty()) {
-                    val first = overdue[0]
-                    title = "BREXA // COMPROMISO ATRASADO ⚠️"
-                    text = "Tienes ${overdue.size} pago(s) vencido(s) pendiente(s): \"${first.title}\" (${decimalFormat.format(first.amount)} ${first.currencyCode})."
+                } else if (dueYesterday.isNotEmpty()) {
+                    if (dueYesterday.size == 1) {
+                        val item = dueYesterday[0]
+                        val formattedAmount = decimalFormat.format(item.amount)
+                        title = "BREXA // PAGO VENCIDO AYER ⚠️"
+                        text = "Tu compromiso \"${item.title}\" por $formattedAmount ${item.currencyCode} venció ayer. Toca para registrarlo."
+                    } else {
+                        title = "BREXA // ${dueYesterday.size} PAGOS VENCIDOS AYER ⚠️"
+                        val summary = dueYesterday.take(2).joinToString(", ") {
+                            "${it.title} (${decimalFormat.format(it.amount)} ${it.currencyCode})"
+                        }
+                        val extra = if (dueYesterday.size > 2) " y ${dueYesterday.size - 2} más" else ""
+                        text = "Ayer vencieron: $summary$extra. Toca para registrar tus pagos."
+                    }
                 } else {
                     title = "BREXA // SIN PAGOS PENDIENTES HOY ✓"
-                    text = "Tus compromisos están al día. No tienes gastos fijos ni variables programados para hoy."
+                    text = "Tus compromisos están al día. No tienes gastos fijos ni variables programados para hoy ni de ayer."
                 }
 
                 val openAppIntent = Intent(context, MainActivity::class.java).apply {
