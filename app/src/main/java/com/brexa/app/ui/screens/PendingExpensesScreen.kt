@@ -142,6 +142,7 @@ fun PendingExpensesScreen(
     var showCreateModal by remember { mutableStateOf(false) }
     var itemToEdit by remember { mutableStateOf<PendingExpenseEntity?>(null) }
     var itemToPay by remember { mutableStateOf<PendingExpenseEntity?>(null) }
+    var itemToSkip by remember { mutableStateOf<PendingExpenseEntity?>(null) }
     var itemToDelete by remember { mutableStateOf<PendingExpenseEntity?>(null) }
 
     // Listas separadas
@@ -150,6 +151,18 @@ fun PendingExpensesScreen(
     }
     val fixedExpenses = remember(activePending) {
         activePending.filter { it.expenseType == "FIXED" }
+    }
+
+    val todayStart = remember {
+        Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+    val overdueVariablesCount = remember(variableExpenses, todayStart) {
+        variableExpenses.count { it.dueDateTimestamp < todayStart }
+    }
+    val overdueFixedCount = remember(fixedExpenses, todayStart) {
+        fixedExpenses.count { it.dueDateTimestamp < todayStart }
     }
 
     // Cálculos de montos consolidados
@@ -273,79 +286,87 @@ fun PendingExpensesScreen(
             border = BorderStroke(1.dp, if (hasOverdue) ExpenseRed else BorderSolid),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "ESTADO DE PAGOS",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
+            Column(modifier = Modifier.padding(14.dp)) {
+                // Fila 1: Título a la izquierda, Estado (badge) a la derecha
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "ESTADO DE PAGOS",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+
+                    when {
+                        hasOverdue -> BrutalistBadge(
+                            text = "${projections.overdueCount} VENCIDO${if (projections.overdueCount > 1) "S" else ""}",
+                            backgroundColor = ExpenseRed.copy(alpha = 0.2f),
+                            contentColor = ExpenseRed,
+                            borderColor = ExpenseRed,
+                            fontSize = 11.sp
                         )
-                        when {
-                            hasOverdue -> BrutalistBadge(
-                                text = "${projections.overdueCount} VENCIDO${if (projections.overdueCount > 1) "S" else ""}",
-                                backgroundColor = ExpenseRed.copy(alpha = 0.2f),
-                                contentColor = ExpenseRed,
-                                borderColor = ExpenseRed,
-                                fontSize = 11.5.sp
-                            )
-                            hasDueSoon -> BrutalistBadge(
-                                text = "${projections.count7Days} PRÓXIMOS",
-                                backgroundColor = AccentGold.copy(alpha = 0.2f),
-                                contentColor = AccentGold,
-                                borderColor = AccentGold,
-                                fontSize = 11.5.sp
-                            )
-                            else -> BrutalistBadge(
-                                text = "AL DÍA ✓",
-                                backgroundColor = IncomeGreen.copy(alpha = 0.2f),
-                                contentColor = IncomeGreen,
-                                borderColor = IncomeGreen,
-                                fontSize = 11.5.sp
-                            )
-                        }
+                        hasDueSoon -> BrutalistBadge(
+                            text = "${projections.count7Days} PRÓXIMOS",
+                            backgroundColor = AccentGold.copy(alpha = 0.2f),
+                            contentColor = AccentGold,
+                            borderColor = AccentGold,
+                            fontSize = 11.sp
+                        )
+                        else -> BrutalistBadge(
+                            text = "AL DÍA ✓",
+                            backgroundColor = IncomeGreen.copy(alpha = 0.2f),
+                            contentColor = IncomeGreen,
+                            borderColor = IncomeGreen,
+                            fontSize = 11.sp
+                        )
                     }
-                    Spacer(modifier = Modifier.height(4.dp))
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Fila 2: Subtítulo descriptivo y monto próximo
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     val statusSubtitle = when {
-                        hasOverdue -> "Tienes ${projections.overdueCount} compromiso(s) vencido(s) que requieren registro"
-                        hasDueSoon -> "${projections.count7Days} pago(s) vencen en los próximos 7 días"
-                        else -> "Todos tus compromisos fijos y variables están al día"
+                        hasOverdue -> "Tienes ${projections.overdueCount} compromiso(s) vencido(s)"
+                        hasDueSoon -> "${projections.count7Days} pago(s) vencen pronto"
+                        else -> "Todos tus compromisos están al día"
                     }
                     Text(
                         text = statusSubtitle,
                         style = MaterialTheme.typography.bodySmall,
                         color = TextSecondary,
-                        fontSize = 12.sp
+                        fontSize = 12.sp,
+                        modifier = Modifier.weight(1f, fill = false)
                     )
-                }
 
-                if (projections.total7DaysUsd > 0.0) {
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text(
-                            text = "$baseSymbol ${formatter.format(projections.total7DaysUsd)}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (hasOverdue) ExpenseRed else AccentGold
-                        )
-                        Text(
-                            text = "Próximos 7 días",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = TextMuted,
-                            fontSize = 11.sp
-                        )
+                    if (projections.total7DaysUsd > 0.0) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "$baseSymbol ${formatter.format(projections.total7DaysUsd)}",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = if (hasOverdue) ExpenseRed else AccentGold
+                            )
+                            Text(
+                                text = "(7 días)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = TextMuted,
+                                fontSize = 10.sp
+                            )
+                        }
                     }
                 }
             }
@@ -359,19 +380,20 @@ fun PendingExpensesScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             val isVar = selectedSection == "VARIABLES"
+            val varLabel = if (overdueVariablesCount > 0) "⚡ VARIABLES (${variableExpenses.size}) ⚠️" else "⚡ VARIABLES (${variableExpenses.size})"
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .background(if (isVar) AccentGold else SurfaceCard, RoundedCornerShape(12.dp))
-                    .border(1.dp, if (isVar) AccentGold else BorderSolid, RoundedCornerShape(12.dp))
+                    .border(1.dp, if (isVar) AccentGold else (if (overdueVariablesCount > 0) ExpenseRed else BorderSolid), RoundedCornerShape(12.dp))
                     .clickable { selectedSection = "VARIABLES" }
                     .padding(vertical = 12.dp, horizontal = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "⚡ VARIABLES (${variableExpenses.size})",
+                    text = varLabel,
                     style = BrexaTypography.labelMedium.copy(
-                        color = if (isVar) Color(0xFF0D1117) else TextPrimary,
+                        color = if (isVar) Color(0xFF0D1117) else (if (overdueVariablesCount > 0) ExpenseRed else TextPrimary),
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
                     )
@@ -379,19 +401,20 @@ fun PendingExpensesScreen(
             }
 
             val isFixed = selectedSection == "FIJOS"
+            val fixedLabel = if (overdueFixedCount > 0) "🔄 FIJOS (${fixedExpenses.size}) ⚠️" else "🔄 FIJOS (${fixedExpenses.size})"
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .background(if (isFixed) AccentGold else SurfaceCard, RoundedCornerShape(12.dp))
-                    .border(1.dp, if (isFixed) AccentGold else BorderSolid, RoundedCornerShape(12.dp))
+                    .border(1.dp, if (isFixed) AccentGold else (if (overdueFixedCount > 0) ExpenseRed else BorderSolid), RoundedCornerShape(12.dp))
                     .clickable { selectedSection = "FIJOS" }
                     .padding(vertical = 12.dp, horizontal = 8.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "🔄 FIJOS (${fixedExpenses.size})",
+                    text = fixedLabel,
                     style = BrexaTypography.labelMedium.copy(
-                        color = if (isFixed) Color(0xFF0D1117) else TextPrimary,
+                        color = if (isFixed) Color(0xFF0D1117) else (if (overdueFixedCount > 0) ExpenseRed else TextPrimary),
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
                     )
@@ -409,12 +432,15 @@ fun PendingExpensesScreen(
         ) {
             // --- 3. TARJETA RESUMEN DINÁMICA ---
             item {
+                val isSectionOverdue = if (selectedSection == "VARIABLES") overdueVariablesCount > 0 else overdueFixedCount > 0
+                val sectionColor = if (isSectionOverdue) ExpenseRed else (if (selectedSection == "VARIABLES") AccentLime else AccentPurple)
+
                 BrutalistCard(
                     modifier = Modifier.fillMaxWidth(),
                     backgroundColor = SurfaceCard,
-                    borderColor = if (selectedSection == "VARIABLES") (if (projections.overdueCount > 0) ExpenseRed else AccentLime) else AccentPurple,
+                    borderColor = sectionColor,
                     borderWidth = 2.dp,
-                    shadowColor = if (selectedSection == "VARIABLES") (if (projections.overdueCount > 0) ExpenseRed else AccentLime) else AccentPurple,
+                    shadowColor = sectionColor,
                     shadowOffset = 4.dp
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
@@ -435,9 +461,9 @@ fun PendingExpensesScreen(
                             )
 
                             if (selectedSection == "VARIABLES") {
-                                if (projections.overdueCount > 0) {
+                                if (overdueVariablesCount > 0) {
                                     BrutalistBadge(
-                                        text = "🔴 ${projections.overdueCount} VENCIDO${if (projections.overdueCount > 1) "S" else ""}",
+                                        text = "🔴 $overdueVariablesCount VENCIDO${if (overdueVariablesCount > 1) "S" else ""}",
                                         backgroundColor = ExpenseRed,
                                         contentColor = Color.White,
                                         borderColor = ExpenseRed,
@@ -461,13 +487,23 @@ fun PendingExpensesScreen(
                                     )
                                 }
                             } else {
-                                BrutalistBadge(
-                                    text = "${fixedExpenses.size} PROGRAMADO${if (fixedExpenses.size != 1) "S" else ""}",
-                                    backgroundColor = BackgroundBase,
-                                    contentColor = AccentPurple,
-                                    borderColor = AccentPurple,
-                                    fontSize = 9.sp
-                                )
+                                if (overdueFixedCount > 0) {
+                                    BrutalistBadge(
+                                        text = "🔴 $overdueFixedCount VENCIDO${if (overdueFixedCount > 1) "S" else ""}",
+                                        backgroundColor = ExpenseRed,
+                                        contentColor = Color.White,
+                                        borderColor = ExpenseRed,
+                                        fontSize = 9.sp
+                                    )
+                                } else {
+                                    BrutalistBadge(
+                                        text = "${fixedExpenses.size} PROGRAMADOS",
+                                        backgroundColor = BackgroundBase,
+                                        contentColor = AccentPurple,
+                                        borderColor = AccentPurple,
+                                        fontSize = 9.sp
+                                    )
+                                }
                             }
                         }
 
@@ -792,51 +828,83 @@ fun PendingExpensesScreen(
 
                             Spacer(modifier = Modifier.height(12.dp))
 
-                            // Botones de Acción
+                            // Botones de Acción (Minimalistas, intuitivos y con botón OMITIR directo)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                // 1. Botón Pagar / Registrar Pago
-                                Box(
-                                    modifier = Modifier
-                                        .background(if (isFixedItem) AccentPurple else AccentLime, RectangleShape)
-                                        .border(1.5.dp, BorderBright, RectangleShape)
-                                        .clickable { itemToPay = item }
-                                        .padding(horizontal = 10.dp, vertical = 7.dp)
+                                // Acciones principales a la izquierda: PAGAR y OMITIR
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(
-                                        text = if (isFixedItem) "✓ REGISTRAR PAGO ➔" else "✓ PAGAR AHORA ➔",
-                                        style = BrexaTypography.labelMedium.copy(
-                                            color = if (isFixedItem) Color.White else Color.Black,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 10.5.sp
+                                    Box(
+                                        modifier = Modifier
+                                            .background(if (isFixedItem) AccentPurple else AccentLime, RoundedCornerShape(8.dp))
+                                            .clickable { itemToPay = item }
+                                            .padding(horizontal = 14.dp, vertical = 7.dp)
+                                    ) {
+                                        Text(
+                                            text = "✓ PAGAR",
+                                            style = BrexaTypography.labelMedium.copy(
+                                                color = if (isFixedItem) Color.White else Color.Black,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 11.sp
+                                            )
                                         )
-                                    )
+                                    }
+
+                                    Box(
+                                        modifier = Modifier
+                                            .background(SurfaceCardElevated, RoundedCornerShape(8.dp))
+                                            .border(1.dp, BorderSolid, RoundedCornerShape(8.dp))
+                                            .clickable { itemToSkip = item }
+                                            .padding(horizontal = 10.dp, vertical = 7.dp)
+                                    ) {
+                                        Text(
+                                            text = "OMITIR",
+                                            style = BrexaTypography.labelMedium.copy(
+                                                color = AccentPurple,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 11.sp
+                                            )
+                                        )
+                                    }
                                 }
 
-                                // 2. Botón Editar y Botón Eliminar
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    BrutalistBadge(
-                                        text = "✎ EDITAR",
-                                        backgroundColor = BackgroundBase,
-                                        contentColor = AccentLime,
-                                        borderColor = BorderSolid,
-                                        fontSize = 9.sp,
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 5.dp),
-                                        modifier = Modifier.clickable { itemToEdit = item }
-                                    )
+                                // Acciones secundarias a la derecha: Íconos limpios ✎ y 🗑
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .background(BackgroundBase, RoundedCornerShape(8.dp))
+                                            .border(1.dp, BorderSolid, RoundedCornerShape(8.dp))
+                                            .clickable { itemToEdit = item },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "✎",
+                                            style = BrexaTypography.labelMedium.copy(color = AccentLime, fontSize = 13.sp)
+                                        )
+                                    }
 
-                                    BrutalistBadge(
-                                        text = "🗑 ELIMINAR",
-                                        backgroundColor = BackgroundBase,
-                                        contentColor = ExpenseRed,
-                                        borderColor = BorderSolid,
-                                        fontSize = 9.sp,
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 5.dp),
-                                        modifier = Modifier.clickable { itemToDelete = item }
-                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .background(BackgroundBase, RoundedCornerShape(8.dp))
+                                            .border(1.dp, BorderSolid, RoundedCornerShape(8.dp))
+                                            .clickable { itemToDelete = item },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "🗑",
+                                            style = BrexaTypography.labelMedium.copy(color = ExpenseRed, fontSize = 13.sp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -999,6 +1067,67 @@ fun PendingExpensesScreen(
                     contentColor = TextSecondary,
                     borderColor = BorderSolid,
                     modifier = Modifier.clickable { itemToDelete = null }
+                )
+            }
+        )
+    }
+
+    // --- MODAL: CONFIRMAR OMITIR PAGO / AVANZAR CICLO ---
+    if (itemToSkip != null) {
+        val target = itemToSkip!!
+        val isFixed = target.expenseType == "FIXED"
+        AlertDialog(
+            onDismissRequest = { itemToSkip = null },
+            shape = RoundedCornerShape(14.dp),
+            containerColor = SurfaceCard,
+            title = {
+                Text(
+                    text = "OMITIR PAGO",
+                    style = BrexaTypography.titleLarge.copy(color = AccentPurple, fontWeight = FontWeight.Bold)
+                )
+            },
+            text = {
+                Text(
+                    text = if (isFixed) {
+                        "¿Deseas omitir este pago de '${target.title}' (${formatter.format(target.amount)} ${target.currencyCode})? Avanzará al siguiente ciclo sin registrar gasto ni descontar saldo de tus cuentas."
+                    } else {
+                        "¿Deseas omitir este pago de '${target.title}' (${formatter.format(target.amount)} ${target.currencyCode})? Se marcará como atendido sin registrar gasto ni descontar saldo de tus cuentas."
+                    },
+                    style = BrexaTypography.bodyMedium.copy(color = TextPrimary)
+                )
+            },
+            confirmButton = {
+                BrutalistBadge(
+                    text = "OMITIR PAGO",
+                    backgroundColor = AccentPurple,
+                    contentColor = Color.White,
+                    borderColor = AccentPurple,
+                    modifier = Modifier.clickable {
+                        viewModel.markPendingAsPaidWithoutExpense(
+                            id = target.id,
+                            onSuccess = {
+                                Toast.makeText(
+                                    context,
+                                    if (isFixed) "Pago omitido: ciclo avanzado exitosamente" else "Pago omitido: marcado como completado",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                itemToSkip = null
+                            },
+                            onError = {
+                                Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+                                itemToSkip = null
+                            }
+                        )
+                    }
+                )
+            },
+            dismissButton = {
+                BrutalistBadge(
+                    text = "CANCELAR",
+                    backgroundColor = BackgroundBase,
+                    contentColor = TextSecondary,
+                    borderColor = BorderSolid,
+                    modifier = Modifier.clickable { itemToSkip = null }
                 )
             }
         )
