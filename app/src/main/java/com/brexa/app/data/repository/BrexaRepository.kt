@@ -18,7 +18,7 @@ import java.util.UUID
 
 data class BackupPayload(
     val exportTimestamp: Long = System.currentTimeMillis(),
-    val appVersion: String = "1.3.1",
+    val appVersion: String = "1.3.2",
     val currencies: List<CurrencyEntity> = emptyList(),
     val accounts: List<AccountEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),

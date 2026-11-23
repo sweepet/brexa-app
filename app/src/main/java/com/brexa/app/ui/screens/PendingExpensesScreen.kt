@@ -1,6 +1,7 @@
 package com.brexa.app.ui.screens
 
 import android.app.DatePickerDialog
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -114,6 +115,7 @@ fun PendingExpensesScreen(
 ) {
     BackHandler(onBack = onBack)
 
+    val context = LocalContext.current
     val activePending by viewModel.activePendingExpenses.collectAsState()
     val paidPending by viewModel.paidPendingExpenses.collectAsState()
     val totalPendingUsd by viewModel.totalPendingUsd.collectAsState()
@@ -890,8 +892,16 @@ fun PendingExpensesScreen(
                 )
             },
             onAdvanceWithoutDeduct = {
-                viewModel.markPendingAsPaidWithoutExpense(pending.id)
-                itemToPay = null
+                viewModel.markPendingAsPaidWithoutExpense(
+                    id = pending.id,
+                    onSuccess = {
+                        Toast.makeText(context, "Pago omitido: ciclo actualizado sin descontar saldo", Toast.LENGTH_SHORT).show()
+                        itemToPay = null
+                    },
+                    onError = {
+                        Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+                    }
+                )
             }
         )
     }
@@ -1282,16 +1292,49 @@ fun PayPendingConfirmDialog(
                     )
                 }
 
-                // Opción para avanzar sin descontar saldo
-                Text(
-                    text = "• ¿Pagado por un tercero? Avanzar sin descontar saldo",
-                    style = BrexaTypography.labelSmall.copy(
-                        color = AccentPurple,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp
-                    ),
-                    modifier = Modifier.clickable { onAdvanceWithoutDeduct() }
-                )
+                // Opción para omitir pago y avanzar sin descontar saldo
+                Surface(
+                    color = BackgroundBase,
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, BorderSolid),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onAdvanceWithoutDeduct() }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "OMITIR PAGO",
+                                style = BrexaTypography.labelMedium.copy(
+                                    color = AccentPurple,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.5.sp
+                                )
+                            )
+                            Text(
+                                text = "Avanza sin registrar gasto ni descontar saldo",
+                                style = BrexaTypography.bodySmall.copy(
+                                    color = TextSecondary,
+                                    fontSize = 10.sp
+                                )
+                            )
+                        }
+                        Text(
+                            text = "➔",
+                            style = BrexaTypography.labelMedium.copy(
+                                color = AccentPurple,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp
+                            )
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
